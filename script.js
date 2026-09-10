@@ -12,8 +12,8 @@
 // 0. CONFIGURACIÓN DE SUPABASE
 // ==========================================
 // 🔧 Reemplaza estos valores con los de tu proyecto en https://supabase.com
-const SUPABASE_URL = "TU-PROYECTO.supabase.co";
-const SUPABASE_ANON_KEY = "TU_ANON_KEY_PUBLICA";
+const SUPABASE_URL = "https://vskndeoqkjsxophwwwpe.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZza25kZW9xa2pzeG9waHd3d3BlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODkwNjM0NzQsImV4cCI6MjEwNDYzOTQ3NH0.mto-be3VQFaXf5Gar8VIeV1bORbPNtLsa67SY6Adh-0";
 
 let supabaseClient = null;
 try {
