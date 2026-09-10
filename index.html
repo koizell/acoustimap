@@ -8,13 +8,14 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 
-    <!-- Estilos modulares (el orden importa) -->
+    <!-- Estilos modulares -->
     <link rel="stylesheet" href="css/base.css" />
     <link rel="stylesheet" href="css/layout.css" />
     <link rel="stylesheet" href="css/map.css" />
     <link rel="stylesheet" href="css/panel.css" />
     <link rel="stylesheet" href="css/info.css" />
     <link rel="stylesheet" href="css/responsive.css" />
+    
   </head>
   <body>
     <header>
@@ -29,31 +30,47 @@
     <div id="map-view" class="tab-content active">
       <div id="map"></div>
 
-      <div class="map-mode">
-        <button class="mode-btn active" id="mode-live" onclick="setMapMode('live')">En Vivo</button>
-        <button class="mode-btn" id="mode-history" onclick="setMapMode('history')">Historial</button>
-      </div>
+      <!-- BOTÓN DE LEYENDA (icono ℹ️) -->
+      <button class="legend-toggle" id="legend-toggle" onclick="toggleLegend()" aria-label="Información del mapa">
+        ℹ️
+      </button>
 
-      <div class="map-legend">
-        <div><span class="dot" style="background: #10b981"></span>&lt; 55 dB · Bajo</div>
-        <div><span class="dot" style="background: #f59e0b"></span>55 - 70 dB · Moderado</div>
-        <div><span class="dot" style="background: #ef4444"></span>&gt; 70 dB · Alto</div>
-        <div class="legend-count" id="community-count">Cargando datos…</div>
-        <div class="legend-me">
-          <span class="dot-blue"></span>
-          Tu ubicación (solo tú)
+      <!-- LEYENDA COLAPSABLE -->
+      <div class="map-legend collapsed" id="map-legend">
+        <div class="legend-header">
+          <span>Información</span>
+          <button class="legend-close" onclick="toggleLegend()">✕</button>
+        </div>
+        <div class="legend-body">
+          <div><span class="dot" style="background: #10b981"></span>&lt; 55 dB · Bajo</div>
+          <div><span class="dot" style="background: #f59e0b"></span>55 - 70 dB · Moderado</div>
+          <div><span class="dot" style="background: #ef4444"></span>&gt; 70 dB · Alto</div>
+          <hr class="legend-divider">
+          <div class="legend-count" id="community-count">Cargando datos…</div>
+          <div class="legend-me">
+            <span class="dot-blue"></span>
+            Tu ubicación (solo tú)
+          </div>
         </div>
       </div>
 
-      <div class="sensor-panel collapsed" id="sensor-panel">
-        <button class="panel-handle" id="panel-handle" onclick="togglePanel()" aria-label="Expandir panel">
-          <span class="handle-bar"></span>
-          <span class="handle-label" id="handle-label">Mostrar detalles</span>
+      <!-- BOTONES PRINCIPALES DE ACCIÓN -->
+      <div class="main-actions">
+        <button class="action-btn primary" id="btn-toggle" onclick="toggleMonitoring()">
+          <span class="action-icon">🎤</span>
+          <span class="action-text">Activar Micrófono</span>
         </button>
+        <button class="action-btn secondary" id="btn-share" onclick="openShareModal()">
+          <span class="action-icon">📡</span>
+          <span class="action-text">Compartir en mapa</span>
+        </button>
+      </div>
 
-        <div class="panel-top">
+      <!-- PANEL DE ESTADÍSTICAS -->
+      <div class="stats-panel" id="stats-panel">
+        <div class="stats-header">
           <span class="status-badge" id="status-badge">
-            <span class="pulse-dot" id="pulse-dot" style="display: none"></span>
+            <span class="pulse-dot" id="pulse-dot"></span>
             <span id="status-text">Inactivo</span>
           </span>
           <span class="gps-chip" id="gps-chip">📡 GPS: sin permiso</span>
@@ -83,27 +100,24 @@
             <span>Muestras <b id="sample-count">0</b></span>
           </div>
         </div>
+      </div>
+    </div>
 
-        <button class="btn-action" id="btn-toggle" onclick="toggleMonitoring()">
-          Activar Micrófono
-        </button>
-
-        <div class="panel-details" id="panel-details">
-          <label class="share-row" for="share-toggle">
-            <input type="checkbox" id="share-toggle" onchange="toggleSharing()" />
-            <span class="share-text">
-              <strong>Compartir en el mapa comunitario</strong>
-              <small>
-                Tu ubicación se <b>ancla a una cuadrícula de ~70 m</b> antes de enviarse a la
-                base de datos. Tú verás tu posición exacta en azul; los demás
-                solo verán la zona. Nunca se guarda tu audio.
-              </small>
-            </span>
-          </label>
-
-          <p class="privacy-notice" id="share-status">
-            🔒 Compartir desactivado. Tus mediciones no salen de tu dispositivo.
-          </p>
+    <!-- MODAL DE CONFIRMACIÓN PARA COMPARTIR -->
+    <div class="modal-overlay" id="share-modal">
+      <div class="modal-content">
+        <div class="modal-icon">📍</div>
+        <h2>Compartir ubicación</h2>
+        <p class="modal-text">
+          Tu ubicación se <b>ancla a una cuadrícula de ~70 m</b> antes de enviarse a la base de datos.
+          Tú verás tu posición exacta en azul; los demás solo verán la zona.
+        </p>
+        <div class="modal-note">
+          🔒 <b>Privacidad garantizada:</b> Tu audio nunca se graba ni transmite. Solo se guarda el nivel de ruido.
+        </div>
+        <div class="modal-actions">
+          <button class="modal-btn cancel" onclick="closeShareModal()">Cancelar</button>
+          <button class="modal-btn confirm" id="modal-confirm-share" onclick="confirmSharing()">Aceptar y compartir</button>
         </div>
       </div>
     </div>
