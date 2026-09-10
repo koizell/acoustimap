@@ -3,10 +3,10 @@
  * Monitoreo acústico + mapa comunitario en Supabase.
  *
  * CORRECCIONES APLICADAS:
- *  - ✅ Control de localización (botón para centrar en tu posición).
- *  - ✅ Círculo de precisión alrededor del marcador azul (muestra el margen de error).
- *  - ✅ detectRetina en la capa de tiles para mapas nítidos en móviles de alta densidad.
- *  - ✅ Uso de 100dvh en CSS para mejor adaptación en móviles.
+ *  - ✅ La zona comunitaria se dibuja inmediatamente al enviar una medición.
+ *  - ✅ El filtro de exclusión solo se aplica si el usuario NO está compartiendo.
+ *  - ✅ Círculo de precisión en el marcador azul.
+ *  - ✅ detectRetina para mapas nítidos en móviles.
  */
 
 // ============================================
@@ -32,28 +32,13 @@ try {
 // ============================================
 const map = L.map('map', { zoomControl: false }).setView([8.75, -75.88], 14);
 
-// Controles de zoom
 L.control.zoom({ position: 'topleft' }).addTo(map);
 
-// ✅ Control de localización (botón para centrar)
-L.control.locate({
-  position: 'topleft',
-  setView: 'untilPan', // No fuerza el zoom automáticamente
-  flyTo: true,
-  cacheLocation: true,
-  drawCircle: false, // No usamos el círculo del plugin
-  showPopup: false,
-  locateOptions: {
-    enableHighAccuracy: true,
-    maxZoom: 18
-  }
-}).addTo(map);
-
-// Capa de tiles con detectRetina para nitidez en móviles
+// Capa de tiles con detectRetina para nitidez
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
   attribution: '&copy; OpenStreetMap contributors',
   maxZoom: 19,
-  detectRetina: true // ✅ Mejora la nitidez en pantallas de alta densidad
+  detectRetina: true
 }).addTo(map);
 
 const communityLayer  = L.layerGroup().addTo(map);
@@ -64,12 +49,12 @@ const myLocationLayer = L.layerGroup().addTo(map);
 // ============================================
 const COLOR_BY_CAT = { bajo: '#10b981', moderado: '#f59e0b', alto: '#ef4444' };
 
-const CELL_SIZE_M = 70;
+const CELL_SIZE_M            = 70;
 const CIRCLE_VISUAL_RADIUS_M = 50;
-const SELF_EXCLUSION_M = 100;
-const AGG_GRID = 0.0014;
-const SEND_INTERVAL_MS = 10000;
-const REFRESH_INTERVAL_MS = 30000;
+const SELF_EXCLUSION_M       = 100;
+const AGG_GRID               = 0.0014;
+const SEND_INTERVAL_MS       = 10000;
+const REFRESH_INTERVAL_MS    = 30000;
 
 let mapMode = 'live';
 
@@ -79,11 +64,14 @@ let mapMode = 'live';
 let isMonitoring = false;
 let audioCtx, analyser, microphone, stream;
 let rafId = null;
+
 let session = { sum: 0, count: 0, min: Infinity, max: -Infinity, startTime: 0, timerId: null };
 let lastStatTime = 0;
+
 let sharingEnabled = false;
 let currentPosition = null;
 let geoWatchId = null;
+
 let sendWindowSum = 0;
 let sendWindowCount = 0;
 let lastSendTime = 0;
@@ -112,20 +100,22 @@ function snapToGrid(lat, lng) {
   const latRad = lat * Math.PI / 180;
   const metersPerDegLat = 111000;
   const metersPerDegLng = 111000 * Math.cos(latRad);
+
   const cellLat = CELL_SIZE_M / metersPerDegLat;
   const cellLng = CELL_SIZE_M / metersPerDegLng;
+
   const snappedLat = (Math.floor(lat / cellLat) + 0.5) * cellLat;
   const snappedLng = (Math.floor(lng / cellLng) + 0.5) * cellLng;
+
   return { lat: snappedLat, lng: snappedLng };
 }
 
 // ============================================
-// 7. MI UBICACIÓN EXACTA (con círculo de precisión)
+// 7. MI UBICACIÓN EXACTA
 // ============================================
 function showMyLocation(lat, lng, accuracy) {
   myLocationLayer.clearLayers();
 
-  // Círculo de precisión (margen de error del GPS)
   if (accuracy && accuracy > 0) {
     L.circle([lat, lng], {
       radius: accuracy,
@@ -138,7 +128,6 @@ function showMyLocation(lat, lng, accuracy) {
     }).addTo(myLocationLayer);
   }
 
-  // Halo exterior
   L.circleMarker([lat, lng], {
     radius: 18,
     color: '#2563eb',
@@ -149,7 +138,6 @@ function showMyLocation(lat, lng, accuracy) {
     interactive: false
   }).addTo(myLocationLayer);
 
-  // Punto central exacto
   L.circleMarker([lat, lng], {
     radius: 8,
     color: '#ffffff',
@@ -175,6 +163,7 @@ function hideMyLocation() {
 function addCommunityPoint(lat, lng, db, category, createdAt, sampleCount = 1) {
   const color = COLOR_BY_CAT[category] || COLOR_BY_CAT[classifyDb(db)];
   const when  = createdAt ? timeAgo(createdAt) : 'ahora';
+
   const popupHtml = [
     `<b>${db} dB</b>`,
     `Categoría: <b>${category}</b>`,
@@ -226,16 +215,24 @@ function addCommunityPoint(lat, lng, db, category, createdAt, sampleCount = 1) {
 // ============================================
 function aggregatePoints(rows) {
   const buckets = new Map();
+
   rows.forEach((r) => {
     const key = `${Math.round(r.latitude / AGG_GRID)}_${Math.round(r.longitude / AGG_GRID)}`;
     if (!buckets.has(key)) {
-      buckets.set(key, { lat: r.latitude, lng: r.longitude, sumDb: 0, count: 0, latest: r.created_at });
+      buckets.set(key, {
+        lat: r.latitude,
+        lng: r.longitude,
+        sumDb: 0,
+        count: 0,
+        latest: r.created_at
+      });
     }
     const b = buckets.get(key);
     b.sumDb += r.db_level;
     b.count += 1;
     if (new Date(r.created_at) > new Date(b.latest)) b.latest = r.created_at;
   });
+
   return Array.from(buckets.values()).map((b) => {
     const avg = Math.round(b.sumDb / b.count);
     return {
@@ -254,10 +251,12 @@ function aggregatePoints(rows) {
 // ============================================
 async function loadCommunityPoints() {
   const counter = document.getElementById('community-count');
+
   if (!supabaseClient) {
     counter.innerText = 'Sin datos comunitarios aún';
     return;
   }
+
   try {
     let query = supabaseClient
       .from('noise_measurements')
@@ -282,7 +281,10 @@ async function loadCommunityPoints() {
 
     const aggregated = aggregatePoints(data);
 
-    const toDraw = currentPosition
+    // ✅ FILTRO CORREGIDO:
+    // Solo ocultamos las zonas cercanas si el usuario NO está compartiendo.
+    // Si está compartiendo, queremos que vea su propia zona.
+    const toDraw = (currentPosition && !sharingEnabled)
       ? aggregated.filter((p) => {
           const dLat = (p.lat - currentPosition.lat) * 111000;
           const dLng = (p.lng - currentPosition.lng) * 111000 *
@@ -494,7 +496,7 @@ function updateMeter() {
 }
 
 // ============================================
-// 15. ENVÍO A SUPABASE
+// 15. ENVÍO A SUPABASE (con grid snapping)
 // ============================================
 async function sendMeasurementIfDue() {
   const now = Date.now();
@@ -509,6 +511,9 @@ async function sendMeasurementIfDue() {
 
   const snapped = snapToGrid(currentPosition.lat, currentPosition.lng);
   const category = classifyDb(avg);
+
+  // ✅ DIBUJAR LA ZONA INMEDIATAMENTE EN EL MAPA
+  addCommunityPoint(snapped.lat, snapped.lng, avg, category, new Date().toISOString(), 1);
 
   if (supabaseClient) {
     const { error } = await supabaseClient.from('noise_measurements').insert({
@@ -549,6 +554,7 @@ function toggleSharing() {
         status.innerHTML = '✅ Compartiendo. Los demás ven una zona anclada a ~70 m.';
         lastSendTime = 0;
 
+        // Refrescar zonas para aplicar el nuevo filtro
         loadCommunityPoints();
 
         if (geoWatchId === null) {
@@ -580,6 +586,7 @@ function toggleSharing() {
       navigator.geolocation.clearWatch(geoWatchId);
       geoWatchId = null;
     }
+    // Refrescar zonas para ocultar las cercanas de nuevo
     loadCommunityPoints();
   }
 }
