@@ -1,12 +1,13 @@
 /**
- * AcoustiMap - script.js (versión final corregida)
+ * AcoustiMap - script.js (versión final con timestamps visibles)
  * Monitoreo acústico + mapa comunitario en Supabase.
  *
  * CORRECCIONES APLICADAS:
- *  - ✅ La zona comunitaria se dibuja inmediatamente al enviar una medición.
- *  - ✅ El filtro de exclusión solo se aplica si el usuario NO está compartiendo.
- *  - ✅ Círculo de precisión en el marcador azul.
- *  - ✅ detectRetina para mapas nítidos en móviles.
+ *  - ✅ Tooltip permanente sobre cada zona mostrando "hace Xm/h/d".
+ *  - ✅ Contador de leyenda muestra la última actualización.
+ *  - ✅ Modo En Vivo (últimas 24h) vs Historial (todo).
+ *  - ✅ Dibuja la zona al instante al compartir.
+ *  - ✅ Sin filtro de exclusión (siempre ves tu zona).
  */
 
 // ============================================
@@ -34,7 +35,6 @@ const map = L.map('map', { zoomControl: false }).setView([8.75, -75.88], 14);
 
 L.control.zoom({ position: 'topleft' }).addTo(map);
 
-// Capa de tiles con detectRetina para nitidez
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
   attribution: '&copy; OpenStreetMap contributors',
   maxZoom: 19,
@@ -51,7 +51,6 @@ const COLOR_BY_CAT = { bajo: '#10b981', moderado: '#f59e0b', alto: '#ef4444' };
 
 const CELL_SIZE_M            = 70;
 const CIRCLE_VISUAL_RADIUS_M = 50;
-const SELF_EXCLUSION_M       = 100;
 const AGG_GRID               = 0.0014;
 const SEND_INTERVAL_MS       = 10000;
 const REFRESH_INTERVAL_MS    = 30000;
@@ -85,12 +84,15 @@ function classifyDb(db) {
   return 'alto';
 }
 
+/** Formatea el tiempo relativo: "hace 3m", "hace 2h", "hace 1d". */
 function timeAgo(iso) {
   const diff = (Date.now() - new Date(iso).getTime()) / 1000;
-  if (diff < 60) return 'hace unos segundos';
-  if (diff < 3600) return `hace ${Math.floor(diff / 60)} min`;
-  if (diff < 86400) return `hace ${Math.floor(diff / 3600)} h`;
-  return `hace ${Math.floor(diff / 86400)} d`;
+  if (diff < 5) return 'ahora';
+  if (diff < 60) return `hace ${Math.floor(diff)}s`;
+  if (diff < 3600) return `hace ${Math.floor(diff / 60)}m`;
+  if (diff < 86400) return `hace ${Math.floor(diff / 3600)}h`;
+  if (diff < 2592000) return `hace ${Math.floor(diff / 86400)}d`;
+  return `hace ${Math.floor(diff / 2592000)}mes`;
 }
 
 // ============================================
@@ -158,7 +160,7 @@ function hideMyLocation() {
 }
 
 // ============================================
-// 8. PUNTOS COMUNITARIOS
+// 8. PUNTOS COMUNITARIOS (con tooltip permanente)
 // ============================================
 function addCommunityPoint(lat, lng, db, category, createdAt, sampleCount = 1) {
   const color = COLOR_BY_CAT[category] || COLOR_BY_CAT[classifyDb(db)];
@@ -167,10 +169,11 @@ function addCommunityPoint(lat, lng, db, category, createdAt, sampleCount = 1) {
   const popupHtml = [
     `<b>${db} dB</b>`,
     `Categoría: <b>${category}</b>`,
-    sampleCount > 1 ? `<small>Promedio de ${sampleCount} mediciones</small>` : '',
-    `<small>${when}</small>`
+    `<small>Última medición: ${when}</small>`,
+    sampleCount > 1 ? `<small>${sampleCount} mediciones acumuladas</small>` : ''
   ].filter(Boolean).join('<br>');
 
+  // Halo exterior tenue
   L.circle([lat, lng], {
     color,
     fillColor: color,
@@ -180,6 +183,7 @@ function addCommunityPoint(lat, lng, db, category, createdAt, sampleCount = 1) {
     interactive: false
   }).addTo(communityLayer);
 
+  // Círculo principal
   L.circle([lat, lng], {
     color,
     fillColor: color,
@@ -190,6 +194,7 @@ function addCommunityPoint(lat, lng, db, category, createdAt, sampleCount = 1) {
     interactive: false
   }).addTo(communityLayer);
 
+  // Punto central
   L.circleMarker([lat, lng], {
     radius: 4,
     color: '#ffffff',
@@ -199,6 +204,7 @@ function addCommunityPoint(lat, lng, db, category, createdAt, sampleCount = 1) {
     interactive: false
   }).addTo(communityLayer);
 
+  // ✅ Marcador invisible con TOOLTIP PERMANENTE (muestra el tiempo)
   L.circleMarker([lat, lng], {
     radius: 20,
     color: 'transparent',
@@ -207,11 +213,17 @@ function addCommunityPoint(lat, lng, db, category, createdAt, sampleCount = 1) {
     weight: 0
   })
     .addTo(communityLayer)
+    .bindTooltip(when, {
+      permanent: true,
+      direction: 'top',
+      offset: [0, -30],
+      className: `zone-tooltip tooltip-${category}`
+    })
     .bindPopup(popupHtml);
 }
 
 // ============================================
-// 9. AGREGACIÓN
+// 9. AGREGACIÓN (guarda el timestamp más reciente)
 // ============================================
 function aggregatePoints(rows) {
   const buckets = new Map();
@@ -275,33 +287,24 @@ async function loadCommunityPoints() {
     communityLayer.clearLayers();
 
     if (!data || data.length === 0) {
-      counter.innerText = 'Aún no hay mediciones. ¡Sé el primero!';
+      counter.innerText = mapMode === 'live'
+        ? 'Sin mediciones recientes (<24h)'
+        : 'Aún no hay mediciones en el historial';
       return;
     }
 
     const aggregated = aggregatePoints(data);
 
-    // ✅ FILTRO CORREGIDO:
-    // Solo ocultamos las zonas cercanas si el usuario NO está compartiendo.
-    // Si está compartiendo, queremos que vea su propia zona.
-    const toDraw = (currentPosition && !sharingEnabled)
-      ? aggregated.filter((p) => {
-          const dLat = (p.lat - currentPosition.lat) * 111000;
-          const dLng = (p.lng - currentPosition.lng) * 111000 *
-                       Math.cos(currentPosition.lat * Math.PI / 180);
-          const dist = Math.sqrt(dLat * dLat + dLng * dLng);
-          return dist > SELF_EXCLUSION_M;
-        })
-      : aggregated;
-
-    toDraw.forEach((p) =>
+    aggregated.forEach((p) =>
       addCommunityPoint(p.lat, p.lng, p.db, p.category, p.createdAt, p.sampleCount)
     );
 
-    const hidden = aggregated.length - toDraw.length;
-    counter.innerText = hidden > 0
-      ? `${toDraw.length} zonas · ${data.length} mediciones (${hidden} cerca de ti)`
-      : `${toDraw.length} zonas · ${data.length} mediciones`;
+    const mostRecent = data[0].created_at;
+    const modeLabel = mapMode === 'live' ? 'En Vivo (24h)' : 'Historial (todo)';
+
+    counter.innerText =
+      `${modeLabel} · ${aggregated.length} zonas · ${data.length} mediciones\n` +
+      `Última actualización: ${timeAgo(mostRecent)}`;
 
   } catch (err) {
     console.error('Error cargando mediciones:', err);
@@ -496,7 +499,7 @@ function updateMeter() {
 }
 
 // ============================================
-// 15. ENVÍO A SUPABASE (con grid snapping)
+// 15. ENVÍO A SUPABASE
 // ============================================
 async function sendMeasurementIfDue() {
   const now = Date.now();
@@ -511,9 +514,9 @@ async function sendMeasurementIfDue() {
 
   const snapped = snapToGrid(currentPosition.lat, currentPosition.lng);
   const category = classifyDb(avg);
+  const nowIso = new Date().toISOString();
 
-  // ✅ DIBUJAR LA ZONA INMEDIATAMENTE EN EL MAPA
-  addCommunityPoint(snapped.lat, snapped.lng, avg, category, new Date().toISOString(), 1);
+  addCommunityPoint(snapped.lat, snapped.lng, avg, category, nowIso, 1);
 
   if (supabaseClient) {
     const { error } = await supabaseClient.from('noise_measurements').insert({
@@ -554,7 +557,6 @@ function toggleSharing() {
         status.innerHTML = '✅ Compartiendo. Los demás ven una zona anclada a ~70 m.';
         lastSendTime = 0;
 
-        // Refrescar zonas para aplicar el nuevo filtro
         loadCommunityPoints();
 
         if (geoWatchId === null) {
@@ -586,7 +588,6 @@ function toggleSharing() {
       navigator.geolocation.clearWatch(geoWatchId);
       geoWatchId = null;
     }
-    // Refrescar zonas para ocultar las cercanas de nuevo
     loadCommunityPoints();
   }
 }

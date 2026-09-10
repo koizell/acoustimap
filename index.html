@@ -13,11 +13,6 @@
       rel="stylesheet"
       href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
     />
-    <!-- ✅ Leaflet Locate Control CSS -->
-    <link
-      rel="stylesheet"
-      href="https://cdn.jsdelivr.net/npm/leaflet.locatecontrol@0.84.2/dist/L.Control.Locate.min.css"
-    />
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
@@ -33,6 +28,7 @@
     <div id="map-view" class="tab-content active">
       <div id="map"></div>
 
+      <!-- Toggle En Vivo / Historial -->
       <div class="map-mode">
         <button class="mode-btn active" id="mode-live" onclick="setMapMode('live')">En Vivo</button>
         <button class="mode-btn" id="mode-history" onclick="setMapMode('history')">Historial</button>
@@ -179,18 +175,12 @@
             <strong>Privacidad por diseño:</strong> Las coordenadas se anclan a una
             cuadrícula (~70 m) antes de almacenarse, de modo que el mapa comunitario
             muestra <em>zonas de ruido</em> y nunca la ubicación de una persona.
-            Cada usuario ve su propia posición exacta en azul, solo para sí mismo.
           </li>
         </ul>
       </div>
     </div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <!-- ✅ Leaflet Locate Control JS -->
-    <script
-      src="https://cdn.jsdelivr.net/npm/leaflet.locatecontrol@0.84.2/dist/L.Control.Locate.min.js"
-      charset="utf-8"
-    ></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="script.js"></script>
   </body>
