@@ -1,6 +1,6 @@
 /**
  * app.js
- * Pestañas, panel colapsable, compartir ubicación, GPS chip.
+ * Pestañas, leyenda colapsable, modal de compartir, botones de acción.
  * Depende de: todos los módulos anteriores.
  */
 
@@ -19,36 +19,80 @@ function switchTab(tabId, btn) {
 }
 
 // ============================================
-// COLAPSAR PANEL
+// LEYENDA COLAPSABLE
 // ============================================
-function togglePanel() {
-  const panel = document.getElementById('sensor-panel');
-  const label = document.getElementById('handle-label');
-  panel.classList.toggle('collapsed');
-  label.innerText = panel.classList.contains('collapsed')
-    ? 'Mostrar detalles'
-    : 'Ocultar detalles';
+function toggleLegend() {
+  const legend = document.getElementById('map-legend');
+  legend.classList.toggle('collapsed');
+}
+
+// ============================================
+// MODAL DE CONFIRMACIÓN DE COMPARTIR
+// ============================================
+function openShareModal() {
+  // Si ya está compartiendo, desactivar directamente
+  if (sharingEnabled) {
+    toggleSharing();
+    return;
+  }
+  document.getElementById('share-modal').classList.add('visible');
+}
+
+function closeShareModal() {
+  document.getElementById('share-modal').classList.remove('visible');
+}
+
+function confirmSharing() {
+  closeShareModal();
+  toggleSharing();
+}
+
+// ============================================
+// BOTONES PRINCIPALES
+// ============================================
+function updateActionButtons() {
+  const btnShare = document.getElementById('btn-share');
+
+  if (sharingEnabled) {
+    btnShare.classList.add('active');
+    btnShare.innerHTML = '<span class="action-icon">✅</span><span class="action-text">Compartiendo</span>';
+  } else {
+    btnShare.classList.remove('active');
+    btnShare.innerHTML = '<span class="action-icon">📡</span><span class="action-text">Compartir en mapa</span>';
+  }
+}
+
+// ============================================
+// PANEL DE ESTADÍSTICAS
+// ============================================
+function showStatsPanel() {
+  const panel = document.getElementById('stats-panel');
+  if (panel) panel.classList.add('visible');
+}
+
+function hideStatsPanel() {
+  const panel = document.getElementById('stats-panel');
+  if (panel) panel.classList.remove('visible');
 }
 
 // ============================================
 // COMPARTIR UBICACIÓN
 // ============================================
 function toggleSharing() {
-  const cb     = document.getElementById('share-toggle');
   const status = document.getElementById('share-status');
-  sharingEnabled = cb.checked;
+  sharingEnabled = !sharingEnabled;
 
   if (sharingEnabled) {
     if (!navigator.geolocation) {
-      status.innerText = '❌ Geolocalización no soportada.';
-      cb.checked = false;
+      if (status) status.innerText = '❌ Geolocalización no soportada.';
       sharingEnabled = false;
+      updateActionButtons();
       return;
     }
 
-    status.innerHTML = '⏳ Buscando señal GPS…';
+    if (status) status.innerHTML = '⏳ Buscando señal GPS…';
 
-    // Resetear historial para nueva sesión
+    // Resetear historial de posiciones
     positionHistory = [];
 
     navigator.geolocation.getCurrentPosition(
@@ -56,7 +100,10 @@ function toggleSharing() {
         processNewPosition(pos);
         map.setView([currentPosition.lat, currentPosition.lng], 17);
 
-        updateShareStatus();
+        if (status) {
+          status.innerHTML = '✅ Compartiendo. Los demás ven una zona anclada a ~70 m.';
+        }
+        updateActionButtons();
         lastSendTime = 0;
         loadCommunityPoints();
 
@@ -70,15 +117,17 @@ function toggleSharing() {
       },
       (err) => {
         console.warn(err);
-        status.innerText = '❌ Permiso de ubicación denegado.';
-        cb.checked = false;
+        if (status) status.innerText = '❌ Permiso de ubicación denegado.';
         sharingEnabled = false;
+        updateActionButtons();
         updateGpsChip(false);
       },
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     );
   } else {
-    status.innerHTML = '🔒 Compartir desactivado. Tus mediciones no salen de tu dispositivo.';
+    if (status) {
+      status.innerHTML = '🔒 Compartir desactivado. Tus mediciones no salen de tu dispositivo.';
+    }
     updateGpsChip(false);
     hideMyLocation();
     currentPosition = null;
@@ -86,32 +135,17 @@ function toggleSharing() {
       navigator.geolocation.clearWatch(geoWatchId);
       geoWatchId = null;
     }
+    updateActionButtons();
     loadCommunityPoints();
   }
 }
 
 // ============================================
-// ESTADO DEL COMPARTIR (según precisión)
-// ============================================
-function updateShareStatus() {
-  const status = document.getElementById('share-status');
-  if (!sharingEnabled || !currentPosition) return;
-
-  const acc = Math.round(currentPosition.accuracy);
-  if (acc <= 10) {
-    status.innerHTML = `✅ Compartiendo. Señal excelente (±${acc} m).`;
-  } else if (acc <= 30) {
-    status.innerHTML = `✅ Compartiendo. Señal buena (±${acc} m). Los demás ven una zona anclada a ~70 m.`;
-  } else {
-    status.innerHTML = `⚠️ Compartiendo. Señal regular (±${acc} m). <b>Calibra la brújula moviendo el teléfono en forma de 8.</b>`;
-  }
-}
-
-// ============================================
-// CHIP DE GPS (muestra precisión en metros)
+// CHIP DE GPS
 // ============================================
 function updateGpsChip(active, accuracy) {
   const chip = document.getElementById('gps-chip');
+  if (!chip) return;
 
   if (!active) {
     chip.innerText = '📡 GPS: sin permisos';

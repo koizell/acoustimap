@@ -201,3 +201,12 @@ function setMapMode(mode) {
   if (btn) btn.classList.add('active');
   loadCommunityPoints();
 }
+
+// ============================================
+// AL CAMBIAR SHARING, ACTUALIZAR BOTONES
+// ============================================
+const originalToggleSharing = toggleSharing;
+toggleSharing = function() {
+  originalToggleSharing();
+  updateActionButtons();
+};
