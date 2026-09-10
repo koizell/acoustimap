@@ -1,62 +1,111 @@
 /* ============================================================
    panel.css
-   Panel flotante: sensor, medidor, promedio, botones y compartir.
+   Botones de acción principales, panel de estadísticas,
+   medidor de dB, promedio de sesión y modal de compartir.
    ============================================================ */
 
-.sensor-panel {
+/* ============================================================
+   BOTONES PRINCIPALES DE ACCIÓN
+   ============================================================ */
+.main-actions {
   position: absolute;
-  bottom: 12px;
-  left: 12px;
-  right: 12px;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
   z-index: 999;
-  max-width: 360px;
-  background: var(--card-bg);
-  backdrop-filter: blur(16px);
-  border-radius: 16px;
-  padding: 14px;
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.35);
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  transition: all 0.25s ease;
+  display: flex;
+  gap: 10px;
+  width: calc(100% - 32px);
+  max-width: 400px;
 }
 
-.panel-handle {
-  width: 100%;
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  padding: 4px 0 8px;
+.action-btn {
+  flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 4px;
-}
-
-.handle-bar {
-  width: 40px;
-  height: 4px;
-  background: #cbd5e1;
-  border-radius: 999px;
-  display: block;
-}
-
-.handle-label {
-  font-size: 0.68rem;
+  padding: 12px 8px;
+  border: none;
+  border-radius: 14px;
+  cursor: pointer;
   font-weight: 700;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  font-size: 0.78rem;
+  transition: all 0.2s;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.18);
 }
 
-.sensor-panel.collapsed .panel-details { display: none; }
-.sensor-panel.collapsed .avg-meta      { display: none; }
+.action-btn.primary {
+  background: var(--primary);
+  color: #fff;
+}
 
-/* Fila superior */
-.panel-top {
+.action-btn.primary:hover {
+  background: #1d4ed8;
+}
+
+.action-btn.secondary {
+  background: #fff;
+  color: var(--primary);
+  border: 2px solid var(--primary);
+}
+
+.action-btn.secondary:hover {
+  background: #eff6ff;
+}
+
+.action-btn.active {
+  background: #dc2626 !important;
+  color: #fff !important;
+  border-color: #dc2626 !important;
+}
+
+.action-icon {
+  font-size: 1.4rem;
+}
+
+.action-text {
+  font-size: 0.72rem;
+  line-height: 1.1;
+  text-align: center;
+}
+
+/* ============================================================
+   PANEL DE ESTADÍSTICAS
+   ============================================================ */
+.stats-panel {
+  position: absolute;
+  bottom: 90px;
+  left: 50%;
+  transform: translateX(-50%) translateY(20px);
+  z-index: 998;
+  width: calc(100% - 32px);
+  max-width: 400px;
+  background: var(--card-bg);
+  backdrop-filter: blur(16px);
+  border-radius: 16px;
+  padding: 14px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.22);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  opacity: 0;
+  pointer-events: none;
+  transition: all 0.3s ease;
+}
+
+.stats-panel.visible {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateX(-50%) translateY(0);
+}
+
+/* Cabecera del panel */
+.stats-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
+  margin-bottom: 8px;
 }
 
 .status-badge {
@@ -94,23 +143,25 @@
   white-space: nowrap;
 }
 
-.gps-chip.ok { background: #dcfce7; color: #15803d; }
+.gps-chip.ok     { background: #dcfce7; color: #15803d; }
+.gps-chip.medium { background: #fef3c7; color: #b45309; }
+.gps-chip.poor   { background: #fee2e2; color: #b91c1c; }
 
 /* Medidor en vivo */
 .meter-container {
   text-align: center;
-  margin: 8px 0 10px;
+  margin: 6px 0 8px;
 }
 
 .db-value {
-  font-size: 2.8rem;
+  font-size: 2.6rem;
   font-weight: 800;
   color: var(--text-main);
   line-height: 1;
 }
 
 .db-label {
-  font-size: 0.78rem;
+  font-size: 0.75rem;
   color: var(--text-muted);
   font-weight: 600;
   text-transform: uppercase;
@@ -123,7 +174,7 @@
   background: #e2e8f0;
   border-radius: 5px;
   overflow: hidden;
-  margin-top: 10px;
+  margin-top: 8px;
 }
 
 .db-bar-fill {
@@ -135,7 +186,7 @@
 
 /* Promedio de sesión */
 .avg-block {
-  margin: 10px 0 6px;
+  margin-top: 8px;
   padding: 10px 12px;
   border-radius: 12px;
   background: linear-gradient(135deg, #f1f5f9, #e2e8f0);
@@ -160,7 +211,7 @@
 }
 
 .avg-value {
-  font-size: 1.9rem;
+  font-size: 1.7rem;
   font-weight: 800;
   color: var(--text-main);
   line-height: 1;
@@ -196,82 +247,103 @@
 
 .avg-meta b { color: var(--text-main); }
 
-/* Botón principal */
-.btn-action {
+/* ============================================================
+   MODAL DE CONFIRMACIÓN DE COMPARTIR
+   ============================================================ */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  background: rgba(15, 23, 42, 0.7);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s;
+  padding: 20px;
+}
+
+.modal-overlay.visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.modal-content {
+  background: #fff;
+  border-radius: 20px;
+  padding: 24px;
+  max-width: 380px;
   width: 100%;
+  text-align: center;
+  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.4);
+  transform: scale(0.9);
+  transition: transform 0.25s;
+}
+
+.modal-overlay.visible .modal-content {
+  transform: scale(1);
+}
+
+.modal-icon {
+  font-size: 2.5rem;
+  margin-bottom: 8px;
+}
+
+.modal-content h2 {
+  font-size: 1.2rem;
+  margin-bottom: 10px;
+  color: #0f172a;
+}
+
+.modal-text {
+  font-size: 0.85rem;
+  line-height: 1.5;
+  color: #475569;
+  margin-bottom: 12px;
+}
+
+.modal-note {
+  font-size: 0.75rem;
+  background: #f0fdf4;
+  color: #166534;
+  padding: 10px;
+  border-radius: 10px;
+  margin-bottom: 16px;
+  line-height: 1.4;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.modal-btn {
+  flex: 1;
   padding: 11px;
   border: none;
   border-radius: 10px;
+  font-weight: 700;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.modal-btn.cancel {
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.modal-btn.cancel:hover {
+  background: #e2e8f0;
+}
+
+.modal-btn.confirm {
   background: var(--primary);
   color: #fff;
-  font-weight: 700;
-  cursor: pointer;
-  font-size: 0.9rem;
-  margin-top: 8px;
-  box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.4);
-  transition: background 0.2s;
 }
 
-.btn-action:hover { background: #1d4ed8; }
-
-/* Compartir ubicación */
-.panel-details { display: block; }
-
-.share-row {
-  display: flex;
-  gap: 10px;
-  align-items: flex-start;
-  margin-top: 10px;
-  padding: 10px;
-  border-radius: 10px;
-  background: #f8fafc;
-  border: 1px dashed #cbd5e1;
-  cursor: pointer;
-  transition: background 0.2s;
-}
-
-.share-row:hover { background: #f1f5f9; }
-
-.share-row input {
-  margin-top: 3px;
-  accent-color: var(--primary);
-  transform: scale(1.15);
-  cursor: pointer;
-}
-
-.share-text {
-  font-size: 0.76rem;
-  color: var(--text-main);
-  line-height: 1.3;
-}
-
-.share-text small {
-  display: block;
-  color: var(--text-muted);
-  margin-top: 3px;
-  font-size: 0.68rem;
-  font-weight: 500;
-}
-
-.share-text b { color: #15803d; }
-
-.privacy-notice {
-  font-size: 0.7rem;
-  color: var(--text-muted);
-  text-align: center;
-  margin-top: 8px;
-}
-
-/* ============================================================
-   ESTADOS DEL CHIP GPS POR CALIDAD DE SEÑAL
-   ============================================================ */
-
-.gps-chip.medium {
-  background: #fef3c7;
-  color: #b45309;
-}
-
-.gps-chip.poor {
-  background: #fee2e2;
-  color: #b91c1c;
+.modal-btn.confirm:hover {
+  background: #1d4ed8;
 }

@@ -1,32 +1,40 @@
 /* ============================================================
    responsive.css
-   Media queries. SIEMPRE al final.
+   Media queries para adaptar el layout a móvil y escritorio.
+   SIEMPRE debe ser el último archivo en cargar.
    ============================================================ */
 
 /* ============================================================
    ESCRITORIO (≥ 720px)
    ============================================================ */
 @media (min-width: 720px) {
-  .sensor-panel {
-    width: 360px;
-    left: 20px;
-    bottom: 20px;
-    right: auto;
-    max-height: calc(100dvh - var(--header-h) - 40px);
-    overflow-y: auto;
-  }
-
-  .panel-handle {
-    display: none;
-  }
-
-  .sensor-panel.collapsed .panel-details,
-  .sensor-panel.collapsed .avg-meta {
-    display: block;
-  }
-
+  /* Mapa */
   .leaflet-top.leaflet-left {
     top: calc(var(--header-h) + 10px) !important;
+  }
+
+  /* Botones de acción: en horizontal en escritorio */
+  .main-actions {
+    bottom: 24px;
+    max-width: 480px;
+  }
+
+  .action-btn {
+    flex-direction: row;
+    justify-content: center;
+    gap: 8px;
+    padding: 14px 16px;
+    font-size: 0.85rem;
+  }
+
+  .action-icon {
+    font-size: 1.2rem;
+  }
+
+  /* Panel de estadísticas más alto */
+  .stats-panel {
+    bottom: 100px;
+    max-width: 480px;
   }
 }
 
@@ -38,6 +46,7 @@
     --header-h: 56px;
   }
 
+  /* Header compacto */
   header {
     padding: 8px 12px;
   }
@@ -51,49 +60,51 @@
     font-size: 0.72rem;
   }
 
-  /* Panel como bottom sheet */
-  .sensor-panel {
-    left: 8px;
-    right: 8px;
-    bottom: 8px;
-    padding: 10px 12px 12px;
-    border-radius: 18px;
-    max-height: 55dvh;
-    overflow-y: auto;
-    padding-bottom: calc(12px + env(safe-area-inset-bottom));
+  /* Botones de acción pegados abajo */
+  .main-actions {
+    bottom: 12px;
+    max-width: 100%;
   }
 
-  .db-value  { font-size: 2.4rem; }
-  .avg-value { font-size: 1.6rem; }
-  .meter-container { margin: 4px 0 8px; }
+  .action-btn {
+    padding: 10px 6px;
+    font-size: 0.72rem;
+  }
 
-  .map-mode {
+  .action-icon {
+    font-size: 1.3rem;
+  }
+
+  /* Panel de estadísticas */
+  .stats-panel {
+    bottom: 80px;
+  }
+
+  .db-value {
+    font-size: 2.2rem;
+  }
+
+  .avg-value {
+    font-size: 1.5rem;
+  }
+
+  /* Leyenda pegada al icono ℹ️ */
+  .map-legend {
+    top: calc(var(--header-h) + 8px);
+    right: 60px;
+    min-width: 200px;
+    max-width: 220px;
+  }
+
+  .legend-toggle {
     top: calc(var(--header-h) + 8px);
     right: 8px;
-    padding: 2px;
+    width: 36px;
+    height: 36px;
+    font-size: 18px;
   }
 
-  .mode-btn {
-    padding: 4px 8px;
-    font-size: 0.66rem;
-  }
-
-  /* Leyenda bajada para no chocar con el toggle */
-  .map-legend {
-    top: calc(var(--header-h) + 42px);
-    right: 8px;
-    padding: 6px 8px;
-    font-size: 0.66rem;
-    min-width: 140px;
-    max-width: 160px;
-  }
-
-  /* Controles de Leaflet accesibles */
-  .leaflet-top.leaflet-left {
-    top: calc(var(--header-h) + 8px) !important;
-    left: 8px !important;
-  }
-
+  /* Controles de zoom de Leaflet accesibles */
   .leaflet-control-zoom a {
     width: 30px !important;
     height: 30px !important;
@@ -106,8 +117,8 @@
    MÓVIL MUY PEQUEÑO (≤ 400px)
    ============================================================ */
 @media (max-width: 400px) {
-  .brand  { font-size: 0.85rem; }
-  .tab-btn { padding: 5px 6px; font-size: 0.68rem; }
-  .db-value { font-size: 2.1rem; }
-  .map-legend { font-size: 0.62rem; min-width: 130px; }
+  .brand      { font-size: 0.85rem; }
+  .tab-btn    { padding: 5px 6px; font-size: 0.68rem; }
+  .db-value   { font-size: 2rem; }
+  .map-legend { min-width: 180px; max-width: 200px; }
 }

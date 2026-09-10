@@ -3,7 +3,9 @@
    Header, navegación entre pestañas y contenedores principales.
    ============================================================ */
 
-/* Header */
+/* ============================================================
+   HEADER
+   ============================================================ */
 header {
   position: absolute;
   top: 0;
@@ -61,8 +63,6 @@ header {
 
 /* ============================================================
    CONTENEDORES DE PESTAÑAS
-   El contenedor activo tiene una altura fija = viewport.
-   El padding-top deja espacio para el header.
    ============================================================ */
 .tab-content {
   display: none;

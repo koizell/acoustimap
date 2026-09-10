@@ -1,6 +1,6 @@
 /* ============================================================
    base.css
-   Reset, variables globales y estilos del body.
+   Reset, variables globales, tipografía y animaciones base.
    ============================================================ */
 
 :root {
@@ -29,6 +29,9 @@ body {
   height: 100dvh;
 }
 
+/* ============================================================
+   ANIMACIONES GLOBALES
+   ============================================================ */
 @keyframes pulse {
   0%   { opacity: 1; }
   50%  { opacity: 0.3; }

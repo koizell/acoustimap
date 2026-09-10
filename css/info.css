@@ -1,6 +1,6 @@
 /* ============================================================
    info.css
-   Pestañas de Salud y ODS.
+   Pestañas informativas de Salud y ODS.
    ============================================================ */
 
 #info-view {
@@ -10,12 +10,25 @@
   color: var(--text-main);
 }
 
-.info-wrapper { max-width: 900px; margin: 0 auto; }
+.info-wrapper {
+  max-width: 900px;
+  margin: 0 auto;
+}
 
-.info-header { text-align: center; margin-bottom: 30px; }
+.info-header {
+  text-align: center;
+  margin-bottom: 30px;
+}
 
-.info-header h1 { font-size: 2rem; color: #0f172a; margin-bottom: 8px; }
+.info-header h1 {
+  font-size: 2rem;
+  color: #0f172a;
+  margin-bottom: 8px;
+}
 
+/* ============================================================
+   GRID DE TARJETAS
+   ============================================================ */
 .cards-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
@@ -42,6 +55,9 @@
   margin-bottom: 10px;
 }
 
+/* ============================================================
+   BADGES DE CATEGORÍA
+   ============================================================ */
 .badge {
   font-weight: 700;
   font-size: 0.8rem;
