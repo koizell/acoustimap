@@ -1,0 +1,42 @@
+/* ============================================================
+   base.css
+   Reset, variables globales y estilos del body.
+   ============================================================ */
+
+:root {
+  --primary: #2563eb;
+  --bg-dark: #0f172a;
+  --card-bg: rgba(255, 255, 255, 0.96);
+  --green: #10b981;
+  --yellow: #f59e0b;
+  --red: #ef4444;
+  --text-main: #1e293b;
+  --text-muted: #64748b;
+  --header-h: 60px;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  font-family: 'Inter', sans-serif;
+}
+
+body {
+  background-color: var(--bg-dark);
+  color: var(--text-main);
+  overflow: hidden;
+  height: 100dvh;
+}
+
+@keyframes pulse {
+  0%   { opacity: 1; }
+  50%  { opacity: 0.3; }
+  100% { opacity: 1; }
+}
+
+@keyframes pulse-locate {
+  0%   { opacity: 1; }
+  50%  { opacity: 0.4; }
+  100% { opacity: 1; }
+}

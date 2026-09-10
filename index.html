@@ -5,15 +5,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>AcoustiMap - Mapeo de Contaminación Acústica</title>
 
-    <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap"
-      rel="stylesheet"
-    />
-    <link
-      rel="stylesheet"
-      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-    />
-    <link rel="stylesheet" href="styles.css" />
+    <!-- Fuentes y Leaflet -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+    <!-- Estilos modulares (el orden importa) -->
+    <link rel="stylesheet" href="css/base.css" />
+    <link rel="stylesheet" href="css/layout.css" />
+    <link rel="stylesheet" href="css/map.css" />
+    <link rel="stylesheet" href="css/panel.css" />
+    <link rel="stylesheet" href="css/info.css" />
+    <link rel="stylesheet" href="css/responsive.css" />
   </head>
   <body>
     <header>
@@ -28,7 +30,6 @@
     <div id="map-view" class="tab-content active">
       <div id="map"></div>
 
-      <!-- Toggle En Vivo / Historial -->
       <div class="map-mode">
         <button class="mode-btn active" id="mode-live" onclick="setMapMode('live')">En Vivo</button>
         <button class="mode-btn" id="mode-history" onclick="setMapMode('history')">Historial</button>
@@ -114,41 +115,23 @@
           <h1>Escala de Contaminación Acústica</h1>
           <p>Conoce cómo impacta el nivel de decibelios (dB) en tu salud diaria.</p>
         </div>
-
         <div class="cards-grid">
           <div class="info-card bajo">
-            <div class="card-header">
-              <span class="badge green">🟢 Bajo</span>
-              <strong>&lt; 55 dB</strong>
-            </div>
+            <div class="card-header"><span class="badge green">🟢 Bajo</span><strong>&lt; 55 dB</strong></div>
             <h3>🌿 Entorno Confortable</h3>
-            <p style="font-size: 0.88rem; margin: 10px 0; color: #475569">
-              Entorno óptimo para el descanso, el estudio y el bienestar psicológico.
-            </p>
+            <p style="font-size:0.88rem;margin:10px 0;color:#475569">Entorno óptimo para el descanso, el estudio y el bienestar psicológico.</p>
             <small>📍 Ejemplos: Bibliotecas, parques, residencial silencioso.</small>
           </div>
-
           <div class="info-card moderado">
-            <div class="card-header">
-              <span class="badge yellow">🟡 Moderado</span>
-              <strong>55 - 70 dB</strong>
-            </div>
+            <div class="card-header"><span class="badge yellow">🟡 Moderado</span><strong>55 - 70 dB</strong></div>
             <h3>🗣️ Ligeramente Molesto</h3>
-            <p style="font-size: 0.88rem; margin: 10px 0; color: #475569">
-              Puede provocar irritabilidad, dificultad de concentración y estrés leve a largo plazo.
-            </p>
+            <p style="font-size:0.88rem;margin:10px 0;color:#475569">Puede provocar irritabilidad, dificultad de concentración y estrés leve a largo plazo.</p>
             <small>📍 Ejemplos: Tráfico fluido, oficinas, conversaciones elevadas.</small>
           </div>
-
           <div class="info-card alto">
-            <div class="card-header">
-              <span class="badge red">🔴 Alto</span>
-              <strong>&gt; 70 dB</strong>
-            </div>
+            <div class="card-header"><span class="badge red">🔴 Alto</span><strong>&gt; 70 dB</strong></div>
             <h3>🚨 Dañino / Crítico</h3>
-            <p style="font-size: 0.88rem; margin: 10px 0; color: #475569">
-              Riesgo de hipertensión, migrañas, estrés agudo y pérdida auditiva (&gt;85 dB).
-            </p>
+            <p style="font-size:0.88rem;margin:10px 0;color:#475569">Riesgo de hipertensión, migrañas, estrés agudo y pérdida auditiva (&gt;85 dB).</p>
             <small>📍 Ejemplos: Tráfico pesado, sirenas, construcciones, claxon.</small>
           </div>
         </div>
@@ -157,31 +140,23 @@
 
     <div id="ods-view" class="tab-content" style="background: #f8fafc; padding: 80px 20px">
       <div class="info-wrapper">
-        <h1 style="text-align: center; margin-bottom: 20px">Contribución a los ODS</h1>
-        <p style="line-height: 1.6; color: #334155">
-          <strong>AcoustiMap</strong> utiliza tecnología participativa para avanzar en la Agenda 2030:
-        </p>
-        <ul style="margin: 20px 0 0 20px; line-height: 1.8; color: #334155">
-          <li>
-            <strong>ODS 3 (Salud y Bienestar):</strong> Previene enfermedades
-            cardiovasculares y auditivas mediante el mapeo de zonas de riesgo sonoro.
-          </li>
-          <li>
-            <strong>ODS 11 (Ciudades y Comunidades Sostenibles):</strong>
-            Permite la recolección de datos ciudadanos para promover una mejor
-            planificación urbana y control de tráfico.
-          </li>
-          <li>
-            <strong>Privacidad por diseño:</strong> Las coordenadas se anclan a una
-            cuadrícula (~70 m) antes de almacenarse, de modo que el mapa comunitario
-            muestra <em>zonas de ruido</em> y nunca la ubicación de una persona.
-          </li>
+        <h1 style="text-align:center;margin-bottom:20px">Contribución a los ODS</h1>
+        <p style="line-height:1.6;color:#334155"><strong>AcoustiMap</strong> utiliza tecnología participativa para avanzar en la Agenda 2030:</p>
+        <ul style="margin:20px 0 0 20px;line-height:1.8;color:#334155">
+          <li><strong>ODS 3 (Salud y Bienestar):</strong> Previene enfermedades cardiovasculares y auditivas mediante el mapeo de zonas de riesgo sonoro.</li>
+          <li><strong>ODS 11 (Ciudades y Comunidades Sostenibles):</strong> Permite la recolección de datos ciudadanos para promover una mejor planificación urbana y control de tráfico.</li>
+          <li><strong>Privacidad por diseño:</strong> Las coordenadas se anclan a una cuadrícula (~70 m) antes de almacenarse.</li>
         </ul>
       </div>
     </div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="script.js"></script>
+
+    <script src="js/config.js"></script>
+    <script src="js/map.js"></script>
+    <script src="js/audio.js"></script>
+    <script src="js/community.js"></script>
+    <script src="js/app.js"></script>
   </body>
 </html>

@@ -1,0 +1,112 @@
+/* ============================================================
+   responsive.css
+   Media queries. SIEMPRE al final para sobreescribir lo anterior.
+   ============================================================ */
+
+/* ============================================================
+   ESCRITORIO (≥ 720px)
+   ============================================================ */
+@media (min-width: 720px) {
+  .sensor-panel {
+    width: 360px;
+    left: 20px;
+    bottom: 20px;
+    right: auto;
+    max-height: calc(100dvh - var(--header-h) - 40px);
+    overflow-y: auto;
+  }
+
+  .panel-handle {
+    display: none;
+  }
+
+  .sensor-panel.collapsed .panel-details,
+  .sensor-panel.collapsed .avg-meta {
+    display: block;
+  }
+
+  .leaflet-top.leaflet-left {
+    top: calc(var(--header-h) + 10px) !important;
+  }
+}
+
+/* ============================================================
+   MÓVIL (≤ 719px)
+   ============================================================ */
+@media (max-width: 719px) {
+  :root {
+    --header-h: 56px;
+  }
+
+  header {
+    padding: 8px 12px;
+  }
+
+  .brand {
+    font-size: 0.95rem;
+  }
+
+  .tab-btn {
+    padding: 6px 8px;
+    font-size: 0.72rem;
+  }
+
+  /* Panel como bottom sheet */
+  .sensor-panel {
+    left: 8px;
+    right: 8px;
+    bottom: 8px;
+    padding: 10px 12px 12px;
+    border-radius: 18px;
+    max-height: 55dvh;
+    overflow-y: auto;
+  }
+
+  .db-value  { font-size: 2.4rem; }
+  .avg-value { font-size: 1.6rem; }
+  .meter-container { margin: 4px 0 8px; }
+
+  .map-mode {
+    top: calc(var(--header-h) + 8px);
+    right: 8px;
+    padding: 2px;
+  }
+
+  .mode-btn {
+    padding: 4px 8px;
+    font-size: 0.66rem;
+  }
+
+  /* Leyenda bajada para no chocar con el toggle */
+  .map-legend {
+    top: calc(var(--header-h) + 42px);
+    right: 8px;
+    padding: 6px 8px;
+    font-size: 0.66rem;
+    min-width: 140px;
+    max-width: 160px;
+  }
+
+  /* Controles de Leaflet accesibles */
+  .leaflet-top.leaflet-left {
+    top: calc(var(--header-h) + 8px) !important;
+    left: 8px !important;
+  }
+
+  .leaflet-control-zoom a {
+    width: 30px !important;
+    height: 30px !important;
+    line-height: 30px !important;
+    font-size: 16px !important;
+  }
+}
+
+/* ============================================================
+   MÓVIL MUY PEQUEÑO (≤ 400px)
+   ============================================================ */
+@media (max-width: 400px) {
+  .brand  { font-size: 0.85rem; }
+  .tab-btn { padding: 5px 6px; font-size: 0.68rem; }
+  .db-value { font-size: 2.1rem; }
+  .map-legend { font-size: 0.62rem; min-width: 130px; }
+}

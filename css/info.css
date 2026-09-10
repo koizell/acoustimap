@@ -1,0 +1,64 @@
+/* ============================================================
+   info.css
+   Pestañas de Salud y ODS (contenido informativo).
+   ============================================================ */
+
+#info-view {
+  background: #f8fafc;
+  overflow-y: auto;
+  padding: 80px 20px 40px;
+  color: var(--text-main);
+}
+
+.info-wrapper {
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.info-header {
+  text-align: center;
+  margin-bottom: 30px;
+}
+
+.info-header h1 {
+  font-size: 2rem;
+  color: #0f172a;
+  margin-bottom: 8px;
+}
+
+.cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 20px;
+  margin-bottom: 30px;
+}
+
+.info-card {
+  background: #fff;
+  border-radius: 14px;
+  padding: 20px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+  border-top: 5px solid #ccc;
+}
+
+.info-card.bajo     { border-color: var(--green); }
+.info-card.moderado { border-color: var(--yellow); }
+.info-card.alto     { border-color: var(--red); }
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.badge {
+  font-weight: 700;
+  font-size: 0.8rem;
+  padding: 4px 8px;
+  border-radius: 6px;
+}
+
+.badge.green  { background: #dcfce7; color: #15803d; }
+.badge.yellow { background: #fef3c7; color: #b45309; }
+.badge.red    { background: #fee2e2; color: #b91c1c; }
