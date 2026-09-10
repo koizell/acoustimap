@@ -280,3 +280,14 @@
   text-align: center;
   margin-top: 8px;
 }
+
+/* Estados del chip GPS según precisión */
+.gps-chip.medium {
+  background: #fef3c7;
+  color: #b45309;
+}
+
+.gps-chip.poor {
+  background: #fee2e2;
+  color: #b91c1c;
+}

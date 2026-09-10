@@ -1,7 +1,7 @@
 /**
  * map.js
- * Mapa Leaflet, capas, marcador personal y botón "centrar en mí".
- * Depende de: config.js, Leaflet.
+ * Mapa Leaflet, capas, marcador personal, botón "centrar en mí" y filtro Kalman.
+ * Depende de: config.js, kalman.js.
  */
 
 // ============================================
@@ -21,7 +21,7 @@ const communityLayer  = L.layerGroup().addTo(map);
 const myLocationLayer = L.layerGroup().addTo(map);
 
 // ============================================
-// BOTÓN "CENTRAR EN MÍ" (nativo de Leaflet)
+// BOTÓN "CENTRAR EN MÍ"
 // ============================================
 const LocateControl = L.Control.extend({
   options: { position: 'topleft' },
@@ -43,12 +43,12 @@ const LocateControl = L.Control.extend({
 map.addControl(new LocateControl());
 
 // ============================================
-// MOSTRAR MI UBICACIÓN EXACTA
+// MOSTRAR MI UBICACIÓN (con precisión)
 // ============================================
 function showMyLocation(lat, lng, accuracy) {
   myLocationLayer.clearLayers();
 
-  // Círculo de precisión (margen de error del GPS)
+  // Círculo de precisión (margen de error real del GPS)
   if (accuracy && accuracy > 0) {
     L.circle([lat, lng], {
       radius: accuracy,
@@ -93,6 +93,36 @@ function hideMyLocation() {
 }
 
 // ============================================
+// PROCESAR NUEVA POSICIÓN (con filtro Kalman)
+// ============================================
+/**
+ * Recibe una posición cruda del GPS, la pasa por el filtro Kalman
+ * y actualiza el marcador. También actualiza el chip de GPS.
+ */
+function processNewPosition(pos) {
+  const { latitude, longitude, accuracy } = pos.coords;
+  const now = pos.timestamp || Date.now();
+
+  // Filtro Kalman
+  gpsFilter.process(latitude, longitude, accuracy, now);
+
+  const filteredLat = gpsFilter.getLat();
+  const filteredLng = gpsFilter.getLng();
+  const filteredAcc = gpsFilter.getAccuracy();
+
+  // Actualizar estado global
+  currentPosition = {
+    lat: filteredLat,
+    lng: filteredLng,
+    accuracy: filteredAcc
+  };
+
+  // Actualizar marcador y chip
+  showMyLocation(filteredLat, filteredLng, filteredAcc);
+  updateGpsChip(true, filteredAcc);
+}
+
+// ============================================
 // CENTRAR EN EL USUARIO
 // ============================================
 function centerOnUser() {
@@ -108,28 +138,18 @@ function centerOnUser() {
     return;
   }
 
-  // Pedir posición por primera vez
+  // Resetear el filtro antes de una nueva sesión
+  gpsFilter.reset();
+
   navigator.geolocation.getCurrentPosition(
     (pos) => {
-      currentPosition = {
-        lat: pos.coords.latitude,
-        lng: pos.coords.longitude,
-        accuracy: pos.coords.accuracy
-      };
-      showMyLocation(currentPosition.lat, currentPosition.lng, currentPosition.accuracy);
+      processNewPosition(pos);
       map.setView([currentPosition.lat, currentPosition.lng], 16);
 
       // Activar watch si no está activo
       if (geoWatchId === null) {
         geoWatchId = navigator.geolocation.watchPosition(
-          (p) => {
-            currentPosition = {
-              lat: p.coords.latitude,
-              lng: p.coords.longitude,
-              accuracy: p.coords.accuracy
-            };
-            showMyLocation(currentPosition.lat, currentPosition.lng, currentPosition.accuracy);
-          },
+          processNewPosition,
           (err) => console.warn('watchPosition:', err),
           { enableHighAccuracy: true, maximumAge: 0, timeout: 20000 }
         );
