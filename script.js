@@ -13,7 +13,8 @@
 // ==========================================
 // 🔧 Reemplaza estos valores con los de tu proyecto en https://supabase.com
 const SUPABASE_URL = "https://vskndeoqkjsxophwwwpe.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZza25kZW9xa2pzeG9waHd3d3BlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODkwNjM0NzQsImV4cCI6MjEwNDYzOTQ3NH0.mto-be3VQFaXf5Gar8VIeV1bORbPNtLsa67SY6Adh-0";
+const SUPABASE_ANON_KEY =
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZza25kZW9xa2pzeG9waHd3d3BlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODkwNjM0NzQsImV4cCI6MjEwNDYzOTQ3NH0.mto-be3VQFaXf5Gar8VIeV1bORbPNtLsa67SY6Adh-0";
 
 let supabaseClient = null;
 try {
@@ -35,35 +36,38 @@ try {
 // ==========================================
 // 1. MAPA
 // ==========================================
-const map = L.map('map', {
-  zoomControl: false // lo añadimos después en otra posición
+const map = L.map("map", {
+  zoomControl: false, // lo añadimos después en otra posición
 }).setView([8.75, -75.88], 14);
 
 // Zoom control arriba a la izquierda (el CSS lo empuja debajo del header)
-L.control.zoom({ position: 'topleft' }).addTo(map);
+L.control.zoom({ position: "topleft" }).addTo(map);
 
 // Control personalizado para centrar en la ubicación del usuario
 const LocateControl = L.Control.extend({
   options: {
-    position: 'topleft'
+    position: "topleft",
   },
   onAdd: function (map) {
-    const container = L.DomUtil.create('div', 'leaflet-bar leaflet-control leaflet-control-locate');
-    const btn = L.DomUtil.create('a', '', container);
-    btn.innerHTML = '📍';
-    btn.href = '#';
-    btn.title = 'Centrarse en mi ubicación';
-    btn.setAttribute('role', 'button');
-    btn.setAttribute('aria-label', 'Centrarse en mi ubicación');
+    const container = L.DomUtil.create(
+      "div",
+      "leaflet-bar leaflet-control leaflet-control-locate",
+    );
+    const btn = L.DomUtil.create("a", "", container);
+    btn.innerHTML = "📍";
+    btn.href = "#";
+    btn.title = "Centrarse en mi ubicación";
+    btn.setAttribute("role", "button");
+    btn.setAttribute("aria-label", "Centrarse en mi ubicación");
 
-    L.DomEvent.on(btn, 'click', function (e) {
+    L.DomEvent.on(btn, "click", function (e) {
       L.DomEvent.stopPropagation(e);
       L.DomEvent.preventDefault(e);
       centerOnUser();
     });
 
     return container;
-  }
+  },
 });
 map.addControl(new LocateControl());
 
@@ -75,29 +79,28 @@ function centerOnUser() {
       (pos) => {
         currentPosition = {
           lat: pos.coords.latitude,
-          lng: pos.coords.longitude
+          lng: pos.coords.longitude,
         };
         map.setView([currentPosition.lat, currentPosition.lng], 16);
         updateGpsChip(true);
       },
       (err) => {
         console.warn(err);
-        alert("No se pudo obtener tu ubicación actual. Asegúrate de permitir el acceso al GPS.");
+        alert(
+          "No se pudo obtener tu ubicación actual. Asegúrate de permitir el acceso al GPS.",
+        );
       },
-      { enableHighAccuracy: false, timeout: 10000 }
+      { enableHighAccuracy: false, timeout: 10000 },
     );
   } else {
     alert("Geolocalización no soportada por el navegador.");
   }
 }
 
-L.tileLayer(
-  "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
-  {
-    attribution: "&copy; OpenStreetMap &copy; CARTO",
-    maxZoom: 19,
-  },
-).addTo(map);
+L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+  attribution: "&copy; OpenStreetMap contributors",
+  maxZoom: 19,
+}).addTo(map);
 
 // Capa de puntos comunitarios
 const communityLayer = L.layerGroup().addTo(map);
@@ -129,16 +132,16 @@ function timeAgo(iso) {
  */
 function addCommunityPoint(lat, lng, db, category, createdAt, sampleCount = 1) {
   const color = COLOR_BY_CAT[category] || colorForDb(db);
-  const when = createdAt ? timeAgo(createdAt) : 'ahora';
+  const when = createdAt ? timeAgo(createdAt) : "ahora";
 
   // Punto central sutil (marca el centro del área difuminada)
   L.circleMarker([lat, lng], {
     radius: 3,
-    color: '#ffffff',
+    color: "#ffffff",
     weight: 2,
     fillColor: color,
     fillOpacity: 1,
-    interactive: false
+    interactive: false,
   }).addTo(communityLayer);
 
   // Círculo de "zona" pequeño y translúcido
@@ -148,14 +151,14 @@ function addCommunityPoint(lat, lng, db, category, createdAt, sampleCount = 1) {
     fillOpacity: 0.25,
     weight: 1.5,
     radius: 40, // ~40 m visuales en el mapa
-    opacity: 0.8
+    opacity: 0.8,
   })
     .addTo(communityLayer)
     .bindPopup(
       `<b>${db} dB</b><br>
        Categoría: <b>${category}</b><br>
-       ${sampleCount > 1 ? `<small>Promedio de ${sampleCount} mediciones</small><br>` : ''}
-       <small>${when}</small>`
+       ${sampleCount > 1 ? `<small>Promedio de ${sampleCount} mediciones</small><br>` : ""}
+       <small>${when}</small>`,
     );
 }
 
@@ -174,7 +177,7 @@ function aggregatePoints(rows) {
         lng: r.longitude,
         sumDb: 0,
         count: 0,
-        latest: r.created_at
+        latest: r.created_at,
       });
     }
     const b = buckets.get(key);
@@ -189,27 +192,26 @@ function aggregatePoints(rows) {
     db: Math.round(b.sumDb / b.count),
     category: classifyDb(Math.round(b.sumDb / b.count)),
     createdAt: b.latest,
-    sampleCount: b.count
+    sampleCount: b.count,
   }));
 }
-
 
 /**
  * Carga las últimas mediciones comunitarias desde Supabase.
  */
 async function loadCommunityPoints() {
-  const counter = document.getElementById('community-count');
+  const counter = document.getElementById("community-count");
 
   if (!supabaseClient) {
-    counter.innerText = 'Sin datos comunitarios aún';
+    counter.innerText = "Sin datos comunitarios aún";
     return;
   }
 
   try {
     const { data, error } = await supabaseClient
-      .from('noise_measurements')
-      .select('latitude, longitude, db_level, category, created_at')
-      .order('created_at', { ascending: false })
+      .from("noise_measurements")
+      .select("latitude, longitude, db_level, category, created_at")
+      .order("created_at", { ascending: false })
       .limit(500);
 
     if (error) throw error;
@@ -217,19 +219,26 @@ async function loadCommunityPoints() {
     communityLayer.clearLayers();
 
     if (!data || data.length === 0) {
-      counter.innerText = 'Aún no hay mediciones. ¡Sé el primero!';
+      counter.innerText = "Aún no hay mediciones. ¡Sé el primero!";
       return;
     }
 
     const aggregated = aggregatePoints(data);
     aggregated.forEach((p) =>
-      addCommunityPoint(p.lat, p.lng, p.db, p.category, p.createdAt, p.sampleCount)
+      addCommunityPoint(
+        p.lat,
+        p.lng,
+        p.db,
+        p.category,
+        p.createdAt,
+        p.sampleCount,
+      ),
     );
 
     counter.innerText = `${aggregated.length} zonas · ${data.length} mediciones`;
   } catch (err) {
-    console.error('Error cargando mediciones:', err);
-    counter.innerText = 'Error al cargar datos';
+    console.error("Error cargando mediciones:", err);
+    counter.innerText = "Error al cargar datos";
   }
 }
 
