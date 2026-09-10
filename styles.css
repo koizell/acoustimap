@@ -21,7 +21,7 @@ body {
   background-color: var(--bg-dark);
   color: var(--text-main);
   overflow: hidden;
-  height: 100vh;
+  height: 100dvh; /* ✅ Mejor que 100vh en móviles */
 }
 
 header {
@@ -81,7 +81,7 @@ header {
 
 .tab-content {
   display: none;
-  height: 100vh;
+  height: 100dvh;
   width: 100vw;
   padding-top: var(--header-h);
 }
@@ -512,7 +512,7 @@ header {
     left: 20px;
     bottom: 20px;
     right: auto;
-    max-height: calc(100vh - var(--header-h) - 40px);
+    max-height: calc(100dvh - var(--header-h) - 40px);
     overflow-y: auto;
   }
 
@@ -539,7 +539,7 @@ header {
     bottom: 8px;
     padding: 10px 12px 12px;
     border-radius: 18px;
-    max-height: 55vh;
+    max-height: 55dvh;
     overflow-y: auto;
   }
 
