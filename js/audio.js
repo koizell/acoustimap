@@ -1,6 +1,6 @@
 /**
  * audio.js
- * Captura de micrófono, cálculo de dB y promedio de sesión.
+ * Captura de micrófono, cálculo de dB, promedio de sesión y guardado de resumen.
  * Depende de: config.js. Llama a sendMeasurementIfDue() (community.js).
  */
 
@@ -51,7 +51,12 @@ async function toggleMonitoring() {
     document.getElementById('db-number').innerText = '--';
     document.getElementById('db-bar').style.width = '0%';
     document.getElementById('db-status-text').innerText = 'Presiona Iniciar';
+
+    // ✅ Guardar resumen ANTES de detener la sesión
+    await saveSessionSummary();
+
     stopSession();
+
     // ✅ Liberar Wake Lock al detener
     releaseWakeLock();
   }
@@ -119,6 +124,52 @@ function updateAvgUI() {
   minEl.innerText = session.min;
   maxEl.innerText = session.max;
   cntEl.innerText = session.count;
+}
+
+// ============================================
+// GUARDAR RESUMEN DE SESIÓN EN SUPABASE
+// ============================================
+/**
+ * Se llama al detener el monitoreo. Guarda un resumen de la sesión
+ * completa en la tabla `noise_sessions` (si existe y hay datos).
+ *
+ * Privacidad: usa las mismas coordenadas ancladas a cuadrícula que
+ * las mediciones individuales. Nunca guarda la ubicación exacta.
+ */
+async function saveSessionSummary() {
+  // Validaciones mínimas
+  if (!supabaseClient) return;
+  if (session.count === 0) return;       // No hubo mediciones
+  if (!sharingEnabled) return;           // El usuario no compartió
+  if (!currentPosition) return;          // Sin ubicación
+
+  const avg = Math.round(session.sum / session.count);
+  const category = classifyDb(avg);
+  const snapped = snapToGrid(currentPosition.lat, currentPosition.lng);
+
+  const sessionData = {
+    latitude:    snapped.lat,
+    longitude:   snapped.lng,
+    avg_db:      avg,
+    category:    category,
+    sample_count: session.count,
+    start_time:  new Date(session.startTime).toISOString(),
+    end_time:    new Date().toISOString()
+  };
+
+  try {
+    const { error } = await supabaseClient
+      .from('noise_sessions')
+      .insert(sessionData);
+
+    if (error) {
+      console.warn('No se pudo guardar el resumen de sesión:', error.message);
+    } else {
+      console.log('✅ Resumen de sesión guardado:', sessionData);
+    }
+  } catch (err) {
+    console.warn('Error al guardar resumen de sesión:', err);
+  }
 }
 
 // ============================================
