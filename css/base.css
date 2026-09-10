@@ -26,9 +26,6 @@ body {
   background-color: var(--bg-dark);
   color: var(--text-main);
   overflow: hidden;
-  /* Fallback para navegadores antiguos */
-  height: 100vh;
-  /* Altura dinámica del viewport (evita que la barra de direcciones móvil oculte contenido) */
   height: 100dvh;
 }
 

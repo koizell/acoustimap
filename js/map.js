@@ -13,10 +13,16 @@
 // ============================================
 // MAPA Y CAPAS
 // ============================================
-const map = L.map('map', { zoomControl: false }).setView([8.75, -75.88], 14);
+const map = L.map('map', {
+  zoomControl: false,
+  zoomSnap: 0.25,
+  zoomDelta: 0.25,
+  wheelPxPerZoomLevel: 120
+}).setView([8.75, -75.88], 14);
 
 L.control.zoom({ position: 'topleft' }).addTo(map);
 
+// ✅ detectRetina eliminado: causa que las etiquetas se vean más pequeñas
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
   attribution: '&copy; OpenStreetMap contributors',
   maxZoom: 19
@@ -26,13 +32,14 @@ const communityLayer  = L.layerGroup().addTo(map);
 const myLocationLayer = L.layerGroup().addTo(map);
 
 // ============================================
-// RESIZEOBSERVER
+// RESIZEOBSERVER: recalcular el mapa al cambiar de tamaño
 // ============================================
 const resizeObserver = new ResizeObserver(() => {
   setTimeout(() => map.invalidateSize(), 150);
 });
 resizeObserver.observe(document.getElementById('map'));
 
+// También al cambiar de orientación en móvil
 window.addEventListener('orientationchange', () => {
   setTimeout(() => map.invalidateSize(), 300);
 });
