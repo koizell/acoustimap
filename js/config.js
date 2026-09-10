@@ -31,6 +31,13 @@ const AGG_GRID                = 0.0014;
 const SEND_INTERVAL_MS        = 10000;
 const REFRESH_INTERVAL_MS     = 30000;
 
+// Precisión visual máxima (nunca dibujar un círculo mayor a esto)
+const MAX_VISUAL_ACCURACY_M   = 40;
+// Distancia bajo la cual consideramos la posición "estable"
+const STABILITY_THRESHOLD_M   = 12;
+// Cuántas lecturas necesitamos para considerar la posición estable
+const STABILITY_MIN_SAMPLES   = 4;
+
 // ============================================
 // ESTADO COMPARTIDO
 // ============================================
@@ -39,7 +46,10 @@ let isMonitoring    = false;
 let sharingEnabled  = false;
 let currentPosition = null;
 let geoWatchId      = null;
-let wakeLock        = null;   // ✅ Wake Lock
+let wakeLock        = null;
+
+// ✅ NUEVO: historial de lecturas GPS para detectar estabilidad
+let positionHistory = [];
 
 let audioCtx, analyser, microphone, stream;
 let rafId = null;
@@ -82,6 +92,23 @@ function snapToGrid(lat, lng) {
   const snappedLng = (Math.floor(lng / cellLng) + 0.5) * cellLng;
 
   return { lat: snappedLat, lng: snappedLng };
+}
+
+/**
+ * Distancia entre dos coordenadas en metros (fórmula de Haversine).
+ */
+function haversineDistance(lat1, lng1, lat2, lng2) {
+  const R = 6371000; // Radio de la Tierra en metros
+  const toRad = (x) => x * Math.PI / 180;
+
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+
+  const a = Math.sin(dLat / 2) ** 2 +
+            Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+            Math.sin(dLng / 2) ** 2;
+
+  return 2 * R * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
 // ============================================

@@ -2,6 +2,12 @@
  * map.js
  * Mapa Leaflet, capas, marcador personal, botón centrar y ResizeObserver.
  * Depende de: config.js, Leaflet.
+ *
+ * PRECISIÓN PROGRESIVA (estilo Google Maps):
+ *   - Se mantiene un historial de las últimas lecturas GPS.
+ *   - Si varias lecturas son cercanas entre sí, la posición es "estable"
+ *     y el círculo de precisión se encoge automáticamente.
+ *   - El círculo visual NUNCA excede MAX_VISUAL_ACCURACY_M metros.
  */
 
 // ============================================
@@ -11,7 +17,6 @@ const map = L.map('map', { zoomControl: false }).setView([8.75, -75.88], 14);
 
 L.control.zoom({ position: 'topleft' }).addTo(map);
 
-// ✅ detectRetina eliminado: causa que las etiquetas se vean más pequeñas
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
   attribution: '&copy; OpenStreetMap contributors',
   maxZoom: 19
@@ -21,14 +26,13 @@ const communityLayer  = L.layerGroup().addTo(map);
 const myLocationLayer = L.layerGroup().addTo(map);
 
 // ============================================
-// RESIZEOBSERVER: recalcular el mapa al cambiar de tamaño
+// RESIZEOBSERVER
 // ============================================
 const resizeObserver = new ResizeObserver(() => {
   setTimeout(() => map.invalidateSize(), 150);
 });
 resizeObserver.observe(document.getElementById('map'));
 
-// También al cambiar de orientación en móvil
 window.addEventListener('orientationchange', () => {
   setTimeout(() => map.invalidateSize(), 300);
 });
@@ -56,35 +60,83 @@ const LocateControl = L.Control.extend({
 map.addControl(new LocateControl());
 
 // ============================================
-// MOSTRAR MI UBICACIÓN
+// PROCESAR NUEVA POSICIÓN (con detección de estabilidad)
+// ============================================
+/**
+ * Recibe una lectura cruda del GPS, la guarda en el historial,
+ * detecta si la posición es estable, calcula la precisión efectiva
+ * y actualiza el marcador.
+ */
+function processNewPosition(pos) {
+  const { latitude, longitude, accuracy } = pos.coords;
+
+  // Guardar en el historial
+  positionHistory.push({
+    lat: latitude,
+    lng: longitude,
+    accuracy: accuracy,
+    time: Date.now()
+  });
+  if (positionHistory.length > 10) positionHistory.shift();
+
+  // Calcular precisión efectiva
+  let effectiveAccuracy = accuracy;
+
+  if (positionHistory.length >= STABILITY_MIN_SAMPLES) {
+    const recent = positionHistory.slice(-STABILITY_MIN_SAMPLES);
+
+    // Centroide de las últimas lecturas
+    const centerLat = recent.reduce((s, p) => s + p.lat, 0) / recent.length;
+    const centerLng = recent.reduce((s, p) => s + p.lng, 0) / recent.length;
+
+    // Máxima distancia de cualquier lectura al centroide
+    const maxSpread = Math.max(...recent.map(p =>
+      haversineDistance(centerLat, centerLng, p.lat, p.lng)
+    ));
+
+    if (maxSpread < STABILITY_THRESHOLD_M) {
+      // Posición estable → tomar la mejor precisión vista
+      const bestAccuracy = Math.min(...recent.map(p => p.accuracy));
+      effectiveAccuracy = Math.max(bestAccuracy, maxSpread, 5);
+    }
+  }
+
+  // Actualizar estado global
+  currentPosition = {
+    lat: latitude,
+    lng: longitude,
+    accuracy: effectiveAccuracy
+  };
+
+  // Dibujar
+  showMyLocation(latitude, longitude, effectiveAccuracy);
+  updateGpsChip(true, effectiveAccuracy);
+}
+
+// ============================================
+// MOSTRAR MI UBICACIÓN (estilo Google Maps)
 // ============================================
 function showMyLocation(lat, lng, accuracy) {
   myLocationLayer.clearLayers();
 
-  if (accuracy && accuracy > 0) {
+  // Cap visual: nunca dibujar círculos gigantes
+  const visualAccuracy = Math.min(accuracy, MAX_VISUAL_ACCURACY_M);
+
+  if (visualAccuracy > 0) {
     L.circle([lat, lng], {
-      radius: accuracy,
+      radius: visualAccuracy,
       color: '#2563eb',
       weight: 1,
-      opacity: 0.25,
+      opacity: 0.35,
       fillColor: '#2563eb',
-      fillOpacity: 0.08,
+      fillOpacity: 0.1,
       interactive: false
     }).addTo(myLocationLayer);
   }
 
+  // Punto azul pequeño (estilo Google Maps)
   L.circleMarker([lat, lng], {
-    radius: 18,
-    color: '#2563eb',
-    weight: 1,
-    opacity: 0.35,
-    fillColor: '#2563eb',
-    fillOpacity: 0.15,
-    interactive: false
-  }).addTo(myLocationLayer);
-
-  L.circleMarker([lat, lng], {
-    radius: 8,
+    radius: 7,
     color: '#ffffff',
     weight: 3,
     fillColor: '#2563eb',
@@ -92,14 +144,15 @@ function showMyLocation(lat, lng, accuracy) {
   })
     .addTo(myLocationLayer)
     .bindPopup(
-      '<b>📍 Tu ubicación exacta</b><br>' +
-      `<small>Precisión: ±${Math.round(accuracy || 0)} m</small><br>` +
+      '<b>📍 Tu ubicación</b><br>' +
+      `<small>Precisión: ±${Math.round(accuracy)} m</small><br>` +
       '<small>Solo tú puedes verla. No se comparte.</small>'
     );
 }
 
 function hideMyLocation() {
   myLocationLayer.clearLayers();
+  positionHistory = [];
 }
 
 // ============================================
@@ -107,7 +160,7 @@ function hideMyLocation() {
 // ============================================
 function centerOnUser() {
   if (currentPosition) {
-    map.setView([currentPosition.lat, currentPosition.lng], 16);
+    map.setView([currentPosition.lat, currentPosition.lng], 17);
     showMyLocation(currentPosition.lat, currentPosition.lng, currentPosition.accuracy);
     return;
   }
@@ -119,24 +172,12 @@ function centerOnUser() {
 
   navigator.geolocation.getCurrentPosition(
     (pos) => {
-      currentPosition = {
-        lat: pos.coords.latitude,
-        lng: pos.coords.longitude,
-        accuracy: pos.coords.accuracy
-      };
-      showMyLocation(currentPosition.lat, currentPosition.lng, currentPosition.accuracy);
-      map.setView([currentPosition.lat, currentPosition.lng], 16);
+      processNewPosition(pos);
+      map.setView([currentPosition.lat, currentPosition.lng], 17);
 
       if (geoWatchId === null) {
         geoWatchId = navigator.geolocation.watchPosition(
-          (p) => {
-            currentPosition = {
-              lat: p.coords.latitude,
-              lng: p.coords.longitude,
-              accuracy: p.coords.accuracy
-            };
-            showMyLocation(currentPosition.lat, currentPosition.lng, currentPosition.accuracy);
-          },
+          processNewPosition,
           (err) => console.warn('watchPosition:', err),
           { enableHighAccuracy: true, maximumAge: 0, timeout: 20000 }
         );
