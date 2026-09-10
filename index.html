@@ -36,21 +36,26 @@
     <div id="map-view" class="tab-content active">
       <div id="map"></div>
 
+      <!-- TOGGLE EN VIVO / HISTORIAL -->
+      <div class="map-mode">
+        <button class="mode-btn active" id="mode-live" onclick="setMapMode('live')">En Vivo</button>
+        <button class="mode-btn" id="mode-history" onclick="setMapMode('history')">Historial</button>
+      </div>
+
       <!-- LEYENDA DEL MAPA -->
       <div class="map-legend">
-        <div class="map-mode-toggle" style="display: flex; gap: 4px; margin-bottom: 6px;">
-          <button class="mode-btn active" onclick="switchMapLayer('live', this)" style="flex:1; padding:3px; font-size:0.65rem; border-radius:4px; border:1px solid #cbd5e1; background:#2563eb; color:#fff; cursor:pointer; font-weight:600;">En Vivo</button>
-          <button class="mode-btn" onclick="switchMapLayer('history', this)" style="flex:1; padding:3px; font-size:0.65rem; border-radius:4px; border:1px solid #cbd5e1; background:#f1f5f9; color:#475569; cursor:pointer; font-weight:600;">Historial</button>
-        </div>
         <div><span class="dot" style="background: #10b981"></span>&lt; 55 dB · Bajo</div>
         <div><span class="dot" style="background: #f59e0b"></span>55 - 70 dB · Moderado</div>
         <div><span class="dot" style="background: #ef4444"></span>&gt; 70 dB · Alto</div>
-        <div class="legend-count" id="community-count">Sin datos comunitarios aún</div>
+        <div class="legend-count" id="community-count">Cargando datos…</div>
+        <div class="legend-me">
+          <span class="dot-blue"></span>
+          Tu ubicación (solo tú)
+        </div>
       </div>
 
       <!-- PANEL FLOTANTE DE CONTROL -->
       <div class="sensor-panel collapsed" id="sensor-panel">
-        <!-- Barra superior con handle para expandir/colapsar -->
         <button class="panel-handle" id="panel-handle" onclick="togglePanel()" aria-label="Expandir panel">
           <span class="handle-bar"></span>
           <span class="handle-label" id="handle-label">Mostrar detalles</span>
@@ -95,7 +100,7 @@
           Activar Micrófono
         </button>
 
-        <!-- DETALLES (ocultos en modo colapsado móvil) -->
+        <!-- DETALLES -->
         <div class="panel-details" id="panel-details">
           <label class="share-row" for="share-toggle">
             <input type="checkbox" id="share-toggle" onchange="toggleSharing()" />
@@ -103,7 +108,8 @@
               <strong>Compartir en el mapa comunitario</strong>
               <small>
                 Tu ubicación se <b>difumina (~150 m)</b> antes de enviarse a la
-                base de datos. Nunca se guarda tu posición exacta ni tu audio.
+                base de datos. Tú verás tu posición exacta en azul; los demás
+                solo verán la zona. Nunca se guarda tu audio.
               </small>
             </span>
           </label>
@@ -184,6 +190,7 @@
             <strong>Privacidad por diseño:</strong> Las coordenadas se difuminan
             (~150 m) antes de almacenarse, de modo que el mapa comunitario
             muestra <em>zonas de ruido</em> y nunca la ubicación de una persona.
+            Cada usuario ve su propia posición exacta en azul, solo para sí mismo.
           </li>
         </ul>
       </div>
