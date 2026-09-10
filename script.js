@@ -1,20 +1,21 @@
 /**
- * AcoustiMap - script.js (versión final verificada)
+ * AcoustiMap - script.js (versión con grid snapping de 70 m)
  * Monitoreo acústico + mapa comunitario en Supabase.
  *
  * PRIVACIDAD:
  *  - El audio NUNCA se graba ni se transmite.
  *  - Tu ubicación EXACTA solo la ves tú (marcador azul).
- *  - Lo que se envía a Supabase es una coordenada DIFUMINADA (~150 m).
- *  - Las zonas comunitarias cercanas a ti (<250 m) se ocultan para que
+ *  - Lo que se envía a Supabase es la coordenada anclada al centro de una
+ *    celda fija de 70 m × 70 m (determinista, sin saltos aleatorios).
+ *  - Las zonas comunitarias cercanas a ti (<100 m) se ocultan para que
  *    no veas tu propio ruido reflejado como círculos.
  */
 
 // ============================================
 // 1. SUPABASE
 // ============================================
-const SUPABASE_URL = 'https://TU-PROYECTO.supabase.co';
-const SUPABASE_ANON_KEY = 'TU_ANON_KEY_PUBLICA';
+const SUPABASE_URL = "https://vskndeoqkjsxophwwwpe.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZza25kZW9xa2pzeG9waHd3d3BlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODkwNjM0NzQsImV4cCI6MjEwNDYzOTQ3NH0.mto-be3VQFaXf5Gar8VIeV1bORbPNtLsa67SY6Adh-0";
 
 let supabaseClient = null;
 try {
@@ -48,10 +49,17 @@ const myLocationLayer = L.layerGroup().addTo(map);
 // ============================================
 const COLOR_BY_CAT = { bajo: '#10b981', moderado: '#f59e0b', alto: '#ef4444' };
 
-const BLUR_RADIUS_M          = 150;   // difuminado para Supabase
-const CIRCLE_VISUAL_RADIUS_M = 90;    // radio visual del círculo
-const SELF_EXCLUSION_M       = 250;   // ocultar zonas cerca de mí
-const AGG_GRID               = 0.003; // ~330 m de agrupación
+// Tamaño de la celda de anclaje (privacidad determinista)
+const CELL_SIZE_M = 70;
+
+// Radio visual del círculo comunitario en el mapa
+const CIRCLE_VISUAL_RADIUS_M = 50;
+
+// Radio mínimo de exclusión: oculta zonas comunitarias muy cerca de ti
+const SELF_EXCLUSION_M = 100;
+
+// Grid de agregación: fusiona mediciones de celdas vecinas (~2x CELL_SIZE_M)
+const AGG_GRID = 0.0014;
 
 const SEND_INTERVAL_MS    = 10000;
 const REFRESH_INTERVAL_MS = 30000;
@@ -94,20 +102,26 @@ function timeAgo(iso) {
 }
 
 // ============================================
-// 6. DIFUMINACIÓN
+// 6. ANCLAJE A CUADRÍCULA (grid snapping)
 // ============================================
-function blurLocation(lat, lng) {
+/**
+ * Ancla la coordenada al centro de una celda fija de CELL_SIZE_M metros.
+ * - Determinista: mismo lugar → mismo punto exacto.
+ * - Privado: solo revela en qué celda de 70 m estás, no la posición exacta.
+ * - Limpio: todas las mediciones del mismo lugar se superponen.
+ */
+function snapToGrid(lat, lng) {
   const latRad = lat * Math.PI / 180;
   const metersPerDegLat = 111000;
   const metersPerDegLng = 111000 * Math.cos(latRad);
 
-  const angle = Math.random() * 2 * Math.PI;
-  const dist  = Math.sqrt(Math.random()) * BLUR_RADIUS_M;
+  const cellLat = CELL_SIZE_M / metersPerDegLat;
+  const cellLng = CELL_SIZE_M / metersPerDegLng;
 
-  const dLat = (dist * Math.cos(angle)) / metersPerDegLat;
-  const dLng = (dist * Math.sin(angle)) / metersPerDegLng;
+  const snappedLat = (Math.floor(lat / cellLat) + 0.5) * cellLat;
+  const snappedLng = (Math.floor(lng / cellLng) + 0.5) * cellLng;
 
-  return { lat: lat + dLat, lng: lng + dLng };
+  return { lat: snappedLat, lng: snappedLng };
 }
 
 // ============================================
@@ -158,6 +172,7 @@ function addCommunityPoint(lat, lng, db, category, createdAt, sampleCount = 1) {
     `<small>${when}</small>`
   ].filter(Boolean).join('<br>');
 
+  // Halo exterior tenue
   L.circle([lat, lng], {
     color,
     fillColor: color,
@@ -167,6 +182,7 @@ function addCommunityPoint(lat, lng, db, category, createdAt, sampleCount = 1) {
     interactive: false
   }).addTo(communityLayer);
 
+  // Círculo principal suave
   L.circle([lat, lng], {
     color,
     fillColor: color,
@@ -177,6 +193,7 @@ function addCommunityPoint(lat, lng, db, category, createdAt, sampleCount = 1) {
     interactive: false
   }).addTo(communityLayer);
 
+  // Punto central
   L.circleMarker([lat, lng], {
     radius: 4,
     color: '#ffffff',
@@ -186,6 +203,7 @@ function addCommunityPoint(lat, lng, db, category, createdAt, sampleCount = 1) {
     interactive: false
   }).addTo(communityLayer);
 
+  // Marcador invisible para el popup
   L.circleMarker([lat, lng], {
     radius: 20,
     color: 'transparent',
@@ -206,7 +224,13 @@ function aggregatePoints(rows) {
   rows.forEach((r) => {
     const key = `${Math.round(r.latitude / AGG_GRID)}_${Math.round(r.longitude / AGG_GRID)}`;
     if (!buckets.has(key)) {
-      buckets.set(key, { lat: r.latitude, lng: r.longitude, sumDb: 0, count: 0, latest: r.created_at });
+      buckets.set(key, {
+        lat: r.latitude,
+        lng: r.longitude,
+        sumDb: 0,
+        count: 0,
+        latest: r.created_at
+      });
     }
     const b = buckets.get(key);
     b.sumDb += r.db_level;
@@ -376,7 +400,14 @@ async function toggleMonitoring() {
 }
 
 function startSession() {
-  session = { sum: 0, count: 0, min: Infinity, max: -Infinity, startTime: Date.now(), timerId: null };
+  session = {
+    sum: 0,
+    count: 0,
+    min: Infinity,
+    max: -Infinity,
+    startTime: Date.now(),
+    timerId: null
+  };
   sendWindowSum = 0;
   sendWindowCount = 0;
   lastSendTime = Date.now();
@@ -475,7 +506,7 @@ function updateMeter() {
 }
 
 // ============================================
-// 15. ENVÍO A SUPABASE
+// 15. ENVÍO A SUPABASE (con grid snapping)
 // ============================================
 async function sendMeasurementIfDue() {
   const now = Date.now();
@@ -488,13 +519,14 @@ async function sendMeasurementIfDue() {
   sendWindowCount = 0;
   lastSendTime = now;
 
-  const blurred = blurLocation(currentPosition.lat, currentPosition.lng);
+  // ✅ Anclar al centro de la celda de 70 m
+  const snapped = snapToGrid(currentPosition.lat, currentPosition.lng);
   const category = classifyDb(avg);
 
   if (supabaseClient) {
     const { error } = await supabaseClient.from('noise_measurements').insert({
-      latitude: blurred.lat,
-      longitude: blurred.lng,
+      latitude: snapped.lat,
+      longitude: snapped.lng,
       db_level: avg,
       category
     });
@@ -527,7 +559,7 @@ function toggleSharing() {
         map.setView([currentPosition.lat, currentPosition.lng], 16);
 
         updateGpsChip(true);
-        status.innerHTML = '✅ Compartiendo. Los demás ven una zona difuminada ~150 m.';
+        status.innerHTML = '✅ Compartiendo. Los demás ven una zona anclada a ~70 m.';
         lastSendTime = 0;
 
         // Refrescar zonas para aplicar la exclusión de mi propio ruido
@@ -572,7 +604,7 @@ function updateGpsChip(active) {
     chip.innerText = '📡 GPS: activo';
     chip.classList.add('ok');
   } else {
-    chip.innerText = '📡 GPS: sin permiso';
+    chip.innerText = '📡 GPS: sin permisos';
     chip.classList.remove('ok');
   }
 }
