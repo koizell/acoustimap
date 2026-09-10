@@ -59,12 +59,17 @@ header {
   border-color: var(--primary);
 }
 
-/* Contenedores de pestañas */
+/* ============================================================
+   CONTENEDORES DE PESTAÑAS
+   El contenedor activo tiene una altura fija = viewport.
+   El padding-top deja espacio para el header.
+   ============================================================ */
 .tab-content {
   display: none;
   height: 100dvh;
   width: 100vw;
   padding-top: var(--header-h);
+  overflow: hidden;
 }
 
 .tab-content.active {
