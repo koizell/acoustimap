@@ -1,13 +1,5 @@
 /**
- * AcoustiMap - script.js (versión final con timestamps visibles)
- * Monitoreo acústico + mapa comunitario en Supabase.
- *
- * CORRECCIONES APLICADAS:
- *  - ✅ Tooltip permanente sobre cada zona mostrando "hace Xm/h/d".
- *  - ✅ Contador de leyenda muestra la última actualización.
- *  - ✅ Modo En Vivo (últimas 24h) vs Historial (todo).
- *  - ✅ Dibuja la zona al instante al compartir.
- *  - ✅ Sin filtro de exclusión (siempre ves tu zona).
+ * AcoustiMap - script.js (versión final con TTL y precisión)
  */
 
 // ============================================
@@ -173,7 +165,6 @@ function addCommunityPoint(lat, lng, db, category, createdAt, sampleCount = 1) {
     sampleCount > 1 ? `<small>${sampleCount} mediciones acumuladas</small>` : ''
   ].filter(Boolean).join('<br>');
 
-  // Halo exterior tenue
   L.circle([lat, lng], {
     color,
     fillColor: color,
@@ -183,7 +174,6 @@ function addCommunityPoint(lat, lng, db, category, createdAt, sampleCount = 1) {
     interactive: false
   }).addTo(communityLayer);
 
-  // Círculo principal
   L.circle([lat, lng], {
     color,
     fillColor: color,
@@ -194,7 +184,6 @@ function addCommunityPoint(lat, lng, db, category, createdAt, sampleCount = 1) {
     interactive: false
   }).addTo(communityLayer);
 
-  // Punto central
   L.circleMarker([lat, lng], {
     radius: 4,
     color: '#ffffff',
@@ -204,7 +193,6 @@ function addCommunityPoint(lat, lng, db, category, createdAt, sampleCount = 1) {
     interactive: false
   }).addTo(communityLayer);
 
-  // ✅ Marcador invisible con TOOLTIP PERMANENTE (muestra el tiempo)
   L.circleMarker([lat, lng], {
     radius: 20,
     color: 'transparent',
@@ -566,7 +554,7 @@ function toggleSharing() {
               showMyLocation(currentPosition.lat, currentPosition.lng, p.coords.accuracy);
             },
             (err) => console.warn('watchPosition:', err),
-            { enableHighAccuracy: true, maximumAge: 10000, timeout: 20000 }
+            { enableHighAccuracy: true, maximumAge: 0, timeout: 20000 }
           );
         }
       },
