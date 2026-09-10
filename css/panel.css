@@ -50,7 +50,7 @@
 .sensor-panel.collapsed .panel-details { display: none; }
 .sensor-panel.collapsed .avg-meta      { display: none; }
 
-/* Fila superior: estado + chip GPS */
+/* Fila superior */
 .panel-top {
   display: flex;
   justify-content: space-between;
@@ -94,14 +94,9 @@
   white-space: nowrap;
 }
 
-.gps-chip.ok {
-  background: #dcfce7;
-  color: #15803d;
-}
+.gps-chip.ok { background: #dcfce7; color: #15803d; }
 
-/* ============================================================
-   MEDIDOR EN VIVO
-   ============================================================ */
+/* Medidor en vivo */
 .meter-container {
   text-align: center;
   margin: 8px 0 10px;
@@ -138,9 +133,7 @@
   transition: width 0.2s ease, background-color 0.2s ease;
 }
 
-/* ============================================================
-   PROMEDIO DE SESIÓN
-   ============================================================ */
+/* Promedio de sesión */
 .avg-block {
   margin: 10px 0 6px;
   padding: 10px 12px;
@@ -201,13 +194,9 @@
   color: var(--text-muted);
 }
 
-.avg-meta b {
-  color: var(--text-main);
-}
+.avg-meta b { color: var(--text-main); }
 
-/* ============================================================
-   BOTÓN PRINCIPAL
-   ============================================================ */
+/* Botón principal */
 .btn-action {
   width: 100%;
   padding: 11px;
@@ -223,13 +212,9 @@
   transition: background 0.2s;
 }
 
-.btn-action:hover {
-  background: #1d4ed8;
-}
+.btn-action:hover { background: #1d4ed8; }
 
-/* ============================================================
-   COMPARTIR UBICACIÓN
-   ============================================================ */
+/* Compartir ubicación */
 .panel-details { display: block; }
 
 .share-row {
@@ -245,9 +230,7 @@
   transition: background 0.2s;
 }
 
-.share-row:hover {
-  background: #f1f5f9;
-}
+.share-row:hover { background: #f1f5f9; }
 
 .share-row input {
   margin-top: 3px;
@@ -270,24 +253,11 @@
   font-weight: 500;
 }
 
-.share-text b {
-  color: #15803d;
-}
+.share-text b { color: #15803d; }
 
 .privacy-notice {
   font-size: 0.7rem;
   color: var(--text-muted);
   text-align: center;
   margin-top: 8px;
-}
-
-/* Estados del chip GPS según precisión */
-.gps-chip.medium {
-  background: #fef3c7;
-  color: #b45309;
-}
-
-.gps-chip.poor {
-  background: #fee2e2;
-  color: #b91c1c;
 }

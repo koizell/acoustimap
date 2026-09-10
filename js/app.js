@@ -1,7 +1,7 @@
 /**
  * app.js
  * Pestañas, panel colapsable, compartir ubicación, GPS chip.
- * Depende de: config.js, map.js, kalman.js.
+ * Depende de: todos los módulos anteriores.
  */
 
 // ============================================
@@ -48,32 +48,32 @@ function toggleSharing() {
 
     status.innerHTML = '⏳ Solicitando permiso de ubicación…';
 
-    // Resetear filtro al iniciar nueva sesión
-    gpsFilter.reset();
-
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        processNewPosition(pos);
+        currentPosition = {
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
+          accuracy: pos.coords.accuracy
+        };
+        showMyLocation(currentPosition.lat, currentPosition.lng, currentPosition.accuracy);
         map.setView([currentPosition.lat, currentPosition.lng], 16);
 
-        const q = gpsQuality(currentPosition.accuracy);
-        if (q === 'good') {
-          status.innerHTML = '✅ Compartiendo. Señal GPS excelente (±' +
-            Math.round(currentPosition.accuracy) + ' m).';
-        } else if (q === 'medium') {
-          status.innerHTML = '⚠️ Compartiendo. Señal GPS regular (±' +
-            Math.round(currentPosition.accuracy) + ' m). <b>Calibra la brújula moviendo el teléfono en forma de 8.</b>';
-        } else {
-          status.innerHTML = '⚠️ Compartiendo. Señal GPS débil (±' +
-            Math.round(currentPosition.accuracy) + ' m). <b>Sal a un espacio abierto y calibra moviendo el teléfono en forma de 8.</b>';
-        }
-
+        updateGpsChip(true);
+        status.innerHTML = '✅ Compartiendo. Los demás ven una zona anclada a ~70 m.';
         lastSendTime = 0;
+
         loadCommunityPoints();
 
         if (geoWatchId === null) {
           geoWatchId = navigator.geolocation.watchPosition(
-            processNewPosition,
+            (p) => {
+              currentPosition = {
+                lat: p.coords.latitude,
+                lng: p.coords.longitude,
+                accuracy: p.coords.accuracy
+              };
+              showMyLocation(currentPosition.lat, currentPosition.lng, currentPosition.accuracy);
+            },
             (err) => console.warn('watchPosition:', err),
             { enableHighAccuracy: true, maximumAge: 0, timeout: 20000 }
           );
@@ -93,7 +93,6 @@ function toggleSharing() {
     updateGpsChip(false);
     hideMyLocation();
     currentPosition = null;
-    gpsFilter.reset();
     if (geoWatchId !== null) {
       navigator.geolocation.clearWatch(geoWatchId);
       geoWatchId = null;
@@ -103,30 +102,15 @@ function toggleSharing() {
 }
 
 // ============================================
-// CHIP DE GPS (muestra precisión en metros)
+// CHIP DE GPS
 // ============================================
-function updateGpsChip(active, accuracy) {
+function updateGpsChip(active) {
   const chip = document.getElementById('gps-chip');
-
-  if (!active) {
-    chip.innerText = '📡 GPS: sin permisos';
-    chip.classList.remove('ok', 'medium', 'poor');
-    return;
-  }
-
-  const q = gpsQuality(accuracy);
-  const accText = accuracy ? `±${Math.round(accuracy)} m` : '';
-
-  chip.classList.remove('ok', 'medium', 'poor');
-
-  if (q === 'good') {
-    chip.innerText = `📡 GPS: ${accText}`;
+  if (active) {
+    chip.innerText = '📡 GPS: activo';
     chip.classList.add('ok');
-  } else if (q === 'medium') {
-    chip.innerText = `📡 GPS: ${accText} ⚠️`;
-    chip.classList.add('medium');
   } else {
-    chip.innerText = `📡 GPS: ${accText} ❌`;
-    chip.classList.add('poor');
+    chip.innerText = '📡 GPS: sin permisos';
+    chip.classList.remove('ok');
   }
 }

@@ -1,8 +1,7 @@
 /**
  * audio.js
  * Captura de micrófono, cálculo de dB y promedio de sesión.
- * Depende de: config.js.
- * Llama a sendMeasurementIfDue() definida en community.js.
+ * Depende de: config.js. Llama a sendMeasurementIfDue() (community.js).
  */
 
 // ============================================
@@ -30,6 +29,9 @@ async function toggleMonitoring() {
       pulse.style.display = 'inline-block';
       statusText.innerText = 'Midiendo en Vivo';
 
+      // ✅ Activar Wake Lock al iniciar monitoreo
+      await requestWakeLock();
+
       startSession();
       updateMeter();
     } catch (err) {
@@ -50,6 +52,8 @@ async function toggleMonitoring() {
     document.getElementById('db-bar').style.width = '0%';
     document.getElementById('db-status-text').innerText = 'Presiona Iniciar';
     stopSession();
+    // ✅ Liberar Wake Lock al detener
+    releaseWakeLock();
   }
 }
 
@@ -130,7 +134,6 @@ function updateMeter() {
   for (let i = 0; i < dataArray.length; i++) sum += dataArray[i];
   const average = sum / dataArray.length;
 
-  // Aproximación a dB SPL
   let db = Math.round(20 * Math.log10(average || 1) + 25);
   if (db < 30) db = 35;
 
@@ -151,7 +154,6 @@ function updateMeter() {
     dbStatus.innerText = '🔴 Alto (Ruido Molesto)';
   }
 
-  // Acumular estadísticas cada 200 ms
   const now = performance.now();
   if (now - lastStatTime > 200) {
     lastStatTime = now;

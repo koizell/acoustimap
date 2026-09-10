@@ -1,6 +1,6 @@
 /* ============================================================
    responsive.css
-   Media queries. SIEMPRE al final para sobreescribir lo anterior.
+   Media queries. SIEMPRE al final.
    ============================================================ */
 
 /* ============================================================
@@ -60,6 +60,7 @@
     border-radius: 18px;
     max-height: 55dvh;
     overflow-y: auto;
+    padding-bottom: calc(12px + env(safe-area-inset-bottom));
   }
 
   .db-value  { font-size: 2.4rem; }

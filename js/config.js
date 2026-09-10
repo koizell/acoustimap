@@ -1,7 +1,6 @@
 /**
  * config.js
- * Credenciales, constantes globales, estado compartido y utilidades.
- * Debe cargarse ANTES que cualquier otro módulo.
+ * Credenciales, constantes, estado compartido y utilidades.
  */
 
 // ============================================
@@ -26,32 +25,26 @@ try {
 // CONSTANTES
 // ============================================
 const COLOR_BY_CAT            = { bajo: '#10b981', moderado: '#f59e0b', alto: '#ef4444' };
-const CELL_SIZE_M             = 70;       // Tamaño de la celda de anclaje en metros
-const CIRCLE_VISUAL_RADIUS_M  = 50;       // Radio visual del círculo comunitario
-const AGG_GRID                = 0.0014;   // Grid de agregación (~155 m)
-const SEND_INTERVAL_MS        = 10000;    // Enviar a Supabase cada 10 s
-const REFRESH_INTERVAL_MS     = 30000;    // Refrescar mapa cada 30 s
+const CELL_SIZE_M             = 70;
+const CIRCLE_VISUAL_RADIUS_M  = 50;
+const AGG_GRID                = 0.0014;
+const SEND_INTERVAL_MS        = 10000;
+const REFRESH_INTERVAL_MS     = 30000;
 
 // ============================================
 // ESTADO COMPARTIDO
 // ============================================
-let mapMode         = 'live';   // 'live' | 'history'
+let mapMode         = 'live';
 let isMonitoring    = false;
 let sharingEnabled  = false;
-let currentPosition = null;     // { lat, lng, accuracy }
+let currentPosition = null;
 let geoWatchId      = null;
+let wakeLock        = null;   // ✅ Wake Lock
 
 let audioCtx, analyser, microphone, stream;
 let rafId = null;
 
-let session = {
-  sum: 0,
-  count: 0,
-  min: Infinity,
-  max: -Infinity,
-  startTime: 0,
-  timerId: null
-};
+let session = { sum: 0, count: 0, min: Infinity, max: -Infinity, startTime: 0, timerId: null };
 let lastStatTime = 0;
 
 let sendWindowSum   = 0;
@@ -77,7 +70,6 @@ function timeAgo(iso) {
   return `hace ${Math.floor(diff / 2592000)}mes`;
 }
 
-/** Ancla una coordenada al centro de una celda fija de CELL_SIZE_M metros. */
 function snapToGrid(lat, lng) {
   const latRad = lat * Math.PI / 180;
   const metersPerDegLat = 111000;
@@ -90,4 +82,26 @@ function snapToGrid(lat, lng) {
   const snappedLng = (Math.floor(lng / cellLng) + 0.5) * cellLng;
 
   return { lat: snappedLat, lng: snappedLng };
+}
+
+// ============================================
+// WAKE LOCK
+// ============================================
+async function requestWakeLock() {
+  if ('wakeLock' in navigator) {
+    try {
+      wakeLock = await navigator.wakeLock.request('screen');
+      console.log('🔒 Pantalla mantenida encendida');
+    } catch (err) {
+      console.warn('Wake Lock no disponible:', err.message);
+    }
+  }
+}
+
+function releaseWakeLock() {
+  if (wakeLock) {
+    wakeLock.release();
+    wakeLock = null;
+    console.log('🔓 Wake Lock liberado');
+  }
 }

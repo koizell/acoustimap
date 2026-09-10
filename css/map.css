@@ -20,9 +20,7 @@
   top: calc(var(--header-h) + 8px) !important;
 }
 
-/* ============================================================
-   BOTÓN "CENTRAR EN MÍ"
-   ============================================================ */
+/* Botón "centrar en mí" */
 .locate-btn {
   display: flex !important;
   align-items: center;
@@ -43,9 +41,7 @@
   animation: pulse-locate 1s infinite;
 }
 
-/* ============================================================
-   TOGGLE EN VIVO / HISTORIAL
-   ============================================================ */
+/* Toggle En Vivo / Historial */
 .map-mode {
   position: absolute;
   top: calc(var(--header-h) + 10px);
@@ -77,9 +73,7 @@
   color: #fff;
 }
 
-/* ============================================================
-   LEYENDA
-   ============================================================ */
+/* Leyenda */
 .map-legend {
   position: absolute;
   top: calc(var(--header-h) + 10px);
@@ -141,9 +135,7 @@
   color: #1d4ed8;
 }
 
-/* ============================================================
-   TOOLTIPS SOBRE CADA ZONA
-   ============================================================ */
+/* Tooltips de zona */
 .zone-tooltip {
   background: rgba(15, 23, 42, 0.85) !important;
   color: #fff !important;
