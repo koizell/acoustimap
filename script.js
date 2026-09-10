@@ -1,20 +1,20 @@
 /**
- * AcoustiMap - script.js
- * Monitoreo acústico en tiempo real + mapa comunitario con Supabase.
+ * AcoustiMap - script.js (versión final verificada)
+ * Monitoreo acústico + mapa comunitario en Supabase.
  *
  * PRIVACIDAD:
- *  - El audio NUNCA se graba ni se transmite: solo se calcula la intensidad (dB).
- *  - La ubicación se difumina (~150 m) antes de enviarse a Supabase.
- *  - El envío requiere consentimiento explícito del usuario (checkbox).
+ *  - El audio NUNCA se graba ni se transmite.
+ *  - Tu ubicación EXACTA solo la ves tú (marcador azul).
+ *  - Lo que se envía a Supabase es una coordenada DIFUMINADA (~150 m).
+ *  - Las zonas comunitarias cercanas a ti (<250 m) se ocultan para que
+ *    no veas tu propio ruido reflejado como círculos.
  */
 
-// ==========================================
-// 0. CONFIGURACIÓN DE SUPABASE
-// ==========================================
-// 🔧 Reemplaza estos valores con los de tu proyecto en https://supabase.com
-const SUPABASE_URL = "https://vskndeoqkjsxophwwwpe.supabase.co";
-const SUPABASE_ANON_KEY =
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZza25kZW9xa2pzeG9waHd3d3BlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODkwNjM0NzQsImV4cCI6MjEwNDYzOTQ3NH0.mto-be3VQFaXf5Gar8VIeV1bORbPNtLsa67SY6Adh-0";
+// ============================================
+// 1. SUPABASE
+// ============================================
+const SUPABASE_URL = 'https://TU-PROYECTO.supabase.co';
+const SUPABASE_ANON_KEY = 'TU_ANON_KEY_PUBLICA';
 
 let supabaseClient = null;
 try {
@@ -28,10 +28,11 @@ try {
   console.error('Error inicializando Supabase:', e);
 }
 
-// ==========================================
-// 1. MAPA
-// ==========================================
+// ============================================
+// 2. MAPA Y CAPAS
+// ============================================
 const map = L.map('map', { zoomControl: false }).setView([8.75, -75.88], 14);
+
 L.control.zoom({ position: 'topleft' }).addTo(map);
 
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -39,37 +40,27 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
   maxZoom: 19
 }).addTo(map);
 
-// Controles
-L.control.locate({
-  position: 'topleft',
-  setView: 'untilPan',
-  icon: 'leaflet-control-locate',
-  locateOptions: { enableHighAccuracy: true }
-}).addTo(map);
+const communityLayer  = L.layerGroup().addTo(map);
+const myLocationLayer = L.layerGroup().addTo(map);
 
-// Capas separadas
-const communityLayer = L.layerGroup().addTo(map);   // Puntos difuminados (comunidad)
-const myLocationLayer = L.layerGroup().addTo(map);  // Mi ubicación exacta
-
-// ==========================================
-// 2. ESTADO Y CONSTANTES
-// ==========================================
+// ============================================
+// 3. CONSTANTES
+// ============================================
 const COLOR_BY_CAT = { bajo: '#10b981', moderado: '#f59e0b', alto: '#ef4444' };
 
-// Radio de difuminación (metros). ~150 m por defecto.
-const BLUR_RADIUS_M = 150;
-// Radio visual del círculo en el mapa (en metros, para escalado)
-const CIRCLE_VISUAL_RADIUS_M = 50;
-// Intervalo de envío
-const SEND_INTERVAL_MS = 10000;
-// Intervalo de refresco del mapa
-const REFRESH_INTERVAL_MS = 30000;
-// Grid de agregación (~150 m)
-const AGG_GRID = 0.0015;
+const BLUR_RADIUS_M          = 150;   // difuminado para Supabase
+const CIRCLE_VISUAL_RADIUS_M = 90;    // radio visual del círculo
+const SELF_EXCLUSION_M       = 250;   // ocultar zonas cerca de mí
+const AGG_GRID               = 0.003; // ~330 m de agrupación
 
-// Modo: 'live' o 'history'
+const SEND_INTERVAL_MS    = 10000;
+const REFRESH_INTERVAL_MS = 30000;
+
 let mapMode = 'live';
 
+// ============================================
+// 4. ESTADO
+// ============================================
 let isMonitoring = false;
 let audioCtx, analyser, microphone, stream;
 let rafId = null;
@@ -85,12 +76,9 @@ let sendWindowSum = 0;
 let sendWindowCount = 0;
 let lastSendTime = 0;
 
-// Identificador único de esta sesión (para no mostrar mi punto difuminado a mí mismo)
-const sessionId = Math.random().toString(36).substring(2, 10);
-
-// ==========================================
-// 3. CLASIFICACIÓN Y UTILIDADES
-// ==========================================
+// ============================================
+// 5. UTILIDADES
+// ============================================
 function classifyDb(db) {
   if (db < 55) return 'bajo';
   if (db <= 70) return 'moderado';
@@ -105,23 +93,16 @@ function timeAgo(iso) {
   return `hace ${Math.floor(diff / 86400)} d`;
 }
 
-// ==========================================
-// 4. DIFUMINACIÓN DE COORDENADAS
-// ==========================================
-/**
- * Difumina una coordenada a ~150 m de precisión.
- * Usa desplazamiento aleatorio dentro de un radio.
- */
+// ============================================
+// 6. DIFUMINACIÓN
+// ============================================
 function blurLocation(lat, lng) {
-  // 1 grado lat ≈ 111 000 m
-  // 1 grado lng ≈ 111 000 * cos(lat) m
   const latRad = lat * Math.PI / 180;
   const metersPerDegLat = 111000;
   const metersPerDegLng = 111000 * Math.cos(latRad);
 
-  // Ángulo y distancia aleatorios dentro del radio de difuminado
   const angle = Math.random() * 2 * Math.PI;
-  const dist = Math.sqrt(Math.random()) * BLUR_RADIUS_M;
+  const dist  = Math.sqrt(Math.random()) * BLUR_RADIUS_M;
 
   const dLat = (dist * Math.cos(angle)) / metersPerDegLat;
   const dLng = (dist * Math.sin(angle)) / metersPerDegLng;
@@ -129,28 +110,22 @@ function blurLocation(lat, lng) {
   return { lat: lat + dLat, lng: lng + dLng };
 }
 
-// ==========================================
-// 5. MOSTRAR MI UBICACIÓN EXACTA (solo visible para mí)
-// ==========================================
-/**
- * Dibuja un marcador azul con la ubicación exacta del usuario.
- * Este marcador NO se envía a Supabase y NO se comparte con nadie.
- */
+// ============================================
+// 7. MI UBICACIÓN EXACTA
+// ============================================
 function showMyLocation(lat, lng) {
   myLocationLayer.clearLayers();
 
-  // Halo exterior (pulso visual)
   L.circleMarker([lat, lng], {
     radius: 18,
     color: '#2563eb',
     weight: 1,
-    opacity: 0.3,
+    opacity: 0.35,
     fillColor: '#2563eb',
     fillOpacity: 0.15,
     interactive: false
   }).addTo(myLocationLayer);
 
-  // Punto azul central (mi posición exacta)
   L.circleMarker([lat, lng], {
     radius: 8,
     color: '#ffffff',
@@ -159,23 +134,51 @@ function showMyLocation(lat, lng) {
     fillOpacity: 1
   })
     .addTo(myLocationLayer)
-    .bindPopup('<b>📍 Tu ubicación exacta</b><br><small>Solo tú puedes verla. No se comparte.</small>');
+    .bindPopup(
+      '<b>📍 Tu ubicación exacta</b><br>' +
+      '<small>Solo tú puedes verla. No se comparte.</small>'
+    );
 }
 
 function hideMyLocation() {
   myLocationLayer.clearLayers();
 }
 
-// ==========================================
-// 6. PUNTOS COMUNITARIOS (difuminados)
-// ==========================================
+// ============================================
+// 8. PUNTOS COMUNITARIOS
+// ============================================
 function addCommunityPoint(lat, lng, db, category, createdAt, sampleCount = 1) {
   const color = COLOR_BY_CAT[category] || COLOR_BY_CAT[classifyDb(db)];
-  const when = createdAt ? timeAgo(createdAt) : 'ahora';
+  const when  = createdAt ? timeAgo(createdAt) : 'ahora';
 
-  // Punto central blanco
+  const popupHtml = [
+    `<b>${db} dB</b>`,
+    `Categoría: <b>${category}</b>`,
+    sampleCount > 1 ? `<small>Promedio de ${sampleCount} mediciones</small>` : '',
+    `<small>${when}</small>`
+  ].filter(Boolean).join('<br>');
+
+  L.circle([lat, lng], {
+    color,
+    fillColor: color,
+    fillOpacity: 0.08,
+    weight: 0,
+    radius: CIRCLE_VISUAL_RADIUS_M * 1.8,
+    interactive: false
+  }).addTo(communityLayer);
+
+  L.circle([lat, lng], {
+    color,
+    fillColor: color,
+    fillOpacity: 0.18,
+    weight: 1.2,
+    opacity: 0.6,
+    radius: CIRCLE_VISUAL_RADIUS_M,
+    interactive: false
+  }).addTo(communityLayer);
+
   L.circleMarker([lat, lng], {
-    radius: 3,
+    radius: 4,
     color: '#ffffff',
     weight: 2,
     fillColor: color,
@@ -183,24 +186,20 @@ function addCommunityPoint(lat, lng, db, category, createdAt, sampleCount = 1) {
     interactive: false
   }).addTo(communityLayer);
 
-  // Círculo de zona
-  L.circle([lat, lng], {
-    color,
-    fillColor: color,
-    fillOpacity: 0.25,
-    weight: 1.5,
-    radius: CIRCLE_VISUAL_RADIUS_M,
-    opacity: 0.8
+  L.circleMarker([lat, lng], {
+    radius: 20,
+    color: 'transparent',
+    fillColor: 'transparent',
+    fillOpacity: 0,
+    weight: 0
   })
     .addTo(communityLayer)
-    .bindPopup(
-      `<b>${db} dB</b><br>
-       Categoría: <b>${category}</b><br>
-       ${sampleCount > 1 ? `<small>Promedio de ${sampleCount} mediciones</small><br>` : ''}
-       <small>${when}</small>`
-    );
+    .bindPopup(popupHtml);
 }
 
+// ============================================
+// 9. AGREGACIÓN
+// ============================================
 function aggregatePoints(rows) {
   const buckets = new Map();
 
@@ -218,7 +217,9 @@ function aggregatePoints(rows) {
   return Array.from(buckets.values()).map((b) => {
     const avg = Math.round(b.sumDb / b.count);
     return {
-      lat: b.lat, lng: b.lng, db: avg,
+      lat: b.lat,
+      lng: b.lng,
+      db: avg,
       category: classifyDb(avg),
       createdAt: b.latest,
       sampleCount: b.count
@@ -226,15 +227,18 @@ function aggregatePoints(rows) {
   });
 }
 
+// ============================================
+// 10. CARGA DE DATOS
+// ============================================
 async function loadCommunityPoints() {
   const counter = document.getElementById('community-count');
+
   if (!supabaseClient) {
     counter.innerText = 'Sin datos comunitarios aún';
     return;
   }
 
   try {
-    // En modo live: últimas 24h. En modo history: todo.
     let query = supabaseClient
       .from('noise_measurements')
       .select('latitude, longitude, db_level, category, created_at')
@@ -257,34 +261,50 @@ async function loadCommunityPoints() {
     }
 
     const aggregated = aggregatePoints(data);
-    aggregated.forEach((p) =>
+
+    // Excluir zonas muy cercanas a mi ubicación (evita ver mi propio ruido)
+    const toDraw = currentPosition
+      ? aggregated.filter((p) => {
+          const dLat = (p.lat - currentPosition.lat) * 111000;
+          const dLng = (p.lng - currentPosition.lng) * 111000 *
+                       Math.cos(currentPosition.lat * Math.PI / 180);
+          const dist = Math.sqrt(dLat * dLat + dLng * dLng);
+          return dist > SELF_EXCLUSION_M;
+        })
+      : aggregated;
+
+    toDraw.forEach((p) =>
       addCommunityPoint(p.lat, p.lng, p.db, p.category, p.createdAt, p.sampleCount)
     );
 
-    counter.innerText = `${aggregated.length} zonas · ${data.length} mediciones`;
+    const hidden = aggregated.length - toDraw.length;
+    counter.innerText = hidden > 0
+      ? `${toDraw.length} zonas · ${data.length} mediciones (${hidden} cerca de ti)`
+      : `${toDraw.length} zonas · ${data.length} mediciones`;
+
   } catch (err) {
     console.error('Error cargando mediciones:', err);
     counter.innerText = 'Error al cargar datos';
   }
 }
 
-// Refresco automático
 loadCommunityPoints();
 setInterval(loadCommunityPoints, REFRESH_INTERVAL_MS);
 
-// ==========================================
-// 7. TOGGLE EN VIVO / HISTORIAL
-// ==========================================
+// ============================================
+// 11. MODO EN VIVO / HISTORIAL
+// ============================================
 function setMapMode(mode) {
   mapMode = mode;
   document.querySelectorAll('.mode-btn').forEach((b) => b.classList.remove('active'));
-  document.getElementById(`mode-${mode}`).classList.add('active');
+  const btn = document.getElementById(`mode-${mode}`);
+  if (btn) btn.classList.add('active');
   loadCommunityPoints();
 }
 
-// ==========================================
-// 8. NAVEGACIÓN ENTRE PESTAÑAS
-// ==========================================
+// ============================================
+// 12. NAVEGACIÓN PESTAÑAS
+// ============================================
 function switchTab(tabId, btn) {
   document.querySelectorAll('.tab-content').forEach((t) => t.classList.remove('active'));
   document.querySelectorAll('.tab-btn').forEach((b) => b.classList.remove('active'));
@@ -295,19 +315,21 @@ function switchTab(tabId, btn) {
   }
 }
 
-// ==========================================
-// 9. COLAPSAR PANEL
-// ==========================================
+// ============================================
+// 13. COLAPSAR PANEL
+// ============================================
 function togglePanel() {
   const panel = document.getElementById('sensor-panel');
   const label = document.getElementById('handle-label');
   panel.classList.toggle('collapsed');
-  label.innerText = panel.classList.contains('collapsed') ? 'Mostrar detalles' : 'Ocultar detalles';
+  label.innerText = panel.classList.contains('collapsed')
+    ? 'Mostrar detalles'
+    : 'Ocultar detalles';
 }
 
-// ==========================================
-// 10. CAPTURA Y PROCESAMIENTO DE AUDIO
-// ==========================================
+// ============================================
+// 14. MONITOREO DE AUDIO
+// ============================================
 async function toggleMonitoring() {
   const btn = document.getElementById('btn-toggle');
   const badge = document.getElementById('status-badge');
@@ -452,9 +474,9 @@ function updateMeter() {
   rafId = requestAnimationFrame(updateMeter);
 }
 
-// ==========================================
-// 11. ENVÍO A SUPABASE
-// ==========================================
+// ============================================
+// 15. ENVÍO A SUPABASE
+// ============================================
 async function sendMeasurementIfDue() {
   const now = Date.now();
   if (!sharingEnabled || !currentPosition) return;
@@ -468,11 +490,6 @@ async function sendMeasurementIfDue() {
 
   const blurred = blurLocation(currentPosition.lat, currentPosition.lng);
   const category = classifyDb(avg);
-  const createdAt = new Date().toISOString();
-
-  // ⚠️ NO añadimos el punto a la capa comunitaria local.
-  // El punto aparecerá en el próximo refresco (30 s) desde Supabase.
-  // Así evitamos duplicar "mi punto difuminado" con "mi ubicación exacta".
 
   if (supabaseClient) {
     const { error } = await supabaseClient.from('noise_measurements').insert({
@@ -485,9 +502,9 @@ async function sendMeasurementIfDue() {
   }
 }
 
-// ==========================================
-// 12. COMPARTIR UBICACIÓN
-// ==========================================
+// ============================================
+// 16. COMPARTIR UBICACIÓN
+// ============================================
 function toggleSharing() {
   const cb = document.getElementById('share-toggle');
   const status = document.getElementById('share-status');
@@ -506,8 +523,6 @@ function toggleSharing() {
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         currentPosition = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-
-        // ✅ Mostrar MI ubicación exacta (azul, solo visible para mí)
         showMyLocation(currentPosition.lat, currentPosition.lng);
         map.setView([currentPosition.lat, currentPosition.lng], 16);
 
@@ -515,11 +530,13 @@ function toggleSharing() {
         status.innerHTML = '✅ Compartiendo. Los demás ven una zona difuminada ~150 m.';
         lastSendTime = 0;
 
+        // Refrescar zonas para aplicar la exclusión de mi propio ruido
+        loadCommunityPoints();
+
         if (geoWatchId === null) {
           geoWatchId = navigator.geolocation.watchPosition(
             (p) => {
               currentPosition = { lat: p.coords.latitude, lng: p.coords.longitude };
-              // Actualizar mi marcador en tiempo real
               showMyLocation(currentPosition.lat, currentPosition.lng);
             },
             (err) => console.warn('watchPosition:', err),
@@ -537,7 +554,7 @@ function toggleSharing() {
       { enableHighAccuracy: true, timeout: 10000 }
     );
   } else {
-    status.innerHTML = '🔒 Compartir desactivado.';
+    status.innerHTML = '🔒 Compartir desactivado. Tus mediciones no salen de tu dispositivo.';
     updateGpsChip(false);
     hideMyLocation();
     currentPosition = null;
@@ -545,6 +562,7 @@ function toggleSharing() {
       navigator.geolocation.clearWatch(geoWatchId);
       geoWatchId = null;
     }
+    loadCommunityPoints();
   }
 }
 
@@ -557,23 +575,4 @@ function updateGpsChip(active) {
     chip.innerText = '📡 GPS: sin permiso';
     chip.classList.remove('ok');
   }
-}
-
-// ==========================================
-// 13. CENTRAR EN EL USUARIO
-// ==========================================
-function centerOnUser() {
-  if (currentPosition) {
-    map.setView([currentPosition.lat, currentPosition.lng], 16);
-    return;
-  }
-  navigator.geolocation.getCurrentPosition(
-    (pos) => {
-      currentPosition = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-      showMyLocation(currentPosition.lat, currentPosition.lng);
-      map.setView([currentPosition.lat, currentPosition.lng], 16);
-    },
-    (err) => alert('No se pudo obtener tu ubicación. Verifica los permisos.'),
-    { enableHighAccuracy: true, timeout: 10000 }
-  );
 }

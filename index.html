@@ -2,84 +2,41 @@
 <html lang="es">
   <head>
     <meta charset="UTF-8" />
-    <meta
-      name="viewport"
-      content="width=device-width, initial-scale=1.0, viewport-fit=cover"
-    />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>AcoustiMap - Mapeo de Contaminación Acústica</title>
 
-    <!-- Google Fonts -->
     <link
       href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap"
       rel="stylesheet"
     />
-
-    <!-- Leaflet CSS -->
     <link
       rel="stylesheet"
       href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
     />
-
-    <!-- ✅ Leaflet Locate Control CSS -->
-    <link
-      rel="stylesheet"
-      href="https://cdn.jsdelivr.net/npm/leaflet.locatecontrol@0.84.2/dist/L.Control.Locate.min.css"
-    />
-
-    <!-- Estilos propios -->
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
-    <!-- HEADER NAVEGACIÓN -->
     <header>
       <div class="brand">🎙️ Acousti<span>Map</span></div>
       <div class="nav-tabs">
-        <button class="tab-btn active" onclick="switchTab('map-view', this)">
-          🗺️ Mapa
-        </button>
-        <button class="tab-btn" onclick="switchTab('info-view', this)">
-          📚 Salud
-        </button>
-        <button class="tab-btn" onclick="switchTab('ods-view', this)">
-          ℹ️ ODS
-        </button>
+        <button class="tab-btn active" onclick="switchTab('map-view', this)">🗺️ Mapa</button>
+        <button class="tab-btn" onclick="switchTab('info-view', this)">📚 Salud</button>
+        <button class="tab-btn" onclick="switchTab('ods-view', this)">ℹ️ ODS</button>
       </div>
     </header>
 
-    <!-- PESTAÑA 1: MAPA Y SENSOR EN TIEMPO REAL -->
     <div id="map-view" class="tab-content active">
       <div id="map"></div>
 
-      <!-- TOGGLE EN VIVO / HISTORIAL -->
       <div class="map-mode">
-        <button
-          class="mode-btn active"
-          id="mode-live"
-          onclick="setMapMode('live')"
-        >
-          En Vivo
-        </button>
-        <button
-          class="mode-btn"
-          id="mode-history"
-          onclick="setMapMode('history')"
-        >
-          Historial
-        </button>
+        <button class="mode-btn active" id="mode-live" onclick="setMapMode('live')">En Vivo</button>
+        <button class="mode-btn" id="mode-history" onclick="setMapMode('history')">Historial</button>
       </div>
 
-      <!-- LEYENDA DEL MAPA -->
       <div class="map-legend">
-        <div>
-          <span class="dot" style="background: #10b981"></span>&lt; 55 dB · Bajo
-        </div>
-        <div>
-          <span class="dot" style="background: #f59e0b"></span>55 - 70 dB ·
-          Moderado
-        </div>
-        <div>
-          <span class="dot" style="background: #ef4444"></span>&gt; 70 dB · Alto
-        </div>
+        <div><span class="dot" style="background: #10b981"></span>&lt; 55 dB · Bajo</div>
+        <div><span class="dot" style="background: #f59e0b"></span>55 - 70 dB · Moderado</div>
+        <div><span class="dot" style="background: #ef4444"></span>&gt; 70 dB · Alto</div>
         <div class="legend-count" id="community-count">Cargando datos…</div>
         <div class="legend-me">
           <span class="dot-blue"></span>
@@ -87,14 +44,8 @@
         </div>
       </div>
 
-      <!-- PANEL FLOTANTE DE CONTROL -->
       <div class="sensor-panel collapsed" id="sensor-panel">
-        <button
-          class="panel-handle"
-          id="panel-handle"
-          onclick="togglePanel()"
-          aria-label="Expandir panel"
-        >
+        <button class="panel-handle" id="panel-handle" onclick="togglePanel()" aria-label="Expandir panel">
           <span class="handle-bar"></span>
           <span class="handle-label" id="handle-label">Mostrar detalles</span>
         </button>
@@ -107,7 +58,6 @@
           <span class="gps-chip" id="gps-chip">📡 GPS: sin permiso</span>
         </div>
 
-        <!-- MEDIDOR EN VIVO -->
         <div class="meter-container">
           <div class="db-value" id="db-number">--</div>
           <div class="db-label" id="db-status-text">Presiona Iniciar</div>
@@ -116,7 +66,6 @@
           </div>
         </div>
 
-        <!-- PROMEDIO DE LA SESIÓN -->
         <div class="avg-block">
           <div class="avg-head">
             <span>📊 Promedio de la sesión</span>
@@ -138,14 +87,9 @@
           Activar Micrófono
         </button>
 
-        <!-- DETALLES -->
         <div class="panel-details" id="panel-details">
           <label class="share-row" for="share-toggle">
-            <input
-              type="checkbox"
-              id="share-toggle"
-              onchange="toggleSharing()"
-            />
+            <input type="checkbox" id="share-toggle" onchange="toggleSharing()" />
             <span class="share-text">
               <strong>Compartir en el mapa comunitario</strong>
               <small>
@@ -163,14 +107,11 @@
       </div>
     </div>
 
-    <!-- PESTAÑA 2: INFORMACIÓN DE SALUD Y NIVELES -->
     <div id="info-view" class="tab-content">
       <div class="info-wrapper">
         <div class="info-header">
           <h1>Escala de Contaminación Acústica</h1>
-          <p>
-            Conoce cómo impacta el nivel de decibelios (dB) en tu salud diaria.
-          </p>
+          <p>Conoce cómo impacta el nivel de decibelios (dB) en tu salud diaria.</p>
         </div>
 
         <div class="cards-grid">
@@ -181,12 +122,9 @@
             </div>
             <h3>🌿 Entorno Confortable</h3>
             <p style="font-size: 0.88rem; margin: 10px 0; color: #475569">
-              Entorno óptimo para el descanso, el estudio y el bienestar
-              psicológico.
+              Entorno óptimo para el descanso, el estudio y el bienestar psicológico.
             </p>
-            <small
-              >📍 Ejemplos: Bibliotecas, parques, residencial silencioso.</small
-            >
+            <small>📍 Ejemplos: Bibliotecas, parques, residencial silencioso.</small>
           </div>
 
           <div class="info-card moderado">
@@ -196,13 +134,9 @@
             </div>
             <h3>🗣️ Ligeramente Molesto</h3>
             <p style="font-size: 0.88rem; margin: 10px 0; color: #475569">
-              Puede provocar irritabilidad, dificultad de concentración y estrés
-              leve a largo plazo.
+              Puede provocar irritabilidad, dificultad de concentración y estrés leve a largo plazo.
             </p>
-            <small
-              >📍 Ejemplos: Tráfico fluido, oficinas, conversaciones
-              elevadas.</small
-            >
+            <small>📍 Ejemplos: Tráfico fluido, oficinas, conversaciones elevadas.</small>
           </div>
 
           <div class="info-card alto">
@@ -212,37 +146,24 @@
             </div>
             <h3>🚨 Dañino / Crítico</h3>
             <p style="font-size: 0.88rem; margin: 10px 0; color: #475569">
-              Riesgo de hipertensión, migrañas, estrés agudo y pérdida auditiva
-              (&gt;85 dB).
+              Riesgo de hipertensión, migrañas, estrés agudo y pérdida auditiva (&gt;85 dB).
             </p>
-            <small
-              >📍 Ejemplos: Tráfico pesado, sirenas, construcciones,
-              claxon.</small
-            >
+            <small>📍 Ejemplos: Tráfico pesado, sirenas, construcciones, claxon.</small>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- PESTAÑA 3: ALINEACIÓN CON LOS ODS -->
-    <div
-      id="ods-view"
-      class="tab-content"
-      style="background: #f8fafc; padding: 80px 20px"
-    >
+    <div id="ods-view" class="tab-content" style="background: #f8fafc; padding: 80px 20px">
       <div class="info-wrapper">
-        <h1 style="text-align: center; margin-bottom: 20px">
-          Contribución a los ODS
-        </h1>
+        <h1 style="text-align: center; margin-bottom: 20px">Contribución a los ODS</h1>
         <p style="line-height: 1.6; color: #334155">
-          <strong>AcoustiMap</strong> utiliza tecnología participativa para
-          avanzar en la Agenda 2030:
+          <strong>AcoustiMap</strong> utiliza tecnología participativa para avanzar en la Agenda 2030:
         </p>
         <ul style="margin: 20px 0 0 20px; line-height: 1.8; color: #334155">
           <li>
             <strong>ODS 3 (Salud y Bienestar):</strong> Previene enfermedades
-            cardiovasculares y auditivas mediante el mapeo de zonas de riesgo
-            sonoro.
+            cardiovasculares y auditivas mediante el mapeo de zonas de riesgo sonoro.
           </li>
           <li>
             <strong>ODS 11 (Ciudades y Comunidades Sostenibles):</strong>
@@ -253,30 +174,14 @@
             <strong>Privacidad por diseño:</strong> Las coordenadas se difuminan
             (~150 m) antes de almacenarse, de modo que el mapa comunitario
             muestra <em>zonas de ruido</em> y nunca la ubicación de una persona.
-            Cada usuario ve su propia posición exacta en azul, solo para sí
-            mismo.
+            Cada usuario ve su propia posición exacta en azul, solo para sí mismo.
           </li>
         </ul>
       </div>
     </div>
 
-    <!-- ============================================================
-         LIBRERÍAS JS
-         ============================================================ -->
-
-    <!-- 1. Leaflet (mapa) -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
-    <!-- 2. ✅ Leaflet Locate Control (botón de ubicación) -->
-    <script
-      src="https://cdn.jsdelivr.net/npm/leaflet.locatecontrol@0.84.2/dist/L.Control.Locate.min.js"
-      charset="utf-8"
-    ></script>
-
-    <!-- 3. Cliente de Supabase -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
-    <!-- 4. Script lógico de la app (SIEMPRE al final) -->
     <script src="script.js"></script>
   </body>
 </html>
