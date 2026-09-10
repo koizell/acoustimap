@@ -104,6 +104,71 @@ L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
 
 // Capa de puntos comunitarios
 const communityLayer = L.layerGroup().addTo(map);
+const historyLayer = L.layerGroup();
+let currentMapMode = 'live';
+
+function switchMapLayer(mode, btn) {
+  document.querySelectorAll('.map-mode-toggle button').forEach(b => {
+    b.style.background = '#f1f5f9';
+    b.style.color = '#475569';
+  });
+  btn.style.background = '#2563eb';
+  btn.style.color = '#fff';
+  currentMapMode = mode;
+
+  if (mode === 'live') {
+    map.removeLayer(historyLayer);
+    map.addLayer(communityLayer);
+    loadCommunityPoints();
+  } else {
+    map.removeLayer(communityLayer);
+    historyLayer.addTo(map);
+    loadHistoryPoints();
+  }
+}
+
+async function loadHistoryPoints() {
+  const counter = document.getElementById('community-count');
+  historyLayer.clearLayers();
+
+  if (!supabaseClient) {
+    counter.innerText = 'Sin historial disponible';
+    return;
+  }
+
+  try {
+    let { data, error } = await supabaseClient
+      .from('noise_sessions')
+      .select('*')
+      .limit(200);
+
+    if (error || !data || data.length === 0) {
+      await loadCommunityPoints();
+      return;
+    }
+
+    data.forEach((s) => {
+      L.circle([s.latitude, s.longitude], {
+        color: COLOR_BY_CAT[s.category] || '#10b981',
+        fillColor: COLOR_BY_CAT[s.category] || '#10b981',
+        fillOpacity: 0.15,
+        weight: 1,
+        radius: 50,
+      })
+        .addTo(historyLayer)
+        .bindPopup(
+          `<b>Histórico: ${s.avg_db || s.db_level} dB</b><br>
+           Muestras: ${s.sample_count || 1}<br>
+           <small>Zona consolidada</small>`
+        );
+    });
+
+    counter.innerText = `${data.length} zonas históricas`;
+  } catch (err) {
+    console.error('Error cargando historial:', err);
+    counter.innerText = 'Error al cargar historial';
+  }
+}
 
 const COLOR_BY_CAT = { bajo: "#10b981", moderado: "#f59e0b", alto: "#ef4444" };
 
@@ -132,35 +197,34 @@ function timeAgo(iso) {
  */
 function addCommunityPoint(lat, lng, db, category, createdAt, sampleCount = 1) {
   const color = COLOR_BY_CAT[category] || colorForDb(db);
-  const when = createdAt ? timeAgo(createdAt) : "ahora";
+  const when = createdAt ? timeAgo(createdAt) : 'ahora';
 
-  // Punto central sutil (marca el centro del área difuminada)
+  // Círculo central marcador
   L.circleMarker([lat, lng], {
-    radius: 3,
-    color: "#ffffff",
+    radius: 4,
+    color: '#ffffff',
     weight: 2,
     fillColor: color,
     fillOpacity: 1,
-    interactive: false,
+    interactive: false
   }).addTo(communityLayer);
 
-  // Círculo de "zona" pequeño y translúcido
+  // Onda de sonido con efecto de pulso visual
   L.circle([lat, lng], {
     color,
     fillColor: color,
-    fillOpacity: 0.25,
-    weight: 1.5,
-    radius: 40, // ~40 m visuales en el mapa
-    opacity: 0.8,
-  })
-    .addTo(communityLayer)
+    fillOpacity: 0.15,
+    weight: 1,
+    radius: 50,
+  }).addTo(communityLayer)
     .bindPopup(
       `<b>${db} dB</b><br>
        Categoría: <b>${category}</b><br>
-       ${sampleCount > 1 ? `<small>Promedio de ${sampleCount} mediciones</small><br>` : ""}
-       <small>${when}</small>`,
+       ${sampleCount > 1 ? `<small>Promedio de ${sampleCount} mediciones</small><br>` : ''}
+       <small>${when}</small>`
     );
 }
+
 
 /**
  * Agrupa mediciones muy cercanas (grid ~100 m) para evitar círculos apilados.
@@ -465,7 +529,7 @@ function updateMeter() {
 // 6. PRIVACIDAD + ENVÍO A SUPABASE
 // ==========================================
 function blurLocation(lat, lng) {
-  const step = 0.001; // ~111 m
+  const step = 0.0003; // ~30-40 m (más preciso)
   const bLat = Math.round(lat / step) * step + blurOffset.lat;
   const bLng = Math.round(lng / step) * step + blurOffset.lng;
   return { lat: bLat, lng: bLng };
@@ -515,8 +579,8 @@ function toggleSharing() {
     status.innerHTML = "⏳ Solicitando permiso de ubicación…";
 
     blurOffset = {
-      lat: (Math.random() - 0.5) * 0.0014,
-      lng: (Math.random() - 0.5) * 0.0014,
+      lat: (Math.random() - 0.5) * 0.0004,
+      lng: (Math.random() - 0.5) * 0.0004,
     };
 
     navigator.geolocation.getCurrentPosition(
@@ -525,9 +589,10 @@ function toggleSharing() {
           lat: pos.coords.latitude,
           lng: pos.coords.longitude,
         };
+        map.setView([currentPosition.lat, currentPosition.lng], 16);
         updateGpsChip(true);
         status.innerHTML =
-          "✅ Compartiendo en el mapa (ubicación difuminada ~150 m).";
+          "✅ Compartiendo en el mapa (ubicación precisa y difuminada ~30m).";
         lastSendTime = 0;
 
         if (geoWatchId === null) {
@@ -539,7 +604,7 @@ function toggleSharing() {
               };
             },
             (err) => console.warn("watchPosition:", err),
-            { enableHighAccuracy: false, maximumAge: 30000, timeout: 20000 },
+            { enableHighAccuracy: true, maximumAge: 10000, timeout: 20000 },
           );
         }
       },
@@ -550,7 +615,7 @@ function toggleSharing() {
         sharingEnabled = false;
         updateGpsChip(false);
       },
-      { enableHighAccuracy: false, timeout: 10000 },
+      { enableHighAccuracy: true, timeout: 10000 },
     );
   } else {
     status.innerHTML =
