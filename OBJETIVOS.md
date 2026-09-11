@@ -31,23 +31,7 @@ El objetivo es conectar la aplicación a una base de datos relacional en la nube
 * **Configuración en Supabase:**
   * Crear un nuevo proyecto en la plataforma [Supabase](https://supabase.com).
   * Obtener las credenciales de conexión: `SUPABASE_URL` y la clave pública `SUPABASE_ANON_KEY`.
-* **Diseño del Esquema de Base de Datos (SQL):**
-  * Crear una tabla llamada `noise_measurements` con la siguiente estructura básica:
-    ```sql
-    create table noise_measurements (
-      id uuid default gen_random_uuid() primary key,
-      latitude double precision not null,
-      longitude double precision not null,
-      db_level integer not null,
-      category text not null,
-      created_at timestamp with time zone default timezone('utc'::text, now()) not null
-    );
-    ```
   * Habilitar Row Level Security (RLS) y configurar políticas de inserción pública si es necesario.
 * **Integración en el Cliente (`script.js`):**
-  * Incluir el cliente de Supabase vía CDN en `index.html`:
-    ```html
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    ```
   * Inicializar el cliente en `script.js` con las credenciales del proyecto.
   * Implementar una función para enviar los registros de ruido a Supabase cada vez que se realice una medición significativa o se guarde un punto en el mapa.
