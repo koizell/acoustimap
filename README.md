@@ -89,31 +89,8 @@ acoustimap/
     └── setup.sql       · esquema + RLS + cron
 ```
 
----
-
-## 🛠️ Instalación local
-
-```bash
-git clone https://github.com/koizell/acoustimap.git
-cd acoustimap
-python -m http.server 8000
-# Abre http://localhost:8000
-```
-
 > ⚠️ El micrófono y la geolocalización requieren **HTTPS** en producción.
 
----
-
-## 🗄️ Configuración de Supabase
-
-1. Crea un proyecto en [supabase.com](https://supabase.com).
-2. Ejecuta `sql/setup.sql` en el **SQL Editor**.
-3. Copia **Project URL** y **anon key** desde *Settings → API*.
-4. Pégalos en `js/config.js` (`SUPABASE_URL` y `SUPABASE_ANON_KEY`).
-
-> 🔐 La `anon key` es pública por diseño. Los datos están protegidos por **políticas RLS**.
-
----
 
 ## 🌍 ODS relacionados
 
