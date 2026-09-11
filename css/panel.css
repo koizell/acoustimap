@@ -1,7 +1,7 @@
 /* ============================================================
    panel.css
    Botones de acción principales, panel de estadísticas,
-   medidor de dB, promedio de sesión y modal de compartir.
+   medidor de dB, promedio de sesión y modales de confirmación.
    ============================================================ */
 
 /* ============================================================
@@ -177,7 +177,7 @@
    ============================================================ */
 .main-actions {
   position: absolute;
-  bottom: 20px;
+  bottom: 18px; /* ✅ Ajustado de 20px a 18px */
   left: 50%;
   transform: translateX(-50%);
   z-index: 999;
@@ -239,7 +239,7 @@
 }
 
 /* ============================================================
-   MODAL DE CONFIRMACIÓN DE COMPARTIR
+   MODALES DE CONFIRMACIÓN
    ============================================================ */
 .modal-overlay {
   position: fixed;

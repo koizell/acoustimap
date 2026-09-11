@@ -13,7 +13,7 @@
   }
 
   .main-actions {
-    bottom: 24px;
+    bottom: 22px; /* ✅ Ajustado de 24px a 22px */
     max-width: 480px;
   }
 
@@ -57,7 +57,7 @@
   }
 
   .main-actions {
-    bottom: 12px;
+    bottom: 10px; /* ✅ Ajustado de 12px a 10px */
     max-width: 100%;
   }
 

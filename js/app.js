@@ -1,6 +1,6 @@
 /**
  * app.js
- * Pestañas, leyenda colapsable, modal de compartir, botones de acción.
+ * Pestañas, leyenda colapsable, modales, botones de acción.
  * Depende de: todos los módulos anteriores.
  */
 
@@ -45,6 +45,27 @@ function closeShareModal() {
 function confirmSharing() {
   closeShareModal();
   toggleSharing();
+}
+
+// ============================================
+// MODAL DE CONFIRMACIÓN DE MICRÓFONO
+// ============================================
+function openMicModal() {
+  // Si ya está monitoreando, detener directamente
+  if (isMonitoring) {
+    toggleMonitoring();
+    return;
+  }
+  document.getElementById('mic-modal').classList.add('visible');
+}
+
+function closeMicModal() {
+  document.getElementById('mic-modal').classList.remove('visible');
+}
+
+function confirmMicActivation() {
+  closeMicModal();
+  toggleMonitoring();
 }
 
 // ============================================
