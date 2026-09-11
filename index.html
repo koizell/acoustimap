@@ -29,7 +29,7 @@
     <div id="map-view" class="tab-content active">
       <div id="map"></div>
 
-      <!-- BOTÓN DE LEYENDA (icono ℹ️) -->
+      <!-- BOTÓN DE LEYENDA -->
       <button class="legend-toggle" id="legend-toggle" onclick="toggleLegend()" aria-label="Información del mapa">
         ℹ️
       </button>
@@ -53,11 +53,11 @@
         </div>
       </div>
 
-      <!-- PANEL DE ESTADÍSTICAS (siempre visible) -->
+      <!-- PANEL DE ESTADÍSTICAS -->
       <div class="stats-panel" id="stats-panel">
         <div class="stats-header">
           <span class="status-badge" id="status-badge">
-            <span class="pulse-dot" id="pulse-dot"></span>
+            <span class="pulse-dot" id="pulse-dot" style="display: none"></span>
             <span id="status-text">Inactivo</span>
           </span>
           <span class="gps-chip" id="gps-chip">📡 GPS: sin permiso</span>
@@ -89,7 +89,7 @@
         </div>
       </div>
 
-      <!-- BOTONES DE ACCIÓN (juntos) -->
+      <!-- BOTONES DE ACCIÓN -->
       <div class="main-actions">
         <button class="action-btn primary" id="btn-toggle" onclick="openMicModal()">
           <span class="action-icon">🎤</span>
@@ -102,7 +102,7 @@
       </div>
     </div>
 
-    <!-- MODAL DE CONFIRMACIÓN PARA COMPARTIR -->
+    <!-- MODAL: COMPARTIR -->
     <div class="modal-overlay" id="share-modal">
       <div class="modal-content">
         <div class="modal-icon">📍</div>
@@ -121,7 +121,7 @@
       </div>
     </div>
 
-    <!-- MODAL DE CONFIRMACIÓN PARA ACTIVAR MICRÓFONO -->
+    <!-- MODAL: MICRÓFONO -->
     <div class="modal-overlay" id="mic-modal">
       <div class="modal-content">
         <div class="modal-icon">🎤</div>
