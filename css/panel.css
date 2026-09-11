@@ -5,79 +5,13 @@
    ============================================================ */
 
 /* ============================================================
-   BOTONES PRINCIPALES DE ACCIÓN
-   ============================================================ */
-.main-actions {
-  position: absolute;
-  bottom: 20px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 999;
-  display: flex;
-  gap: 10px;
-  width: calc(100% - 32px);
-  max-width: 400px;
-}
-
-.action-btn {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  padding: 12px 8px;
-  border: none;
-  border-radius: 14px;
-  cursor: pointer;
-  font-weight: 700;
-  font-size: 0.78rem;
-  transition: all 0.2s;
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.18);
-}
-
-.action-btn.primary {
-  background: var(--primary);
-  color: #fff;
-}
-
-.action-btn.primary:hover {
-  background: #1d4ed8;
-}
-
-.action-btn.secondary {
-  background: #fff;
-  color: var(--primary);
-  border: 2px solid var(--primary);
-}
-
-.action-btn.secondary:hover {
-  background: #eff6ff;
-}
-
-.action-btn.active {
-  background: #dc2626 !important;
-  color: #fff !important;
-  border-color: #dc2626 !important;
-}
-
-.action-icon {
-  font-size: 1.4rem;
-}
-
-.action-text {
-  font-size: 0.72rem;
-  line-height: 1.1;
-  text-align: center;
-}
-
-/* ============================================================
    PANEL DE ESTADÍSTICAS
    ============================================================ */
 .stats-panel {
   position: absolute;
   bottom: 90px;
   left: 50%;
-  transform: translateX(-50%) translateY(20px);
+  transform: translateX(-50%);
   z-index: 998;
   width: calc(100% - 32px);
   max-width: 400px;
@@ -87,15 +21,6 @@
   padding: 14px;
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.22);
   border: 1px solid rgba(255, 255, 255, 0.4);
-  opacity: 0;
-  pointer-events: none;
-  transition: all 0.3s ease;
-}
-
-.stats-panel.visible {
-  opacity: 1;
-  pointer-events: auto;
-  transform: translateX(-50%) translateY(0);
 }
 
 /* Cabecera del panel */
@@ -246,6 +171,72 @@
 }
 
 .avg-meta b { color: var(--text-main); }
+
+/* ============================================================
+   BOTONES PRINCIPALES DE ACCIÓN
+   ============================================================ */
+.main-actions {
+  position: absolute;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 999;
+  display: flex;
+  gap: 10px;
+  width: calc(100% - 32px);
+  max-width: 400px;
+}
+
+.action-btn {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 12px 8px;
+  border: none;
+  border-radius: 14px;
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 0.78rem;
+  transition: all 0.2s;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.18);
+}
+
+.action-btn.primary {
+  background: var(--primary);
+  color: #fff;
+}
+
+.action-btn.primary:hover {
+  background: #1d4ed8;
+}
+
+.action-btn.secondary {
+  background: #fff;
+  color: var(--primary);
+  border: 2px solid var(--primary);
+}
+
+.action-btn.secondary:hover {
+  background: #eff6ff;
+}
+
+.action-btn.active {
+  background: #dc2626 !important;
+  color: #fff !important;
+  border-color: #dc2626 !important;
+}
+
+.action-icon {
+  font-size: 1.4rem;
+}
+
+.action-text {
+  font-size: 0.72rem;
+  line-height: 1.1;
+  text-align: center;
+}
 
 /* ============================================================
    MODAL DE CONFIRMACIÓN DE COMPARTIR

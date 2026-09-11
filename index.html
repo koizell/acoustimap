@@ -15,7 +15,6 @@
     <link rel="stylesheet" href="css/panel.css" />
     <link rel="stylesheet" href="css/info.css" />
     <link rel="stylesheet" href="css/responsive.css" />
-    
   </head>
   <body>
     <header>
@@ -54,19 +53,7 @@
         </div>
       </div>
 
-      <!-- BOTONES PRINCIPALES DE ACCIÓN -->
-      <div class="main-actions">
-        <button class="action-btn primary" id="btn-toggle" onclick="toggleMonitoring()">
-          <span class="action-icon">🎤</span>
-          <span class="action-text">Activar Micrófono</span>
-        </button>
-        <button class="action-btn secondary" id="btn-share" onclick="openShareModal()">
-          <span class="action-icon">📡</span>
-          <span class="action-text">Compartir en mapa</span>
-        </button>
-      </div>
-
-      <!-- PANEL DE ESTADÍSTICAS -->
+      <!-- PANEL DE ESTADÍSTICAS (siempre visible) -->
       <div class="stats-panel" id="stats-panel">
         <div class="stats-header">
           <span class="status-badge" id="status-badge">
@@ -100,6 +87,18 @@
             <span>Muestras <b id="sample-count">0</b></span>
           </div>
         </div>
+      </div>
+
+      <!-- BOTONES DE ACCIÓN (juntos) -->
+      <div class="main-actions">
+        <button class="action-btn primary" id="btn-toggle" onclick="toggleMonitoring()">
+          <span class="action-icon">🎤</span>
+          <span class="action-text">Activar Micrófono</span>
+        </button>
+        <button class="action-btn secondary" id="btn-share" onclick="openShareModal()">
+          <span class="action-icon">📡</span>
+          <span class="action-text">Compartir en mapa</span>
+        </button>
       </div>
     </div>
 

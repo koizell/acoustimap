@@ -63,19 +63,6 @@ function updateActionButtons() {
 }
 
 // ============================================
-// PANEL DE ESTADÍSTICAS
-// ============================================
-function showStatsPanel() {
-  const panel = document.getElementById('stats-panel');
-  if (panel) panel.classList.add('visible');
-}
-
-function hideStatsPanel() {
-  const panel = document.getElementById('stats-panel');
-  if (panel) panel.classList.remove('visible');
-}
-
-// ============================================
 // COMPARTIR UBICACIÓN
 // ============================================
 function toggleSharing() {

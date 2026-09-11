@@ -8,12 +8,10 @@
    ESCRITORIO (≥ 720px)
    ============================================================ */
 @media (min-width: 720px) {
-  /* Mapa */
   .leaflet-top.leaflet-left {
     top: calc(var(--header-h) + 10px) !important;
   }
 
-  /* Botones de acción: en horizontal en escritorio */
   .main-actions {
     bottom: 24px;
     max-width: 480px;
@@ -31,7 +29,6 @@
     font-size: 1.2rem;
   }
 
-  /* Panel de estadísticas más alto */
   .stats-panel {
     bottom: 100px;
     max-width: 480px;
@@ -46,7 +43,6 @@
     --header-h: 56px;
   }
 
-  /* Header compacto */
   header {
     padding: 8px 12px;
   }
@@ -60,7 +56,6 @@
     font-size: 0.72rem;
   }
 
-  /* Botones de acción pegados abajo */
   .main-actions {
     bottom: 12px;
     max-width: 100%;
@@ -75,7 +70,6 @@
     font-size: 1.3rem;
   }
 
-  /* Panel de estadísticas */
   .stats-panel {
     bottom: 80px;
   }
@@ -88,7 +82,6 @@
     font-size: 1.5rem;
   }
 
-  /* Leyenda pegada al icono ℹ️ */
   .map-legend {
     top: calc(var(--header-h) + 8px);
     right: 60px;
@@ -104,7 +97,6 @@
     font-size: 18px;
   }
 
-  /* Controles de zoom de Leaflet accesibles */
   .leaflet-control-zoom a {
     width: 30px !important;
     height: 30px !important;
