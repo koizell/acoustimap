@@ -8,7 +8,10 @@
 // TOGGLE MICRÓFONO
 // ============================================
 async function toggleMonitoring() {
-  const btn = document.getElementById('btn-toggle');
+  const btn        = document.getElementById('btn-toggle');
+  const badge      = document.getElementById('status-badge');
+  const pulse      = document.getElementById('pulse-dot');
+  const statusText = document.getElementById('status-text');
 
   if (!isMonitoring) {
     try {
@@ -25,12 +28,15 @@ async function toggleMonitoring() {
       btn.classList.add('active');
       btn.innerHTML = '<span class="action-icon">⏹️</span><span class="action-text">Detener</span>';
 
+      // ✅ Actualizar badge de estado
+      badge.classList.add('active');
+      pulse.style.display = 'inline-block';
+      statusText.innerText = 'Midiendo en Vivo';
+
       // ✅ Activar Wake Lock
       await requestWakeLock();
 
       startSession();
-
-      // ✅ Mostrar panel de estadísticas (ya no es necesario ocultarlo/mostrarlo)
       updateMeter();
     } catch (err) {
       console.error(err);
@@ -45,6 +51,11 @@ async function toggleMonitoring() {
     // ✅ Restaurar botón principal
     btn.classList.remove('active');
     btn.innerHTML = '<span class="action-icon">🎤</span><span class="action-text">Activar Micrófono</span>';
+
+    // ✅ Restaurar badge de estado
+    badge.classList.remove('active');
+    pulse.style.display = 'none';
+    statusText.innerText = 'Inactivo';
 
     // Resetear UI del medidor
     document.getElementById('db-number').innerText = '--';
