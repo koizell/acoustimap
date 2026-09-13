@@ -169,10 +169,6 @@ async function sendMeasurementIfDue() {
   if (sendWindowCount === 0) return;
 
   const avg = Math.round(sendWindowSum / sendWindowCount);
-  sendWindowSum = 0;
-  sendWindowCount = 0;
-  lastSendTime = now;
-
   const snapped  = snapToGrid(currentPosition.lat, currentPosition.lng);
   const category = classifyDb(avg);
   const nowIso   = new Date().toISOString();
@@ -180,6 +176,7 @@ async function sendMeasurementIfDue() {
   // Dibujar la zona inmediatamente en el mapa
   addCommunityPoint(snapped.lat, snapped.lng, avg, category, nowIso, 1);
 
+  let success = false;
   if (supabaseClient) {
     const { error } = await supabaseClient.from('noise_measurements').insert({
       latitude: snapped.lat,
@@ -187,7 +184,19 @@ async function sendMeasurementIfDue() {
       db_level: avg,
       category
     });
-    if (error) console.error('Supabase insert error:', error);
+    if (error) {
+      console.error('Supabase insert error:', error);
+    } else {
+      success = true;
+    }
+  } else {
+    success = true;
+  }
+
+  if (success) {
+    sendWindowSum = 0;
+    sendWindowCount = 0;
+    lastSendTime = now;
   }
 }
 

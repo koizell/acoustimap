@@ -1,13 +1,19 @@
 /**
  * config.js
  * Credenciales, constantes, estado compartido y utilidades.
+ * 
+ * Las credenciales de Supabase se cargan desde:
+ * 1. window.__ACOUSTIMAP_CONFIG__ (config.local.js para desarrollo local)
+ * 2. Valores inyectados en build (GitHub Actions para producción)
+ * 3. Fallback: placeholders que indican configuración pendiente
  */
 
 // ============================================
-// SUPABASE
+// SUPABASE - Cargar credenciales de forma segura
 // ============================================
-const SUPABASE_URL = 'https://vskndeoqkjsxophwwwpe.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZza25kZW9xa2pzeG9waHd3d3BlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODkwNjM0NzQsImV4cCI6MjEwNDYzOTQ3NH0.mto-be3VQFaXf5Gar8VIeV1bORbPNtLsa67SY6Adh-0';
+const _localConfig = window.__ACOUSTIMAP_CONFIG__ || {};
+const SUPABASE_URL = _localConfig.SUPABASE_URL || 'https://TU-PROYECTO.supabase.co';
+const SUPABASE_ANON_KEY = _localConfig.SUPABASE_ANON_KEY || 'TU_ANON_KEY_AQUI';
 
 let supabaseClient = null;
 try {
@@ -15,7 +21,7 @@ try {
     supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
     console.log('✅ Supabase conectado');
   } else {
-    console.warn('⚠️ Supabase no configurado.');
+    console.warn('⚠️ Supabase no configurado. Crea js/config.local.js copiando js/config.local.js.template');
   }
 } catch (e) {
   console.error('Error inicializando Supabase:', e);

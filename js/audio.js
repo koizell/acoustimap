@@ -47,6 +47,10 @@ async function toggleMonitoring() {
     if (stream) stream.getTracks().forEach((t) => t.stop());
     if (rafId) cancelAnimationFrame(rafId);
     rafId = null;
+    if (audioCtx) {
+      audioCtx.close();
+      audioCtx = null;
+    }
 
     // ✅ Restaurar botón principal
     btn.classList.remove('active');

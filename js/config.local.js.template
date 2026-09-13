@@ -1,0 +1,22 @@
+/**
+ * config.local.js
+ * Configuración local con credenciales sensibles.
+ * 
+ * INSTRUCCIONES:
+ * 1. Copia este archivo como `config.local.js` en la misma carpeta
+ * 2. Rellena tus credenciales de Supabase
+ * 3. NO committear config.local.js (está en .gitignore)
+ * 
+ * Para producción en GitHub Pages, usa el script build-config.js
+ * que inyecta las variables desde GitHub Secrets.
+ */
+
+// Sobrescribe las credenciales de config.js
+const SUPABASE_URL = 'https://TU-PROYECTO.supabase.co';
+const SUPABASE_ANON_KEY = 'TU_ANON_KEY_AQUI';
+
+// Exportar para que config.js pueda leerlas
+window.__ACOUSTIMAP_CONFIG__ = {
+  SUPABASE_URL,
+  SUPABASE_ANON_KEY
+};

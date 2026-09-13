@@ -1,0 +1,26 @@
+{
+  "name": "acoustimap",
+  "version": "1.0.0",
+  "description": "Mapeo colaborativo de contaminación acústica urbana",
+  "scripts": {
+    "build:config": "node build-config.js",
+    "dev": "npx serve .",
+    "test": "echo \"No tests specified\" && exit 0"
+  },
+  "keywords": [
+    "noise",
+    "pollution",
+    "map",
+    "citizen-science",
+    "supabase",
+    "leaflet"
+  ],
+  "author": "Koizell",
+  "license": "MIT",
+  "devDependencies": {
+    "serve": "^14.2.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
