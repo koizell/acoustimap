@@ -1,0 +1,38 @@
+name: Notificar a Code2Vault
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'src/**.js'
+      - 'src/**.sql'
+      - 'src/**.py'
+      - 'src/**.html'
+      - 'src/**.css'
+
+jobs:
+  notificar:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 🔑 Generar token temporal de la GitHub App
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+          owner: koizell-dev
+
+      - name: 📨 Enviar evento al repo privado
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+          repository: koizell-dev/code2vault-template
+          event-type: codigo-actualizado
+          client-payload: |
+            {
+              "ref": "${{ github.ref }}",
+              "sha": "${{ github.sha }}",
+              "repository": "${{ github.repository }}",
+              "commit_message": "${{ github.event.head_commit.message }}"
+            }
