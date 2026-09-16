@@ -3,12 +3,31 @@ name: Notificar a Code2Vault
 on:
   push:
     branches: [ main ]
-    paths:
-      - 'src/**.js'
-      - 'src/**.sql'
-      - 'src/**.py'
-      - 'src/**.html'
-      - 'src/**.css'
+    paths-ignore:
+      - '**/*.md'
+      - '**/*.txt'
+      - '**/*.json'
+      - '**/*.lock'
+      - '**/node_modules/**'
+      - '**/.git/**'
+      - '**/.github/**'
+      - '**/dist/**'
+      - '**/build/**'
+      - '**/docs/**'
+      - '**/assets/**'
+      - '**/images/**'
+      - '**/img/**'
+      - '**/public/**'
+      - '**/*.png'
+      - '**/*.jpg'
+      - '**/*.jpeg'
+      - '**/*.gif'
+      - '**/*.svg'
+      - '**/*.ico'
+      - '**/*.pdf'
+      - '**/*.zip'
+      - '**/*.mp4'
+      - '**/*.mp3'
 
 jobs:
   notificar:
@@ -34,5 +53,6 @@ jobs:
               "ref": "${{ github.ref }}",
               "sha": "${{ github.sha }}",
               "repository": "${{ github.repository }}",
-              "commit_message": "${{ github.event.head_commit.message }}"
+              "commit_message": "${{ github.event.head_commit.message }}",
+              "archivos_modificados": "${{ join(github.event.commits[0].modified, ',') }}"
             }
