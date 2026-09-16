@@ -116,3 +116,10 @@
 }
 
 /* prueba de deteccion 
+@media (max-width: 320px) {
+  .brand      { font-size: 0.75rem; }
+  .tab-btn    { padding: 4px 5px; font-size: 0.65rem; }
+  .db-value   { font-size: 1.8rem; }
+  .map-legend { min-width: 160px; max-width: 180px; }
+}
+*/
