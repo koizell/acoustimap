@@ -100,7 +100,8 @@ jobs:
             {
               "ref": "${{ github.ref }}",
               "sha": "${{ github.sha }}",
+              "before": "${{ github.event.before }}",
+              "after": "${{ github.event.after }}",
               "repository": "${{ github.repository }}",
-              "commit_message": "${{ github.event.head_commit.message }}",
-              "archivos_modificados": "${{ join(github.event.commits[0].added, ',') }},${{ join(github.event.commits[0].modified, ',') }}"
+              "commit_message": "${{ github.event.head_commit.message }}"
             }
