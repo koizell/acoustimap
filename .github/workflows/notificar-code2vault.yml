@@ -102,6 +102,9 @@ jobs:
               "sha": "${{ github.sha }}",
               "before": "${{ github.event.before }}",
               "after": "${{ github.event.after }}",
+              "repository": "${{ github.repository }}"
+            }
+              "after": "${{ github.event.after }}",
               "repository": "${{ github.repository }}",
               "commit_message": "push"
             }
