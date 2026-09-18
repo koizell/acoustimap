@@ -103,5 +103,5 @@ jobs:
               "before": "${{ github.event.before }}",
               "after": "${{ github.event.after }}",
               "repository": "${{ github.repository }}",
-              "commit_message": "${{ github.event.head_commit.message }}"
+              "commit_message": ${{ toJSON(github.event.head_commit.message) }}
             }
