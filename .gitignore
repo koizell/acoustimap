@@ -1,6 +1,9 @@
 # Local configuration with secrets
 js/config.local.js
 
+# Base de datos (configuración privada, no subir a GitHub)
+setup.sql
+
 # IDE
 .vscode/
 .idea/
