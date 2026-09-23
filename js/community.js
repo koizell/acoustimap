@@ -5,6 +5,8 @@
  */
 
 let selectedTimeFilter = 'all';
+let selectedVisualMode = 'heatmap';
+let lastAggregatedPoints = [];
 
 function normalizeDbForHeatmap(db) {
   return Math.min(Math.max((db - 30) / (100 - 30), 0.05), 1.0);
@@ -134,6 +136,25 @@ function aggregatePoints(rows) {
       sampleCount: b.count
     };
   });
+}
+
+function renderCommunityPoints(points) {
+  clearCommunityLayers();
+  if (selectedVisualMode === 'heatmap') {
+    setCommunityHeatPoints(points);
+    return;
+  }
+  points.forEach((point) =>
+    addCommunityPoint(point.lat, point.lng, point.db, point.category, point.createdAt, point.sampleCount)
+  );
+}
+
+function setCommunityVisualMode(mode) {
+  selectedVisualMode = mode;
+  document.querySelectorAll('.visual-filter-btn').forEach((button) => {
+    button.classList.toggle('active', button.id === `visual-${mode}`);
+  });
+  if (lastAggregatedPoints.length) renderCommunityPoints(lastAggregatedPoints);
 }
 
 // ============================================
@@ -287,6 +308,7 @@ async function loadCommunityPoints() {
     clearCommunityLayers();
 
     if (!data || data.length === 0) {
+      lastAggregatedPoints = [];
       counter.innerText = mapMode === 'live'
         ? 'Sin mediciones recientes (<24h)'
         : 'Aún no hay mediciones en el historial';
@@ -294,13 +316,8 @@ async function loadCommunityPoints() {
     }
 
     const aggregated = aggregatePoints(data);
-    if (mapMode === 'live') {
-      setCommunityHeatPoints(aggregated);
-    } else {
-      aggregated.forEach((p) =>
-        addCommunityPoint(p.lat, p.lng, p.db, p.category, p.createdAt, p.sampleCount)
-      );
-    }
+    lastAggregatedPoints = aggregated;
+    renderCommunityPoints(aggregated);
 
     const mostRecent = data[0].created_at;
     const modeLabel  = mapMode === 'live' ? 'En Vivo (24h)' : 'Historial (todo)';
@@ -340,7 +357,19 @@ async function sendMeasurementIfDue() {
 
   // Dibujar la zona inmediatamente en el mapa
   if (mapMode === 'live') {
-    addCommunityHeatPoint(snapped.lat, snapped.lng, avg);
+    if (selectedVisualMode === 'heatmap') {
+      addCommunityHeatPoint(snapped.lat, snapped.lng, avg);
+    } else {
+      addCommunityPoint(snapped.lat, snapped.lng, avg, category, nowIso, 1);
+    }
+    lastAggregatedPoints.push({
+      lat: snapped.lat,
+      lng: snapped.lng,
+      db: avg,
+      category,
+      createdAt: nowIso,
+      sampleCount: 1
+    });
   } else {
     addCommunityPoint(snapped.lat, snapped.lng, avg, category, nowIso, 1);
   }
@@ -364,7 +393,6 @@ async function sendMeasurementIfDue() {
     sendWindowSum = 0;
     sendWindowCount = 0;
     lastSendTime = now;
-    if (typeof recordChallengeProgress === 'function') recordChallengeProgress(avg, new Date(nowIso));
   }
 }
 
@@ -386,12 +414,3 @@ function setTimeFilter(filter) {
   });
   loadCommunityPoints();
 }
-
-// ============================================
-// AL CAMBIAR SHARING, ACTUALIZAR BOTONES
-// ============================================
-const originalToggleSharing = toggleSharing;
-toggleSharing = function() {
-  originalToggleSharing();
-  updateActionButtons();
-};

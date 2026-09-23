@@ -23,6 +23,7 @@ async function toggleMonitoring() {
       analyser.fftSize = 256;
 
       isMonitoring = true;
+      document.getElementById('stats-panel').classList.add('monitoring');
 
       // ✅ Actualizar botón principal
       btn.classList.add('active');
@@ -44,6 +45,7 @@ async function toggleMonitoring() {
     }
   } else {
     isMonitoring = false;
+    document.getElementById('stats-panel').classList.remove('monitoring');
     if (stream) stream.getTracks().forEach((t) => t.stop());
     if (rafId) cancelAnimationFrame(rafId);
     rafId = null;

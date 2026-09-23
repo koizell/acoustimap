@@ -149,6 +149,15 @@ function toggleSharing() {
 }
 
 // ============================================
+// AL CAMBIAR SHARING, ACTUALIZAR BOTONES
+// ============================================
+const originalToggleSharing = toggleSharing;
+toggleSharing = function() {
+  originalToggleSharing();
+  updateActionButtons();
+};
+
+// ============================================
 // CHIP DE GPS
 // ============================================
 function updateGpsChip(active, accuracy) {

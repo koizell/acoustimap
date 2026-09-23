@@ -24,8 +24,8 @@
       <div class="brand">🎙️ Acousti<span>Map</span></div>
       <div class="nav-tabs">
         <button class="tab-btn active" onclick="switchTab('map-view', this)">🗺️ Mapa</button>
-        <button class="tab-btn" onclick="switchTab('info-view', this)">📚 Salud</button>
-        <button class="tab-btn" onclick="switchTab('ods-view', this)">ℹ️ ODS</button>
+        <button class="tab-btn" onclick="switchTab('health-view', this)" aria-label="Salud y ODS">📚 <span class="tab-long">Salud + ODS</span><span class="tab-short">Salud</span></button>
+        <button class="tab-btn" onclick="switchTab('stats-view', this); openStatsTab('stats')">📊 <span class="tab-long">Estadísticas</span><span class="tab-short">Stats</span></button>
       </div>
     </header>
 
@@ -38,6 +38,11 @@
         <button class="time-filter-btn" id="time-morning" onclick="setTimeFilter('morning')">Mañana</button>
         <button class="time-filter-btn" id="time-afternoon" onclick="setTimeFilter('afternoon')">Tarde</button>
         <button class="time-filter-btn" id="time-night" onclick="setTimeFilter('night')">Noche</button>
+      </div>
+
+      <div class="visual-filters" role="group" aria-label="Forma de visualizar el mapa">
+        <button class="visual-filter-btn active" id="visual-heatmap" onclick="setCommunityVisualMode('heatmap')">🌡️ Heatmap</button>
+        <button class="visual-filter-btn" id="visual-zones" onclick="setCommunityVisualMode('zones')">📍 Zonas</button>
       </div>
 
       <!-- BOTÓN DE LEYENDA -->
@@ -158,7 +163,7 @@
       </div>
     </div>
 
-    <div id="info-view" class="tab-content">
+    <div id="info-view" class="tab-content legacy-hidden">
       <div class="info-wrapper">
         <div class="info-header">
           <h1>Escala de Contaminación Acústica</h1>
@@ -187,10 +192,59 @@
       </div>
     </div>
 
-    <div id="ods-view" class="tab-content" style="background: #f8fafc; padding: 80px 20px">
+    <div id="health-view" class="tab-content info-tab-content">
       <div class="info-wrapper">
-        <h1 style="text-align:center;margin-bottom:20px">Contribución a los ODS</h1>
-        <p style="line-height:1.6;color:#334155"><strong>AcoustiMap</strong> utiliza tecnología participativa para avanzar en la Agenda 2030:</p>
+        <div class="info-header">
+          <h1>Salud y ODS</h1>
+          <p>Entiende el impacto del ruido y cómo los datos ciudadanos ayudan a mejorar la ciudad.</p>
+        </div>
+        <div class="cards-grid">
+          <div class="info-card bajo">
+            <div class="card-header"><span class="badge green">❤️ Salud</span><strong>Bienestar</strong></div>
+            <h3>Menos ruido, más descanso</h3>
+            <p>La exposición prolongada al ruido puede afectar el sueño, la concentración y la salud cardiovascular.</p>
+          </div>
+          <div class="info-card moderado">
+            <div class="card-header"><span class="badge yellow">🌍 ODS 3</span><strong>Salud</strong></div>
+            <h3>Ciudades más saludables</h3>
+            <p>AcoustiMap ayuda a identificar zonas de riesgo acústico para orientar decisiones de prevención.</p>
+          </div>
+          <div class="info-card alto">
+            <div class="card-header"><span class="badge red">🏙️ ODS 11</span><strong>Ciudad</strong></div>
+            <h3>Participación local</h3>
+            <p>Las mediciones anónimas aportan evidencia ciudadana para una planificación urbana más sostenible.</p>
+          </div>
+        </div>
+        <h2 class="section-title">Privacidad por diseño</h2>
+        <p class="info-copy"><strong>AcoustiMap</strong> no graba audio, no requiere login y guarda las coordenadas ancladas a una cuadrícula aproximada de 70 m.</p>
+        <h2 class="section-title">Cómo interpretar el mapa</h2>
+        <p class="info-copy">Verde indica niveles bajos, amarillo niveles moderados y rojo niveles altos. El heatmap muestra patrones, no la ubicación exacta de las personas.</p>
+      </div>
+    </div>
+
+    <div id="stats-view" class="tab-content stats-tab-content">
+      <div class="stats-page">
+        <div class="stats-page-header">
+          <div>
+            <span class="eyebrow">Datos ciudadanos</span>
+            <h1>Estadísticas del ruido</h1>
+            <p>Explora tendencias, reportes y zonas persistentes sin salir de la aplicación.</p>
+          </div>
+          <button class="stats-back-btn" onclick="switchTab('map-view', document.querySelector('.tab-btn'))">🗺️ Volver al mapa</button>
+        </div>
+        <div class="stats-section-nav" role="tablist" aria-label="Secciones de estadísticas">
+          <button class="stats-section-btn active" onclick="openStatsTab('stats')">📈 Resumen</button>
+          <button class="stats-section-btn" onclick="openStatsTab('report')">📝 Reportar ruido</button>
+          <button class="stats-section-btn" onclick="openStatsTab('compare')">↔️ Comparar meses</button>
+          <button class="stats-section-btn" onclick="openStatsTab('challenges')">🎯 Retos</button>
+        </div>
+        <div id="stats-feature-content" class="stats-feature-content"></div>
+      </div>
+    </div>
+
+    <div id="ods-view" class="tab-content legacy-hidden">
+      <div class="info-wrapper">
+        <h1>Contribución a los ODS</h1>
         <ul style="margin:20px 0 0 20px;line-height:1.8;color:#334155">
           <li><strong>ODS 3 (Salud y Bienestar):</strong> Previene enfermedades cardiovasculares y auditivas mediante el mapeo de zonas de riesgo sonoro.</li>
           <li><strong>ODS 11 (Ciudades y Comunidades Sostenibles):</strong> Permite la recolección de datos ciudadanos para promover una mejor planificación urbana y control de tráfico.</li>

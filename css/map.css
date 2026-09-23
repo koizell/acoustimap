@@ -68,6 +68,44 @@
   color: #ffffff;
 }
 
+.visual-filters {
+  position: absolute;
+  top: calc(var(--header-h) + 58px);
+  left: 50%;
+  z-index: 1000;
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  border-radius: 9px;
+  background: var(--card-bg);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.14);
+  transform: translateX(-50%);
+}
+
+.visual-filter-btn {
+  padding: 5px 9px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 0.7rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.visual-filter-btn.active {
+  background: var(--primary);
+  color: #fff;
+}
+
+@media (max-width: 719px) {
+  .visual-filters {
+    top: calc(var(--header-h) + 56px);
+  }
+}
+
 /* Controles de Leaflet debajo del header */
 .leaflet-top.leaflet-left {
   top: calc(var(--header-h) + 8px) !important;

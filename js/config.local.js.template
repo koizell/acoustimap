@@ -11,12 +11,8 @@
  * que inyecta las variables desde GitHub Secrets.
  */
 
-// Sobrescribe las credenciales de config.js
-const SUPABASE_URL = 'https://TU-PROYECTO.supabase.co';
-const SUPABASE_ANON_KEY = 'TU_ANON_KEY_AQUI';
-
-// Exportar para que config.js pueda leerlas
+// Sobrescribe las credenciales de config.js sin crear constantes globales.
 window.__ACOUSTIMAP_CONFIG__ = {
-  SUPABASE_URL,
-  SUPABASE_ANON_KEY
+  SUPABASE_URL: 'https://TU-PROYECTO.supabase.co',
+  SUPABASE_ANON_KEY: 'TU_ANON_KEY_AQUI'
 };

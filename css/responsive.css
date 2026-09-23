@@ -56,31 +56,59 @@
     font-size: 0.72rem;
   }
 
+  .nav-tabs { gap: 4px; }
+
   .main-actions {
-    bottom: 10px; /* ✅ Ajustado de 12px a 10px */
-    max-width: 100%;
+    right: 12px;
+    bottom: max(10px, env(safe-area-inset-bottom));
+    left: 12px;
+    width: auto;
+    max-width: none;
+    height: 56px;
+    transform: none;
   }
 
   .action-btn {
-    padding: 10px 6px;
-    font-size: 0.72rem;
+    min-width: 0;
+    padding: 6px 5px;
+    font-size: 0.66rem;
+    border-radius: 10px;
   }
 
   .action-icon {
-    font-size: 1.3rem;
+    font-size: 1.05rem;
   }
 
   .stats-panel {
-    bottom: 80px;
+    right: 14px;
+    bottom: calc(66px + max(8px, env(safe-area-inset-bottom)));
+    left: 14px;
+    width: auto;
+    max-width: none;
+    max-height: 92px;
+    overflow: hidden;
+    padding: 9px 10px;
+    transform: none;
   }
+
+  .stats-panel.monitoring {
+    bottom: calc(70px + max(8px, env(safe-area-inset-bottom)));
+    max-height: 158px;
+  }
+  .stats-panel:not(.monitoring) .meter-container { display: none; }
+  .stats-panel:not(.monitoring) .avg-block { margin-top: 0; }
 
   .db-value {
-    font-size: 2.2rem;
+    font-size: 1.6rem;
   }
 
-  .avg-value {
-    font-size: 1.5rem;
-  }
+  .meter-container { margin: 2px 0 5px; }
+  .db-label { margin-top: 2px; font-size: 0.68rem; }
+  .db-bar-bg { margin-top: 5px; }
+  .avg-block { margin-top: 3px; padding: 6px 8px; }
+  .avg-head { margin-bottom: 4px; }
+  .avg-value { font-size: 1.25rem; }
+  .avg-meta { margin-top: 4px; }
 
   .map-legend {
     top: calc(var(--header-h) + 8px);
@@ -113,6 +141,10 @@
   .tab-btn    { padding: 5px 6px; font-size: 0.68rem; }
   .db-value   { font-size: 2rem; }
   .map-legend { min-width: 180px; max-width: 200px; }
+
+  .main-actions { gap: 6px; right: 8px; left: 8px; height: 52px; }
+  .action-text { font-size: 0.68rem; }
+  .stats-panel { right: 10px; left: 10px; }
 }
 
 /* prueba de deteccion 

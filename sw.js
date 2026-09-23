@@ -1,4 +1,4 @@
-const CACHE_NAME = 'acoustimap-shell-v1';
+const CACHE_NAME = 'acoustimap-shell-v12';
 const APP_SHELL = [
   './',
   './index.html',

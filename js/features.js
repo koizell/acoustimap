@@ -48,13 +48,13 @@ function createFeatureUi() {
   const toolbar = document.createElement('div');
   toolbar.className = 'feature-toolbar';
   toolbar.innerHTML = `
-    <button type="button" data-feature="compare">📊 ${t('compare')}</button>
-    <button type="button" data-feature="draw">⬡ ${t('draw')}</button>
-    <button type="button" data-feature="report">📝 ${t('report')}</button>
-    <button type="button" data-feature="stats">📈 ${t('stats')}</button>
-    <button type="button" data-feature="challenges">🎯 ${t('challenges')}</button>
-    <button type="button" data-feature="theme">◐ ${t('theme')}</button>
-    <button type="button" data-feature="language">🌐 ${t('language')}</button>`;
+    <button type="button" class="feature-menu-toggle" aria-expanded="false" aria-label="${t('tools')}" title="${t('tools')}">⋯</button>
+    <div class="feature-menu-items" hidden>
+      <button type="button" data-feature="draw">⬡ ${t('draw')}</button>
+      <button type="button" data-feature="clear-zone">⌫ Quitar zona</button>
+      <button type="button" data-feature="theme">◐ ${t('theme')}</button>
+      <button type="button" data-feature="language">🌐 ${t('language')}</button>
+    </div>`;
   document.getElementById('map-view').appendChild(toolbar);
 
   const panel = document.createElement('aside');
@@ -63,13 +63,23 @@ function createFeatureUi() {
   panel.hidden = true;
   document.getElementById('map-view').appendChild(panel);
 
+  toolbar.querySelector('.feature-menu-toggle').addEventListener('click', () => {
+    const menu = toolbar.querySelector('.feature-menu-items');
+    const isOpen = !menu.hidden;
+    menu.hidden = isOpen;
+    toolbar.querySelector('.feature-menu-toggle').setAttribute('aria-expanded', String(!isOpen));
+  });
+
   toolbar.addEventListener('click', (event) => {
     const button = event.target.closest('[data-feature]');
     if (!button) return;
     const feature = button.dataset.feature;
+    toolbar.querySelector('.feature-menu-items').hidden = true;
+    toolbar.querySelector('.feature-menu-toggle').setAttribute('aria-expanded', 'false');
     if (feature === 'theme') toggleTheme();
     else if (feature === 'language') rotateLanguage();
     else if (feature === 'draw') enableZoneDrawing();
+    else if (feature === 'clear-zone') clearDrawnZone();
     else openFeaturePanel(feature);
   });
 
@@ -90,19 +100,36 @@ function openFeaturePanel(view) {
   (renderers[view] || renderStatsPanel)(panel);
 }
 
+function openStatsTab(view) {
+  const content = document.getElementById('stats-feature-content');
+  if (!content) return;
+  document.querySelectorAll('.stats-section-btn').forEach((button) => {
+    button.classList.toggle('active', button.getAttribute('onclick')?.includes(`'${view}'`));
+  });
+  content.dataset.view = view;
+  const renderers = { compare: renderComparisonPanel, report: renderReportPanel, stats: renderStatsPanel, challenges: renderChallengesPanel };
+  (renderers[view] || renderStatsPanel)(content);
+}
+
 function closeFeaturePanel() {
   const panel = document.getElementById('feature-panel');
-  panel.hidden = true;
-  panel.innerHTML = '';
-  panel.dataset.view = '';
+  const content = document.getElementById('stats-feature-content');
+  const target = panel || content;
+  if (!target) return;
+  if (panel) panel.hidden = true;
+  target.innerHTML = '';
+  target.dataset.view = '';
 }
 
 function panelFrame(title, content) {
-  return `<div class="panel-actions"><button type="button" class="danger-action" data-close>${t('close')}</button></div><h2>${title}</h2>${content}`;
+  const closeButton = document.getElementById('stats-feature-content')
+    ? ''
+    : `<div class="panel-actions"><button type="button" class="danger-action" data-close>${t('close')}</button></div>`;
+  return `${closeButton}<h2>${title}</h2>${content}`;
 }
 
 async function fetchFeatureMeasurements(start, end) {
-  if (!supabaseClient) return [];
+  if (!supabaseClient) throw new Error('Supabase no está configurado.');
   const rows = [];
   const pageSize = 1000;
   let from = 0;
@@ -127,9 +154,15 @@ function averageDb(rows) {
   return rows.length ? Math.round(rows.reduce((sum, row) => sum + row.db_level, 0) / rows.length) : null;
 }
 
+function noDataMessage() {
+  return supabaseClient
+    ? 'No hay mediciones suficientes para este análisis.'
+    : 'Conecta Supabase para cargar las mediciones reales.';
+}
+
 function renderComparisonPanel(panel) {
   panel.innerHTML = panelFrame(t('comparison'), `<p>${t('comparisonHelp')}</p><div class="feature-status">${t('loading')}</div>`);
-  panel.querySelector('[data-close]').addEventListener('click', closeFeaturePanel);
+  panel.querySelector('[data-close]')?.addEventListener('click', closeFeaturePanel);
   comparePeriods(panel);
 }
 
@@ -149,13 +182,13 @@ async function comparePeriods(panel) {
     const previousAvg = averageDb(previous);
     const difference = currentAvg == null || previousAvg == null ? null : currentAvg - previousAvg;
     const status = panel.querySelector('.feature-status');
-    status.textContent = difference == null ? t('noData') : `${t('current')}: ${currentAvg} dB · ${t('previous')}: ${previousAvg} dB · ${t('difference')}: ${difference > 0 ? '+' : ''}${difference} dB`;
+    status.textContent = difference == null ? noDataMessage() : `${t('current')}: ${currentAvg} dB · ${t('previous')}: ${previousAvg} dB · ${t('difference')}: ${difference > 0 ? '+' : ''}${difference} dB`;
     const points = previous.map((row) => [row.latitude, row.longitude, normalizeDbForHeatmap(row.db_level)]);
     if (comparisonLayer) map.removeLayer(comparisonLayer);
-    comparisonLayer = L.heatLayer(points, { radius: 35, blur: 25, maxZoom: 17, minOpacity: 0.2, gradient: { 0.2: '#2563eb', 0.55: '#38bdf8', 1: '#1d4ed8' } }).addTo(map);
+    comparisonLayer = L.heatLayer(points, { radius: 24, blur: 18, maxZoom: 17, max: 1, minOpacity: 0.2, gradient: { 0.2: '#2563eb', 0.55: '#38bdf8', 1: '#1d4ed8' } }).addTo(map);
   } catch (error) {
     console.error('Error comparando periodos:', error);
-    panel.querySelector('.feature-status').textContent = 'No se pudo cargar la comparación.';
+    panel.querySelector('.feature-status').textContent = error.message || 'No se pudo cargar la comparación.';
   }
 }
 
@@ -173,6 +206,13 @@ function enableZoneDrawing() {
   });
 }
 
+function clearDrawnZone() {
+  if (!drawnZone) return;
+  map.removeLayer(drawnZone);
+  drawnZone = null;
+  closeFeaturePanel();
+}
+
 function pointInPolygon(point, polygon) {
   let inside = false;
   for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
@@ -187,24 +227,52 @@ function pointInPolygon(point, polygon) {
 }
 
 async function analyzeDrawnZone(polygon) {
-  openFeaturePanel('stats');
-  const panel = document.getElementById('feature-panel');
+  openStatsTab('stats');
+  const panel = document.getElementById('stats-feature-content');
   panel.innerHTML = panelFrame(t('zone'), `<p>${t('zoneHelp')}</p><div class="feature-status">${t('loading')}</div>`);
-  panel.querySelector('[data-close]').addEventListener('click', closeFeaturePanel);
+  panel.querySelector('[data-close]')?.addEventListener('click', closeFeaturePanel);
   try {
     const rows = await fetchFeatureMeasurements();
     const selected = rows.filter((row) => pointInPolygon({ lat: row.latitude, lng: row.longitude }, polygon));
-    panel.querySelector('.feature-status').textContent = selected.length ? `${t('average')}: ${averageDb(selected)} dB · ${selected.length} ${t('measurements')}` : t('noData');
+    panel.querySelector('.feature-status').textContent = selected.length ? `${t('average')}: ${averageDb(selected)} dB · ${selected.length} ${t('measurements')}` : noDataMessage();
   } catch (error) {
     console.error('Error analizando zona:', error);
-    panel.querySelector('.feature-status').textContent = 'No se pudo analizar la zona.';
+    panel.querySelector('.feature-status').textContent = error.message || 'No se pudo analizar la zona.';
   }
 }
 
 function renderReportPanel(panel) {
   panel.innerHTML = panelFrame(t('reportTitle'), `<p>${t('reportHelp')}</p><textarea id="report-note" maxlength="280" placeholder="${t('notePlaceholder')}"></textarea><div class="feature-status" id="feature-status"></div><div class="panel-actions"><button type="button" class="primary-action" id="send-report">${t('send')}</button></div>`);
-  panel.querySelector('[data-close]').addEventListener('click', closeFeaturePanel);
+  panel.querySelector('[data-close]')?.addEventListener('click', closeFeaturePanel);
   panel.querySelector('#send-report').addEventListener('click', submitReport);
+}
+
+async function loadCitizenReports(panel) {
+  const list = panel.querySelector('#citizen-reports-list');
+  if (!list) return;
+  if (!supabaseClient) {
+    list.innerHTML = `<li>${noDataMessage()}</li>`;
+    return;
+  }
+  const { data, error } = await supabaseClient
+    .from('noise_reports')
+    .select('db_level, note, created_at')
+    .order('created_at', { ascending: false })
+    .limit(20);
+  if (error) {
+    list.innerHTML = '<li>No se pudieron cargar los reportes.</li>';
+    return;
+  }
+  if (!data.length) {
+    list.innerHTML = '<li>Aún no hay reportes ciudadanos.</li>';
+    return;
+  }
+  list.innerHTML = '';
+  data.forEach((report) => {
+    const item = document.createElement('li');
+    item.textContent = `${report.db_level} dB · ${report.note} · ${timeAgo(report.created_at)}`;
+    list.appendChild(item);
+  });
 }
 
 async function submitReport() {
@@ -220,13 +288,18 @@ async function submitReport() {
 }
 
 function renderStatsPanel(panel) {
-  panel.innerHTML = panelFrame(t('ranking'), `<div class="feature-status">${t('loading')}</div><h2>${t('loudest')}</h2><ul class="feature-list" id="loudest-list"></ul><h2>${t('quietest')}</h2><ul class="feature-list" id="quietest-list"></ul><h2>${t('alerts')}</h2><ul class="feature-list" id="alerts-list"></ul><div class="panel-actions"><button type="button" id="confirm-noise">🔊 ${t('confirm')}</button></div><p>${t('confirmHelp')}</p>`);
-  panel.querySelector('[data-close]').addEventListener('click', closeFeaturePanel);
+  panel.innerHTML = panelFrame('Resumen del ruido', `<div class="feature-status">${t('loading')}</div><div class="stats-metrics"><div><strong id="metric-total">--</strong><span>mediciones</span></div><div><strong id="metric-average">--</strong><span>promedio dB</span></div><div><strong id="metric-high">--</strong><span>niveles altos</span></div></div><div class="stats-columns"><section><h2>${t('loudest')}</h2><ul class="feature-list" id="loudest-list"></ul></section><section><h2>${t('quietest')}</h2><ul class="feature-list" id="quietest-list"></ul></section></div><h2>${t('alerts')}</h2><ul class="feature-list" id="alerts-list"></ul><h2>Reportes ciudadanos</h2><ul class="feature-list" id="citizen-reports-list"><li>${t('loading')}</li></ul><div class="panel-actions"><button type="button" id="confirm-noise">🔊 ${t('confirm')}</button></div><p>${t('confirmHelp')}</p>`);
+  panel.querySelector('[data-close]')?.addEventListener('click', closeFeaturePanel);
   panel.querySelector('#confirm-noise').addEventListener('click', confirmNoise);
   loadStats(panel);
+  loadCitizenReports(panel);
 }
 
 function appendRanking(list, rows) {
+  if (!rows.length) {
+    list.innerHTML = `<li>${noDataMessage()}</li>`;
+    return;
+  }
   rows.forEach((row) => {
     const item = document.createElement('li');
     item.textContent = `${row.db} dB · ${row.count} ${t('measurements')} · ${row.lat.toFixed(4)}, ${row.lng.toFixed(4)}`;
@@ -238,6 +311,9 @@ async function loadStats(panel) {
   try {
     featureRows = await fetchFeatureMeasurements();
     const zones = aggregatePoints(featureRows).map((point) => ({ ...point, count: point.sampleCount }));
+    panel.querySelector('#metric-total').textContent = featureRows.length;
+    panel.querySelector('#metric-average').textContent = averageDb(featureRows) ?? '--';
+    panel.querySelector('#metric-high').textContent = featureRows.filter((row) => row.db_level > 70).length;
     appendRanking(panel.querySelector('#loudest-list'), [...zones].sort((a, b) => b.db - a.db).slice(0, 3));
     appendRanking(panel.querySelector('#quietest-list'), [...zones].sort((a, b) => a.db - b.db).slice(0, 3));
     const byZone = new Map();
@@ -250,10 +326,13 @@ async function loadStats(panel) {
     const alertList = panel.querySelector('#alerts-list');
     if (!alerts.length) alertList.innerHTML = `<li>${t('noAlerts')}</li>`;
     alerts.forEach((zone) => { const item = document.createElement('li'); item.textContent = `⚠️ ${zone.row.db_level} dB · ${zone.days.size} días`; alertList.appendChild(item); });
-    panel.querySelector('.feature-status').textContent = `${featureRows.length} ${t('measurements')}`;
+    panel.querySelector('.feature-status').textContent = featureRows.length ? `${zones.length} zonas analizadas` : noDataMessage();
   } catch (error) {
     console.error('Error cargando estadísticas:', error);
-    panel.querySelector('.feature-status').textContent = t('noData');
+    panel.querySelector('.feature-status').textContent = error.message || noDataMessage();
+    panel.querySelector('#loudest-list').innerHTML = `<li>${error.message || noDataMessage()}</li>`;
+    panel.querySelector('#quietest-list').innerHTML = `<li>${error.message || noDataMessage()}</li>`;
+    panel.querySelector('#alerts-list').innerHTML = `<li>${error.message || noDataMessage()}</li>`;
   }
 }
 
@@ -272,21 +351,38 @@ function renderChallengesPanel(panel) {
     { title: 'Cobertura nocturna', detail: 'Comparte 3 mediciones entre las 18:00 y las 06:00.', key: 'night-cover', target: 3 }
   ];
   panel.innerHTML = panelFrame(t('challengeTitle'), `<p>${t('challengeHelp')}</p><ul class="feature-list" id="challenge-list"></ul>`);
-  panel.querySelector('[data-close]').addEventListener('click', closeFeaturePanel);
+  panel.querySelector('[data-close]')?.addEventListener('click', closeFeaturePanel);
   const list = panel.querySelector('#challenge-list');
-  challenges.forEach((challenge) => {
-    const progress = Number(localStorage.getItem(`challenge-${challenge.key}`) || 0);
-    const item = document.createElement('li');
-    item.textContent = `${challenge.title}: ${challenge.detail} ${Math.min(progress, challenge.target)}/${challenge.target} ${t('challengeProgress')}`;
-    list.appendChild(item);
-  });
+  loadChallengeProgress(list, challenges);
 }
 
-function recordChallengeProgress(db, date = new Date()) {
-  const hour = date.getHours();
-  const challenges = hour >= 7 && hour <= 9 ? ['rush-hour'] : hour >= 18 || hour < 6 ? ['night-cover'] : [];
-  if (db < 55) challenges.push('quiet-route');
-  challenges.forEach((key) => localStorage.setItem(`challenge-${key}`, String(Number(localStorage.getItem(`challenge-${key}`) || 0) + 1)));
+async function loadChallengeProgress(list, challenges) {
+  try {
+    const rows = await fetchFeatureMeasurements();
+    const rushDays = new Set();
+    const nightRows = [];
+    const quietRows = [];
+    rows.forEach((row) => {
+      const date = new Date(row.created_at);
+      const hour = date.getHours();
+      if (hour >= 7 && hour <= 9) rushDays.add(row.created_at.slice(0, 10));
+      if (hour >= 18 || hour < 6) nightRows.push(row);
+      if (row.db_level < 55) quietRows.push(row);
+    });
+    const progress = {
+      'rush-hour': rushDays.size,
+      'quiet-route': quietRows.length,
+      'night-cover': nightRows.length
+    };
+    list.innerHTML = '';
+    challenges.forEach((challenge) => {
+      const item = document.createElement('li');
+      item.textContent = `${challenge.title}: ${challenge.detail} ${Math.min(progress[challenge.key], challenge.target)}/${challenge.target} ${t('challengeProgress')}`;
+      list.appendChild(item);
+    });
+  } catch (error) {
+    list.innerHTML = `<li>${error.message || noDataMessage()}</li>`;
+  }
 }
 
 function toggleTheme() {

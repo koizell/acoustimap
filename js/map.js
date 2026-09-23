@@ -30,9 +30,10 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
 
 const communityLayer  = L.layerGroup().addTo(map);
 const communityHeatLayer = L.heatLayer([], {
-  radius: 35,
-  blur: 25,
+  radius: 24,
+  blur: 18,
   maxZoom: 17,
+  max: 1,
   minOpacity: 0.15,
   gradient: {
     0.0: '#2563eb',
