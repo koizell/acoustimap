@@ -377,7 +377,21 @@ async function loadChallengeProgress(list, challenges) {
     list.innerHTML = '';
     challenges.forEach((challenge) => {
       const item = document.createElement('li');
-      item.textContent = `${challenge.title}: ${challenge.detail} ${Math.min(progress[challenge.key], challenge.target)}/${challenge.target} ${t('challengeProgress')}`;
+      const current = Math.min(progress[challenge.key], challenge.target);
+      const percentage = Math.round((current / challenge.target) * 100);
+      item.className = 'challenge-item';
+      item.style.setProperty('--challenge-progress', `${percentage}%`);
+      item.innerHTML = `
+        <div class="challenge-topline">
+          <strong>${challenge.title}</strong>
+          <span class="challenge-count">${current}/${challenge.target}</span>
+        </div>
+        <span class="challenge-detail">${challenge.detail}</span>
+        <div class="challenge-track" aria-label="${percentage}% ${t('challengeProgress')}">
+          <span class="challenge-fill"></span>
+        </div>
+        <span class="challenge-state">${percentage === 100 ? '✓ Completado' : `${percentage}% ${t('challengeProgress')}`}</span>`;
+      if (percentage === 100) item.classList.add('completed');
       list.appendChild(item);
     });
   } catch (error) {
