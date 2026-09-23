@@ -1,7 +1,6 @@
 /**
  * app.js
  * Pestañas, leyenda colapsable, modales, botones de acción.
- * Depende de: todos los módulos anteriores.
  */
 
 // ============================================
@@ -12,7 +11,6 @@ function switchTab(tabId, btn) {
   document.querySelectorAll('.tab-btn').forEach((b) => b.classList.remove('active'));
   document.getElementById(tabId).classList.add('active');
   btn.classList.add('active');
-
   if (tabId === 'map-view') {
     setTimeout(() => map.invalidateSize(), 200);
   }
@@ -23,32 +21,36 @@ function switchTab(tabId, btn) {
 // ============================================
 function toggleLegend() {
   const legend = document.getElementById('map-legend');
-  legend.classList.toggle('collapsed');
+  if (legend) legend.classList.toggle('collapsed');
 }
 
+// ============================================
+// TOGGLE PANEL DE ESTADÍSTICAS
+// ============================================
 function toggleStatsPanel() {
   const panel = document.getElementById('stats-panel');
-  const toggle = document.getElementById('stats-toggle');
-  if (!panel || !toggle) return;
-  const expanded = panel.classList.toggle('expanded');
-  toggle.setAttribute('aria-expanded', String(expanded));
-  toggle.setAttribute('aria-label', expanded ? 'Ocultar detalles de medición' : 'Mostrar detalles de medición');
+  if (!panel) return;
+
+  const isCollapsed = panel.classList.toggle('collapsed');
+
+  const label = document.getElementById('stats-handle-label');
+  if (label) {
+    label.innerText = isCollapsed ? 'Mostrar detalles' : 'Ocultar detalles';
+  }
 }
 
 // ============================================
-// MODAL DE CONFIRMACIÓN DE COMPARTIR
+// MODAL COMPARTIR
 // ============================================
 function openShareModal() {
-  // Si ya está compartiendo, desactivar directamente
-  if (sharingEnabled) {
-    toggleSharing();
-    return;
-  }
-  document.getElementById('share-modal').classList.add('visible');
+  if (sharingEnabled) { toggleSharing(); return; }
+  const modal = document.getElementById('share-modal');
+  if (modal) modal.classList.add('visible');
 }
 
 function closeShareModal() {
-  document.getElementById('share-modal').classList.remove('visible');
+  const modal = document.getElementById('share-modal');
+  if (modal) modal.classList.remove('visible');
 }
 
 function confirmSharing() {
@@ -57,19 +59,17 @@ function confirmSharing() {
 }
 
 // ============================================
-// MODAL DE CONFIRMACIÓN DE MICRÓFONO
+// MODAL MICRÓFONO
 // ============================================
 function openMicModal() {
-  // Si ya está monitoreando, detener directamente
-  if (isMonitoring) {
-    toggleMonitoring();
-    return;
-  }
-  document.getElementById('mic-modal').classList.add('visible');
+  if (isMonitoring) { toggleMonitoring(); return; }
+  const modal = document.getElementById('mic-modal');
+  if (modal) modal.classList.add('visible');
 }
 
 function closeMicModal() {
-  document.getElementById('mic-modal').classList.remove('visible');
+  const modal = document.getElementById('mic-modal');
+  if (modal) modal.classList.remove('visible');
 }
 
 function confirmMicActivation() {
@@ -82,13 +82,14 @@ function confirmMicActivation() {
 // ============================================
 function updateActionButtons() {
   const btnShare = document.getElementById('btn-share');
+  if (!btnShare) return;
 
   if (sharingEnabled) {
     btnShare.classList.add('active');
     btnShare.innerHTML = '<span class="action-icon">✅</span><span class="action-text">Compartiendo</span>';
   } else {
     btnShare.classList.remove('active');
-    btnShare.innerHTML = '<span class="action-icon">📡</span><span class="action-text">Compartir en mapa</span>';
+    btnShare.innerHTML = '<span class="action-icon">📡</span><span class="action-text">Compartir</span>';
   }
 }
 
@@ -108,18 +109,13 @@ function toggleSharing() {
     }
 
     if (status) status.innerHTML = '⏳ Buscando señal GPS…';
-
-    // Resetear historial de posiciones
     positionHistory = [];
 
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         processNewPosition(pos);
         map.setView([currentPosition.lat, currentPosition.lng], 17);
-
-        if (status) {
-          status.innerHTML = '✅ Compartiendo. Los demás ven una zona anclada a ~70 m.';
-        }
+        if (status) status.innerHTML = '✅ Compartiendo.';
         updateActionButtons();
         lastSendTime = 0;
         loadCommunityPoints();
@@ -134,7 +130,7 @@ function toggleSharing() {
       },
       (err) => {
         console.warn(err);
-        if (status) status.innerText = '❌ Permiso de ubicación denegado.';
+        if (status) status.innerText = '❌ Permiso denegado.';
         sharingEnabled = false;
         updateActionButtons();
         updateGpsChip(false);
@@ -142,9 +138,7 @@ function toggleSharing() {
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     );
   } else {
-    if (status) {
-      status.innerHTML = '🔒 Compartir desactivado. Tus mediciones no salen de tu dispositivo.';
-    }
+    if (status) status.innerHTML = '🔒 Compartir desactivado.';
     updateGpsChip(false);
     hideMyLocation();
     currentPosition = null;
@@ -158,16 +152,7 @@ function toggleSharing() {
 }
 
 // ============================================
-// AL CAMBIAR SHARING, ACTUALIZAR BOTONES
-// ============================================
-const originalToggleSharing = toggleSharing;
-toggleSharing = function() {
-  originalToggleSharing();
-  updateActionButtons();
-};
-
-// ============================================
-// CHIP DE GPS
+// CHIP GPS
 // ============================================
 function updateGpsChip(active, accuracy) {
   const chip = document.getElementById('gps-chip');
