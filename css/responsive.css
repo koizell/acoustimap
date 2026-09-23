@@ -1,7 +1,5 @@
 /* ============================================================
    responsive.css
-   Media queries para adaptar el layout a móvil y escritorio.
-   SIEMPRE debe ser el último archivo en cargar.
    ============================================================ */
 
 /* ============================================================
@@ -12,136 +10,96 @@
     top: calc(var(--header-h) + 10px) !important;
   }
 
-  .main-actions {
-    bottom: 22px; /* ✅ Ajustado de 24px a 22px */
-    max-width: 480px;
-  }
-
-  .action-btn {
-    flex-direction: row;
-    justify-content: center;
-    gap: 8px;
-    padding: 14px 16px;
-    font-size: 0.85rem;
-  }
-
-  .action-icon {
-    font-size: 1.2rem;
-  }
-
   .stats-panel {
-    bottom: 100px;
-    max-width: 480px;
+    max-width: 420px;
+    max-height: 70dvh;
+    padding: 14px 16px;
   }
+
+  .db-value { font-size: 2.6rem; }
+  .avg-value { font-size: 1.8rem; }
 }
 
 /* ============================================================
    MÓVIL (≤ 719px)
    ============================================================ */
 @media (max-width: 719px) {
-  :root {
-    --header-h: 56px;
+  :root { --header-h: 56px; }
+
+  header { padding: 8px 12px; }
+  .brand { font-size: 0.95rem; }
+  .tab-btn { padding: 6px 8px; font-size: 0.7rem; }
+  .tab-long { display: none; }
+  .tab-short { display: inline; }
+
+  /* Filtros compactos */
+  .time-filters,
+  .visual-filters {
+    top: calc(var(--header-h) + 6px);
+    font-size: 0.7rem;
   }
 
-  header {
-    padding: 8px 12px;
-  }
-
-  .brand {
-    font-size: 0.95rem;
-  }
-
-  .tab-btn {
-    padding: 6px 8px;
-    font-size: 0.72rem;
-  }
-
-  .nav-tabs { gap: 4px; }
-
-  .main-actions {
-    position: static;
-    width: 100%;
-    max-width: none;
+  /* Leyenda reposicionada */
+  .legend-toggle {
+    top: calc(var(--header-h) + 80px);
+    right: 8px;
+    width: 34px;
     height: 34px;
+    font-size: 16px;
+  }
+
+  .map-legend {
+    top: calc(var(--header-h) + 78px);
+    right: 50px;
+    left: 8px;
+    min-width: auto;
+    max-width: none;
+  }
+
+  /* ✅ Panel: 55dvh en móvil para que quepa con botones */
+  .stats-panel {
+    bottom: 8px;
+    left: 8px;
+    right: 8px;
+    width: auto;
     transform: none;
+    max-width: none;
+    max-height: 55dvh;
+    padding: 10px 12px;
+    border-radius: 16px;
+    padding-bottom: calc(12px + env(safe-area-inset-bottom));
+  }
+
+  .db-value { font-size: 2rem; }
+  .avg-value { font-size: 1.4rem; }
+  .meter-container { margin: 2px 0 4px; }
+  .avg-block { padding: 8px 10px; }
+
+  /* Botones en columna horizontal pero dentro del panel */
+  .main-actions {
+    gap: 6px;
+    padding-top: 6px;
   }
 
   .action-btn {
-    min-width: 0;
-    padding: 6px 5px;
-    font-size: 0.66rem;
-    border-radius: 10px;
+    padding: 9px 6px;
+    font-size: 0.7rem;
   }
 
-  .action-icon {
-    font-size: 1.05rem;
-  }
+  .action-icon { font-size: 1rem; }
+  .action-text { font-size: 0.68rem; }
 
-  .stats-panel {
-    right: 14px;
-    bottom: max(10px, env(safe-area-inset-bottom));
-    left: 14px;
-    width: auto;
-    max-width: none;
-    max-height: 124px;
-    overflow: hidden;
-    padding: 9px 10px;
-    transform: none;
-  }
-
-  .stats-panel:not(.expanded) {
-    max-height: 124px;
-  }
-
-  .stats-panel.expanded {
-    max-height: 220px;
-    bottom: max(10px, env(safe-area-inset-bottom));
-  }
-
-  .stats-panel.expanded .meter-container,
-  .stats-panel.expanded .avg-block {
-    display: block;
-  }
-
-  .stats-panel.monitoring {
-    bottom: max(10px, env(safe-area-inset-bottom));
-    max-height: 220px;
-  }
-  .stats-panel:not(.monitoring) .meter-container { display: none; }
-  .stats-panel:not(.monitoring) .avg-block { margin-top: 0; }
-
-  .db-value {
-    font-size: 1.6rem;
-  }
-
-  .meter-container { margin: 2px 0 5px; }
-  .db-label { margin-top: 2px; font-size: 0.68rem; }
-  .db-bar-bg { margin-top: 5px; }
-  .avg-block { margin-top: 3px; padding: 6px 8px; }
-  .avg-head { margin-bottom: 4px; }
-  .avg-value { font-size: 1.25rem; }
-  .avg-meta { margin-top: 4px; }
-
-  .map-legend {
-    top: calc(var(--header-h) + 8px);
-    right: 60px;
-    min-width: 200px;
-    max-width: 220px;
-  }
-
-  .legend-toggle {
-    top: calc(var(--header-h) + 8px);
-    right: 8px;
-    width: 36px;
-    height: 36px;
-    font-size: 18px;
+  /* Controles de Leaflet */
+  .leaflet-top.leaflet-left {
+    top: calc(var(--header-h) + 6px) !important;
+    left: 6px !important;
   }
 
   .leaflet-control-zoom a {
-    width: 30px !important;
-    height: 30px !important;
-    line-height: 30px !important;
-    font-size: 16px !important;
+    width: 28px !important;
+    height: 28px !important;
+    line-height: 28px !important;
+    font-size: 15px !important;
   }
 }
 
@@ -149,21 +107,11 @@
    MÓVIL MUY PEQUEÑO (≤ 400px)
    ============================================================ */
 @media (max-width: 400px) {
-  .brand      { font-size: 0.85rem; }
-  .tab-btn    { padding: 5px 6px; font-size: 0.68rem; }
-  .db-value   { font-size: 2rem; }
-  .map-legend { min-width: 180px; max-width: 200px; }
+  .brand { font-size: 0.85rem; }
+  .tab-btn { padding: 5px 6px; font-size: 0.65rem; }
+  .db-value { font-size: 1.8rem; }
+  .avg-value { font-size: 1.3rem; }
+  .action-text { font-size: 0.62rem; }
 
-  .main-actions { gap: 6px; height: 34px; }
-  .action-text { font-size: 0.68rem; }
-  .stats-panel { right: 10px; left: 10px; }
+  .stats-panel { max-height: 60dvh; }
 }
-
-/* prueba de deteccion 
-@media (max-width: 320px) {
-  .brand      { font-size: 0.75rem; }
-  .tab-btn    { padding: 4px 5px; font-size: 0.65rem; }
-  .db-value   { font-size: 1.8rem; }
-  .map-legend { min-width: 160px; max-width: 180px; }
-}
-*/

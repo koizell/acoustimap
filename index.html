@@ -6,6 +6,9 @@
     <title>AcoustiMap - Mapeo de Contaminación Acústica</title>
     <link rel="manifest" href="manifest.webmanifest" />
 
+    <!-- ✅ Favicon SVG inline (evita el 404 de favicon.ico) -->
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎙️</text></svg>" />
+
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 
@@ -36,7 +39,6 @@
     <div id="map-view" class="tab-content active">
       <div id="map"></div>
 
-      <!-- Filtros de franja horaria -->
       <div class="time-filters" role="group" aria-label="Filtrar por franja horaria">
         <span class="time-filters-label">Franja</span>
         <button class="time-filter-btn active" id="time-all" onclick="setTimeFilter('all')">Todo</button>
@@ -45,18 +47,15 @@
         <button class="time-filter-btn" id="time-night" onclick="setTimeFilter('night')">Noche</button>
       </div>
 
-      <!-- Filtros visuales -->
       <div class="visual-filters" role="group" aria-label="Forma de visualizar el mapa">
         <button class="visual-filter-btn active" id="visual-heatmap" onclick="setCommunityVisualMode('heatmap')">🌡️ Heatmap</button>
         <button class="visual-filter-btn" id="visual-zones" onclick="setCommunityVisualMode('zones')">📍 Zonas</button>
       </div>
 
-      <!-- Botón de leyenda -->
       <button class="legend-toggle" id="legend-toggle" onclick="toggleLegend()" aria-label="Información del mapa">
         ℹ️
       </button>
 
-      <!-- Leyenda colapsable -->
       <div class="map-legend collapsed" id="map-legend">
         <div class="legend-header">
           <span>Información</span>
@@ -81,8 +80,9 @@
         </div>
       </div>
 
-      <!-- Panel de estadísticas -->
+      <!-- ✅ PANEL ÚNICO: header + contenido scrolleable + botones fijos al fondo -->
       <div class="stats-panel" id="stats-panel">
+
         <div class="stats-header">
           <span class="status-badge" id="status-badge">
             <span class="pulse-dot" id="pulse-dot" style="display: none"></span>
@@ -92,51 +92,54 @@
           <button class="stats-toggle" id="stats-toggle" type="button" onclick="toggleStatsPanel()" aria-expanded="false" aria-label="Mostrar detalles de medición">⌃</button>
         </div>
 
-        <div class="compact-reading" aria-live="polite">
-          <strong id="compact-db">-- dB</strong>
-          <span id="compact-status">Listo para medir</span>
+        <!-- Contenido scrolleable (se oculta cuando está colapsado) -->
+        <div class="stats-content" id="stats-content">
+          <div class="compact-reading" aria-live="polite">
+            <strong id="compact-db">-- dB</strong>
+            <span id="compact-status">Listo para medir</span>
+          </div>
+
+          <div class="meter-container">
+            <div class="db-value" id="db-number">--</div>
+            <div class="db-label" id="db-status-text">Presiona Iniciar</div>
+            <div class="db-bar-bg">
+              <div class="db-bar-fill" id="db-bar"></div>
+            </div>
+          </div>
+
+          <div class="avg-block">
+            <div class="avg-head">
+              <span>📊 Promedio de la sesión</span>
+              <span id="avg-time">00:00</span>
+            </div>
+            <div class="avg-main">
+              <span class="avg-value" id="avg-number">--</span>
+              <span class="avg-unit">dB</span>
+              <span class="avg-tag" id="avg-tag">Sin datos</span>
+            </div>
+            <div class="avg-meta">
+              <span>Mín <b id="min-db">--</b></span>
+              <span>Máx <b id="max-db">--</b></span>
+              <span>Muestras <b id="sample-count">0</b></span>
+            </div>
+          </div>
         </div>
 
-        <div class="meter-container">
-          <div class="db-value" id="db-number">--</div>
-          <div class="db-label" id="db-status-text">Presiona Iniciar</div>
-          <div class="db-bar-bg">
-            <div class="db-bar-fill" id="db-bar"></div>
-          </div>
+        <!-- ✅ Botones DENTRO del panel, fijos al fondo -->
+        <div class="main-actions">
+          <button class="action-btn primary" id="btn-toggle" onclick="openMicModal()">
+            <span class="action-icon">🎤</span>
+            <span class="action-text">Activar Micrófono</span>
+          </button>
+          <button class="action-btn secondary" id="btn-share" onclick="openShareModal()">
+            <span class="action-icon">📡</span>
+            <span class="action-text">Compartir en mapa</span>
+          </button>
         </div>
-
-        <div class="avg-block">
-          <div class="avg-head">
-            <span>📊 Promedio de la sesión</span>
-            <span id="avg-time">00:00</span>
-          </div>
-          <div class="avg-main">
-            <span class="avg-value" id="avg-number">--</span>
-            <span class="avg-unit">dB</span>
-            <span class="avg-tag" id="avg-tag">Sin datos</span>
-          </div>
-          <div class="avg-meta">
-            <span>Mín <b id="min-db">--</b></span>
-            <span>Máx <b id="max-db">--</b></span>
-            <span>Muestras <b id="sample-count">0</b></span>
-          </div>
-        </div>
-      </div>
-
-      <!-- Botones de acción (fuera del panel para que siempre estén visibles) -->
-      <div class="main-actions">
-        <button class="action-btn primary" id="btn-toggle" onclick="openMicModal()">
-          <span class="action-icon">🎤</span>
-          <span class="action-text">Activar Micrófono</span>
-        </button>
-        <button class="action-btn secondary" id="btn-share" onclick="openShareModal()">
-          <span class="action-icon">📡</span>
-          <span class="action-text">Compartir en mapa</span>
-        </button>
       </div>
     </div>
 
-    <!-- MODAL: COMPARTIR -->
+    <!-- MODALES -->
     <div class="modal-overlay" id="share-modal">
       <div class="modal-content">
         <div class="modal-icon">📍</div>
@@ -155,7 +158,6 @@
       </div>
     </div>
 
-    <!-- MODAL: MICRÓFONO -->
     <div class="modal-overlay" id="mic-modal">
       <div class="modal-content">
         <div class="modal-icon">🎤</div>
@@ -175,35 +177,9 @@
       </div>
     </div>
 
-    <!-- PESTAÑA: INFO (legacy, oculta) -->
-    <div id="info-view" class="tab-content legacy-hidden">
-      <div class="info-wrapper">
-        <div class="info-header">
-          <h1>Escala de Contaminación Acústica</h1>
-          <p>Conoce cómo impacta el nivel de decibelios (dB) en tu salud diaria.</p>
-        </div>
-        <div class="cards-grid">
-          <div class="info-card bajo">
-            <div class="card-header"><span class="badge green">🟢 Bajo</span><strong>&lt; 55 dB</strong></div>
-            <h3>🌿 Entorno Confortable</h3>
-            <p style="font-size:0.88rem;margin:10px 0;color:#475569">Entorno óptimo para el descanso, el estudio y el bienestar psicológico.</p>
-            <small>📍 Ejemplos: Bibliotecas, parques, residencial silencioso.</small>
-          </div>
-          <div class="info-card moderado">
-            <div class="card-header"><span class="badge yellow">🟡 Moderado</span><strong>55 - 70 dB</strong></div>
-            <h3>🗣️ Ligeramente Molesto</h3>
-            <p style="font-size:0.88rem;margin:10px 0;color:#475569">Puede provocar irritabilidad, dificultad de concentración y estrés leve a largo plazo.</p>
-            <small>📍 Ejemplos: Tráfico fluido, oficinas, conversaciones elevadas.</small>
-          </div>
-          <div class="info-card alto">
-            <div class="card-header"><span class="badge red">🔴 Alto</span><strong>&gt; 70 dB</strong></div>
-            <h3>🚨 Dañino / Crítico</h3>
-            <p style="font-size:0.88rem;margin:10px 0;color:#475569">Riesgo de hipertensión, migrañas, estrés agudo y pérdida auditiva (&gt;85 dB).</p>
-            <small>📍 Ejemplos: Tráfico pesado, sirenas, construcciones, claxon.</small>
-          </div>
-        </div>
-      </div>
-    </div>
+    <!-- PESTAÑAS LEGACY (ocultas) -->
+    <div id="info-view" class="tab-content legacy-hidden"></div>
+    <div id="ods-view" class="tab-content legacy-hidden"></div>
 
     <!-- PESTAÑA: SALUD Y ODS -->
     <div id="health-view" class="tab-content info-tab-content">
@@ -257,24 +233,12 @@
       </div>
     </div>
 
-    <!-- PESTAÑA: ODS (legacy, oculta) -->
-    <div id="ods-view" class="tab-content legacy-hidden">
-      <div class="info-wrapper">
-        <h1>Contribución a los ODS</h1>
-        <ul style="margin:20px 0 0 20px;line-height:1.8;color:#334155">
-          <li><strong>ODS 3 (Salud y Bienestar):</strong> Previene enfermedades cardiovasculares y auditivas mediante el mapeo de zonas de riesgo sonoro.</li>
-          <li><strong>ODS 11 (Ciudades y Comunidades Sostenibles):</strong> Permite la recolección de datos ciudadanos para promover una mejor planificación urbana y control de tráfico.</li>
-          <li><strong>Privacidad por diseño:</strong> Las coordenadas se anclan a una cuadrícula (~70 m) antes de almacenarse.</li>
-        </ul>
-      </div>
-    </div>
-
-    <!-- Librerías externas (orden estricto) -->
+    <!-- Librerías externas -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-    <!-- Scripts internos (orden estricto) -->
+    <!-- Scripts internos -->
     <script src="js/config.local.js"></script>
     <script src="js/config.js"></script>
     <script src="js/map.js"></script>

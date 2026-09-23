@@ -33,6 +33,19 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
+
+  const url = new URL(event.request.url);
+
+  // ✅ Ignorar esquemas no soportados (chrome-extension, moz-extension, etc.)
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+    return;
+  }
+
+  // ✅ Ignorar peticiones de métodos no soportados
+  if (event.request.method !== 'GET') {
+    return;
+  }
+
   if (event.request.method !== 'GET') return;
   event.respondWith(
     caches.match(event.request).then((cached) => cached || fetch(event.request).then((response) => {

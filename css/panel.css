@@ -1,66 +1,73 @@
 /* ============================================================
    panel.css
-   Botones de acción principales, panel de estadísticas,
-   medidor de dB, promedio de sesión y modales de confirmación.
+   Panel único (stats + botones) con layout flex-column.
+   Los botones quedan SIEMPRE visibles al fondo.
    ============================================================ */
 
 /* ============================================================
-   PANEL DE ESTADÍSTICAS
+   PANEL PRINCIPAL
    ============================================================ */
 .stats-panel {
   position: absolute;
-  bottom: 90px;
+  bottom: 12px;
   left: 50%;
   transform: translateX(-50%);
   z-index: 998;
-  width: min(440px, calc(100% - 32px));
-  max-height: 185px;
-  overflow: hidden;
+  width: calc(100% - 24px);
+  max-width: 400px;
+  max-height: 60dvh; /* ⬅️ Limita la altura para que no tape el mapa */
   background: var(--card-bg);
   backdrop-filter: blur(16px);
   border-radius: 16px;
-  padding: 14px;
+  padding: 12px 14px;
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.22);
   border: 1px solid rgba(255, 255, 255, 0.4);
+
+  /* ✅ Flex column: header + contenido scrolleable + botones fijos */
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
-.stats-panel.monitoring {
-  max-height: 270px;
+/* El contenido del medio scrollea si no cabe */
+.stats-content {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  flex: 1 1 auto;
+  min-height: 0; /* ⬅️ Necesario para que flex permita scroll */
+  padding-right: 2px;
 }
 
-.stats-panel:not(.monitoring) .meter-container {
+/* Scrollbar sutil */
+.stats-content::-webkit-scrollbar { width: 4px; }
+.stats-content::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+/* Cuando está colapsado, se oculta el contenido del medio */
+.stats-panel.collapsed .stats-content {
   display: none;
 }
 
-.stats-panel:not(.monitoring) .avg-block {
-  margin-top: 0;
+/* El botón toggle rota su flecha */
+.stats-panel.collapsed .stats-toggle {
+  transform: rotate(180deg);
 }
 
-.compact-reading,
-.stats-toggle {
-  display: none;
-}
-
-@media (min-width: 720px) and (max-height: 720px) {
-  .stats-panel.monitoring {
-    bottom: 82px;
-    max-height: 230px;
-    padding: 10px 12px;
-  }
-
-  .stats-panel.monitoring .db-value { font-size: 2.1rem; }
-  .stats-panel.monitoring .meter-container { margin: 3px 0 5px; }
-  .stats-panel.monitoring .avg-block { margin-top: 4px; padding: 8px 10px; }
-}
-
-/* Cabecera del panel */
+/* ============================================================
+   HEADER DEL PANEL
+   ============================================================ */
 .stats-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-  margin-bottom: 8px;
+  gap: 6px;
+  flex-wrap: nowrap;
+  flex: 0 0 auto; /* No se estira */
 }
 
 .status-badge {
@@ -69,10 +76,11 @@
   gap: 6px;
   padding: 4px 10px;
   border-radius: 20px;
-  font-size: 0.72rem;
+  font-size: 0.7rem;
   font-weight: 700;
   background: #e2e8f0;
   color: #475569;
+  white-space: nowrap;
 }
 
 .status-badge.active {
@@ -89,34 +97,75 @@
 }
 
 .gps-chip {
-  font-size: 0.68rem;
+  font-size: 0.65rem;
   font-weight: 600;
   color: var(--text-muted);
   background: #f1f5f9;
   padding: 4px 8px;
   border-radius: 8px;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1 1 auto;
+  text-align: center;
 }
 
 .gps-chip.ok     { background: #dcfce7; color: #15803d; }
 .gps-chip.medium { background: #fef3c7; color: #b45309; }
 .gps-chip.poor   { background: #fee2e2; color: #b91c1c; }
 
-/* Medidor en vivo */
+.stats-toggle {
+  background: #f1f5f9;
+  border: none;
+  border-radius: 8px;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 14px;
+  color: var(--text-muted);
+  transition: transform 0.2s ease, background 0.2s;
+  flex: 0 0 auto;
+}
+
+.stats-toggle:hover {
+  background: #e2e8f0;
+}
+
+/* ============================================================
+   CONTENIDO DEL PANEL
+   ============================================================ */
+.compact-reading {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  padding: 4px 2px;
+}
+
+.compact-reading strong {
+  font-size: 1.1rem;
+  color: var(--text-main);
+  font-weight: 800;
+}
+
 .meter-container {
   text-align: center;
-  margin: 6px 0 8px;
+  margin: 4px 0;
 }
 
 .db-value {
-  font-size: 2.6rem;
+  font-size: 2.4rem;
   font-weight: 800;
   color: var(--text-main);
   line-height: 1;
 }
 
 .db-label {
-  font-size: 0.75rem;
+  font-size: 0.72rem;
   color: var(--text-muted);
   font-weight: 600;
   text-transform: uppercase;
@@ -139,9 +188,7 @@
   transition: width 0.2s ease, background-color 0.2s ease;
 }
 
-/* Promedio de sesión */
 .avg-block {
-  margin-top: 8px;
   padding: 10px 12px;
   border-radius: 12px;
   background: linear-gradient(135deg, #f1f5f9, #e2e8f0);
@@ -166,7 +213,7 @@
 }
 
 .avg-value {
-  font-size: 1.7rem;
+  font-size: 1.6rem;
   font-weight: 800;
   color: var(--text-main);
   line-height: 1;
@@ -196,50 +243,41 @@
   display: flex;
   justify-content: space-between;
   margin-top: 8px;
-  font-size: 0.7rem;
+  font-size: 0.68rem;
   color: var(--text-muted);
 }
 
 .avg-meta b { color: var(--text-main); }
 
 /* ============================================================
-   BOTONES PRINCIPALES DE ACCIÓN
+   BOTONES DE ACCIÓN (dentro del panel, fijos al fondo)
    ============================================================ */
 .main-actions {
-  position: absolute;
-  bottom: 18px; /* ✅ Ajustado de 20px a 18px */
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 999;
   display: flex;
-  gap: 10px;
-  width: calc(100% - 32px);
-  max-width: 400px;
-}
-
-.stats-panel .main-actions {
-  position: static;
-  width: 100%;
-  max-width: none;
-  margin-top: 10px;
-  transform: none;
-  z-index: auto;
+  gap: 8px;
+  flex: 0 0 auto; /* ⬅️ No se encoge, siempre visible */
+  margin-top: 2px;
+  padding-top: 8px;
+  border-top: 1px solid #e2e8f0;
 }
 
 .action-btn {
   flex: 1;
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
-  gap: 4px;
-  padding: 12px 8px;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px 8px;
   border: none;
-  border-radius: 14px;
+  border-radius: 12px;
   cursor: pointer;
   font-weight: 700;
-  font-size: 0.78rem;
+  font-size: 0.75rem;
   transition: all 0.2s;
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.18);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.12);
+  white-space: nowrap;
+  min-width: 0;
 }
 
 .action-btn.primary {
@@ -247,9 +285,7 @@
   color: #fff;
 }
 
-.action-btn.primary:hover {
-  background: #1d4ed8;
-}
+.action-btn.primary:hover { background: #1d4ed8; }
 
 .action-btn.secondary {
   background: #fff;
@@ -257,9 +293,7 @@
   border: 2px solid var(--primary);
 }
 
-.action-btn.secondary:hover {
-  background: #eff6ff;
-}
+.action-btn.secondary:hover { background: #eff6ff; }
 
 .action-btn.active {
   background: #dc2626 !important;
@@ -268,17 +302,19 @@
 }
 
 .action-icon {
-  font-size: 1.4rem;
+  font-size: 1.1rem;
+  flex: 0 0 auto;
 }
 
 .action-text {
   font-size: 0.72rem;
-  line-height: 1.1;
-  text-align: center;
+  line-height: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* ============================================================
-   MODALES DE CONFIRMACIÓN
+   MODALES
    ============================================================ */
 .modal-overlay {
   position: fixed;
@@ -312,14 +348,9 @@
   transition: transform 0.25s;
 }
 
-.modal-overlay.visible .modal-content {
-  transform: scale(1);
-}
+.modal-overlay.visible .modal-content { transform: scale(1); }
 
-.modal-icon {
-  font-size: 2.5rem;
-  margin-bottom: 8px;
-}
+.modal-icon { font-size: 2.5rem; margin-bottom: 8px; }
 
 .modal-content h2 {
   font-size: 1.2rem;
@@ -344,10 +375,7 @@
   line-height: 1.4;
 }
 
-.modal-actions {
-  display: flex;
-  gap: 10px;
-}
+.modal-actions { display: flex; gap: 10px; }
 
 .modal-btn {
   flex: 1;
@@ -360,107 +388,7 @@
   transition: all 0.2s;
 }
 
-.modal-btn.cancel {
-  background: #f1f5f9;
-  color: #475569;
-}
-
-.modal-btn.cancel:hover {
-  background: #e2e8f0;
-}
-
-.modal-btn.confirm {
-  background: var(--primary);
-  color: #fff;
-}
-
-.modal-btn.confirm:hover {
-  background: #1d4ed8;
-}
-
-@media (max-width: 719px) {
-  .stats-panel {
-    transition: max-height 0.22s ease, bottom 0.22s ease;
-  }
-
-  .stats-panel .stats-header {
-    position: relative;
-    padding-right: 30px;
-  }
-
-  .stats-panel .stats-toggle {
-    position: absolute;
-    top: 0;
-    right: 0;
-    display: grid;
-    width: 26px;
-    height: 26px;
-    place-items: center;
-    padding: 0;
-    border: 0;
-    border-radius: 50%;
-    background: #e2e8f0;
-    color: #475569;
-    cursor: pointer;
-    font-size: 0.9rem;
-    font-weight: 800;
-  }
-
-  .stats-panel .compact-reading {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: 8px;
-    min-height: 24px;
-    color: var(--text-muted);
-  }
-
-  .stats-panel .compact-reading strong {
-    color: var(--text-main);
-    font-size: 1.25rem;
-  }
-
-  .stats-panel .compact-reading span {
-    font-size: 0.68rem;
-    font-weight: 700;
-    text-transform: uppercase;
-  }
-
-  .stats-panel:not(.expanded) .meter-container,
-  .stats-panel:not(.expanded) .avg-block {
-    display: none;
-  }
-
-  .stats-panel .main-actions {
-    display: flex;
-    gap: 6px;
-    height: 34px;
-    margin-top: 6px;
-  }
-
-  .stats-panel .action-btn {
-    flex-direction: row;
-    gap: 4px;
-    min-height: 34px;
-    padding: 4px 6px;
-    border-radius: 8px;
-    font-size: 0.64rem;
-    box-shadow: none;
-  }
-
-  .stats-panel .action-icon { font-size: 0.85rem; }
-  .stats-panel .action-text { font-size: 0.64rem; }
-
-  .stats-panel.expanded .compact-reading {
-    display: none;
-  }
-
-  .stats-panel.expanded .stats-toggle {
-    transform: rotate(180deg);
-  }
-
-  body.dark-theme .stats-panel .stats-toggle {
-    background: #334155;
-    color: #e2e8f0;
-  }
-}
+.modal-btn.cancel { background: #f1f5f9; color: #475569; }
+.modal-btn.cancel:hover { background: #e2e8f0; }
+.modal-btn.confirm { background: var(--primary); color: #fff; }
+.modal-btn.confirm:hover { background: #1d4ed8; }
