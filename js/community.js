@@ -8,9 +8,6 @@ let selectedTimeFilter = 'all';
 let selectedVisualMode = 'heatmap';
 let lastAggregatedPoints = [];
 
-function normalizeDbForHeatmap(db) {
-  return Math.min(Math.max((db - 30) / (100 - 30), 0.05), 1.0);
-}
 
 function getTimeFilterRange(filter) {
   if (filter === 'all') return null;

@@ -8,7 +8,6 @@
 
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css" />
 
     <!-- Estilos modulares -->
     <link rel="stylesheet" href="css/base.css" />
@@ -24,14 +23,20 @@
       <div class="brand">🎙️ Acousti<span>Map</span></div>
       <div class="nav-tabs">
         <button class="tab-btn active" onclick="switchTab('map-view', this)">🗺️ Mapa</button>
-        <button class="tab-btn" onclick="switchTab('health-view', this)" aria-label="Salud y ODS">📚 <span class="tab-long">Salud + ODS</span><span class="tab-short">Salud</span></button>
-        <button class="tab-btn" onclick="switchTab('stats-view', this); openStatsTab('stats')">📊 <span class="tab-long">Estadísticas</span><span class="tab-short">Stats</span></button>
+        <button class="tab-btn" onclick="switchTab('health-view', this)" aria-label="Salud y ODS">
+          📚 <span class="tab-long">Salud + ODS</span><span class="tab-short">Salud</span>
+        </button>
+        <button class="tab-btn" onclick="switchTab('stats-view', this); openStatsTab('stats')">
+          📊 <span class="tab-long">Estadísticas</span><span class="tab-short">Stats</span>
+        </button>
       </div>
     </header>
 
+    <!-- PESTAÑA: MAPA -->
     <div id="map-view" class="tab-content active">
       <div id="map"></div>
 
+      <!-- Filtros de franja horaria -->
       <div class="time-filters" role="group" aria-label="Filtrar por franja horaria">
         <span class="time-filters-label">Franja</span>
         <button class="time-filter-btn active" id="time-all" onclick="setTimeFilter('all')">Todo</button>
@@ -40,17 +45,18 @@
         <button class="time-filter-btn" id="time-night" onclick="setTimeFilter('night')">Noche</button>
       </div>
 
+      <!-- Filtros visuales -->
       <div class="visual-filters" role="group" aria-label="Forma de visualizar el mapa">
         <button class="visual-filter-btn active" id="visual-heatmap" onclick="setCommunityVisualMode('heatmap')">🌡️ Heatmap</button>
         <button class="visual-filter-btn" id="visual-zones" onclick="setCommunityVisualMode('zones')">📍 Zonas</button>
       </div>
 
-      <!-- BOTÓN DE LEYENDA -->
+      <!-- Botón de leyenda -->
       <button class="legend-toggle" id="legend-toggle" onclick="toggleLegend()" aria-label="Información del mapa">
         ℹ️
       </button>
 
-      <!-- LEYENDA COLAPSABLE -->
+      <!-- Leyenda colapsable -->
       <div class="map-legend collapsed" id="map-legend">
         <div class="legend-header">
           <span>Información</span>
@@ -75,7 +81,7 @@
         </div>
       </div>
 
-      <!-- PANEL DE ESTADÍSTICAS -->
+      <!-- Panel de estadísticas -->
       <div class="stats-panel" id="stats-panel">
         <div class="stats-header">
           <span class="status-badge" id="status-badge">
@@ -115,17 +121,18 @@
             <span>Muestras <b id="sample-count">0</b></span>
           </div>
         </div>
-        <div class="main-actions">
-          <button class="action-btn primary" id="btn-toggle" onclick="openMicModal()">
-            <span class="action-icon">🎤</span>
-            <span class="action-text">Activar Micrófono</span>
-          </button>
-          <button class="action-btn secondary" id="btn-share" onclick="openShareModal()">
-            <span class="action-icon">📡</span>
-            <span class="action-text">Compartir en mapa</span>
-          </button>
-        </div>
       </div>
+
+      <!-- Botones de acción (fuera del panel para que siempre estén visibles) -->
+      <div class="main-actions">
+        <button class="action-btn primary" id="btn-toggle" onclick="openMicModal()">
+          <span class="action-icon">🎤</span>
+          <span class="action-text">Activar Micrófono</span>
+        </button>
+        <button class="action-btn secondary" id="btn-share" onclick="openShareModal()">
+          <span class="action-icon">📡</span>
+          <span class="action-text">Compartir en mapa</span>
+        </button>
       </div>
     </div>
 
@@ -168,6 +175,7 @@
       </div>
     </div>
 
+    <!-- PESTAÑA: INFO (legacy, oculta) -->
     <div id="info-view" class="tab-content legacy-hidden">
       <div class="info-wrapper">
         <div class="info-header">
@@ -197,6 +205,7 @@
       </div>
     </div>
 
+    <!-- PESTAÑA: SALUD Y ODS -->
     <div id="health-view" class="tab-content info-tab-content">
       <div class="info-wrapper">
         <div class="info-header">
@@ -227,6 +236,7 @@
       </div>
     </div>
 
+    <!-- PESTAÑA: ESTADÍSTICAS -->
     <div id="stats-view" class="tab-content stats-tab-content">
       <div class="stats-page">
         <div class="stats-page-header">
@@ -247,6 +257,7 @@
       </div>
     </div>
 
+    <!-- PESTAÑA: ODS (legacy, oculta) -->
     <div id="ods-view" class="tab-content legacy-hidden">
       <div class="info-wrapper">
         <h1>Contribución a los ODS</h1>
@@ -258,11 +269,12 @@
       </div>
     </div>
 
+    <!-- Librerías externas (orden estricto) -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
-    <script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
+    <!-- Scripts internos (orden estricto) -->
     <script src="js/config.local.js"></script>
     <script src="js/config.js"></script>
     <script src="js/map.js"></script>
