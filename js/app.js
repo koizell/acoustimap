@@ -1,6 +1,6 @@
 /**
  * app.js
- * Pestañas, leyenda colapsable, modales, botones de acción.
+ * Pestañas, leyenda, modales, toggle del panel.
  */
 
 // ============================================
@@ -9,15 +9,16 @@
 function switchTab(tabId, btn) {
   document.querySelectorAll('.tab-content').forEach((t) => t.classList.remove('active'));
   document.querySelectorAll('.tab-btn').forEach((b) => b.classList.remove('active'));
-  document.getElementById(tabId).classList.add('active');
-  btn.classList.add('active');
+  const tab = document.getElementById(tabId);
+  if (tab) tab.classList.add('active');
+  if (btn) btn.classList.add('active');
   if (tabId === 'map-view') {
     setTimeout(() => map.invalidateSize(), 200);
   }
 }
 
 // ============================================
-// LEYENDA COLAPSABLE
+// LEYENDA
 // ============================================
 function toggleLegend() {
   const legend = document.getElementById('map-legend');
@@ -31,51 +32,37 @@ function toggleStatsPanel() {
   const panel = document.getElementById('stats-panel');
   if (!panel) return;
 
-  const isCollapsed = panel.classList.toggle('collapsed');
+  panel.classList.toggle('collapsed');
+  const isCollapsed = panel.classList.contains('collapsed');
 
   const label = document.getElementById('stats-handle-label');
-  if (label) {
-    label.innerText = isCollapsed ? 'Mostrar detalles' : 'Ocultar detalles';
-  }
+  if (label) label.innerText = isCollapsed ? 'Mostrar detalles' : 'Ocultar detalles';
 }
 
 // ============================================
-// MODAL COMPARTIR
+// MODALES
 // ============================================
 function openShareModal() {
   if (sharingEnabled) { toggleSharing(); return; }
   const modal = document.getElementById('share-modal');
   if (modal) modal.classList.add('visible');
 }
-
 function closeShareModal() {
   const modal = document.getElementById('share-modal');
   if (modal) modal.classList.remove('visible');
 }
+function confirmSharing() { closeShareModal(); toggleSharing(); }
 
-function confirmSharing() {
-  closeShareModal();
-  toggleSharing();
-}
-
-// ============================================
-// MODAL MICRÓFONO
-// ============================================
 function openMicModal() {
   if (isMonitoring) { toggleMonitoring(); return; }
   const modal = document.getElementById('mic-modal');
   if (modal) modal.classList.add('visible');
 }
-
 function closeMicModal() {
   const modal = document.getElementById('mic-modal');
   if (modal) modal.classList.remove('visible');
 }
-
-function confirmMicActivation() {
-  closeMicModal();
-  toggleMonitoring();
-}
+function confirmMicActivation() { closeMicModal(); toggleMonitoring(); }
 
 // ============================================
 // BOTONES PRINCIPALES
@@ -107,7 +94,6 @@ function toggleSharing() {
       updateActionButtons();
       return;
     }
-
     if (status) status.innerHTML = '⏳ Buscando señal GPS…';
     positionHistory = [];
 

@@ -1,13 +1,7 @@
 /**
  * map.js
- * Mapa Leaflet, capas, marcador personal, botón centrar y ResizeObserver.
- * Depende de: config.js, Leaflet.
- *
- * PRECISIÓN PROGRESIVA (estilo Google Maps):
- *   - Se mantiene un historial de las últimas lecturas GPS.
- *   - Si varias lecturas son cercanas entre sí, la posición es "estable"
- *     y el círculo de precisión se encoge automáticamente.
- *   - El círculo visual NUNCA excede MAX_VISUAL_ACCURACY_M metros.
+ * Mapa Leaflet, capas, marcador personal, heatmap y botón centrar.
+ * Depende de: config.js, Leaflet, leaflet.heat.
  */
 
 // ============================================
@@ -16,72 +10,123 @@
 const map = L.map('map', {
   zoomControl: false,
   zoomSnap: 0.25,
-  zoomDelta: 0.25,
-  wheelPxPerZoomLevel: 120
+  zoomDelta: 0.25
 }).setView([8.75, -75.88], 14);
 
 L.control.zoom({ position: 'topleft' }).addTo(map);
 
-// ✅ detectRetina eliminado: causa que las etiquetas se vean más pequeñas
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
   attribution: '&copy; OpenStreetMap contributors',
   maxZoom: 19
 }).addTo(map);
 
 const communityLayer  = L.layerGroup().addTo(map);
-const communityHeatLayer = L.heatLayer([], {
-  radius: 24,
-  blur: 18,
-  maxZoom: 17,
-  max: 1,
-  minOpacity: 0.15,
-  gradient: {
-    0.0: '#2563eb',
-    0.35: '#10b981',
-    0.55: '#f59e0b',
-    0.75: '#ef4444',
-    1.0: '#7f1d1d'
-  }
-});
 const myLocationLayer = L.layerGroup().addTo(map);
 
-function clearCommunityLayers() {
-  communityLayer.clearLayers();
-  communityHeatLayer.setLatLngs([]);
-  if (map.hasLayer(communityHeatLayer)) map.removeLayer(communityHeatLayer);
+// ============================================
+// HEATMAP: una sola instancia reutilizable
+// ============================================
+let communityHeatLayer = null;
+let heatmapReady = false;
+
+/** Espera a que el mapa tenga dimensiones > 0 antes de dibujar el heatmap */
+function waitForMapSize(callback, attempts = 0) {
+  const mapEl = document.getElementById('map');
+  if (mapEl && mapEl.offsetWidth > 0 && mapEl.offsetHeight > 0) {
+    heatmapReady = true;
+    callback();
+    return;
+  }
+  if (attempts > 20) {
+    console.warn('Mapa sin dimensiones después de 20 intentos');
+    return;
+  }
+  setTimeout(() => waitForMapSize(callback, attempts + 1), 150);
 }
 
+/** Crear la instancia del heatmap (una sola vez) */
+function ensureHeatLayer() {
+  if (communityHeatLayer) return communityHeatLayer;
+
+  communityHeatLayer = L.heatLayer([], {
+    radius: 35,
+    blur: 25,
+    maxZoom: 17,
+    minOpacity: 0.15,
+    gradient: {
+      0.0: '#2563eb',
+      0.35: '#10b981',
+      0.55: '#f59e0b',
+      0.75: '#ef4444',
+      1.0: '#7f1d1d'
+    }
+  });
+
+  return communityHeatLayer;
+}
+
+/** Asigna los puntos al heatmap (nunca lo recrea) */
 function setCommunityHeatPoints(points) {
-  const heatPoints = points.map((point) => [
-    point.lat,
-    point.lng,
-    normalizeDbForHeatmap(point.db)
+  // Limpiar capa de círculos
+  if (communityLayer) communityLayer.clearLayers();
+
+  // Crear heatmap si no existe
+  const layer = ensureHeatLayer();
+
+  if (!points || points.length === 0) {
+    // Sin datos: ocultar el heatmap si está en el mapa
+    if (map.hasLayer(layer)) map.removeLayer(layer);
+    return;
+  }
+
+  // Preparar datos normalizados
+  const heatData = points.map((p) => [
+    p.lat,
+    p.lng,
+    typeof normalizeDbForHeatmap === 'function'
+      ? normalizeDbForHeatmap(p.db)
+      : Math.min(Math.max((p.db - 30) / 70, 0.05), 1.0)
   ]);
-  communityHeatLayer.setLatLngs(heatPoints);
-  if (!map.hasLayer(communityHeatLayer)) communityHeatLayer.addTo(map);
+
+  // Esperar a que el mapa esté listo antes de añadir
+  waitForMapSize(() => {
+    try {
+      layer.setLatLngs(heatData);
+      if (!map.hasLayer(layer)) {
+        layer.addTo(map);
+      }
+    } catch (e) {
+      console.warn('Error actualizando heatmap:', e.message);
+    }
+  });
 }
 
+/** Añadir un punto individual al heatmap (sin recrear) */
 function addCommunityHeatPoint(lat, lng, db) {
-  communityHeatLayer.addLatLng([
-    lat,
-    lng,
-    normalizeDbForHeatmap(db)
-  ]);
-  if (!map.hasLayer(communityHeatLayer)) communityHeatLayer.addTo(map);
+  const layer = ensureHeatLayer();
+  const intensity = typeof normalizeDbForHeatmap === 'function'
+    ? normalizeDbForHeatmap(db)
+    : Math.min(Math.max((db - 30) / 70, 0.05), 1.0);
+
+  waitForMapSize(() => {
+    try {
+      const current = layer._latlngs || [];
+      current.push([lat, lng, intensity]);
+      layer.setLatLngs(current);
+      if (!map.hasLayer(layer)) layer.addTo(map);
+    } catch (e) {
+      console.warn('Error añadiendo punto al heatmap:', e.message);
+    }
+  });
 }
 
-// ============================================
-// RESIZEOBSERVER: recalcular el mapa al cambiar de tamaño
-// ============================================
-const resizeObserver = new ResizeObserver(() => {
-  setTimeout(() => map.invalidateSize(), 150);
-});
-resizeObserver.observe(document.getElementById('map'));
-
-// También al cambiar de orientación en móvil
-window.addEventListener('orientationchange', () => {
-  setTimeout(() => map.invalidateSize(), 300);
-});
+/** Limpiar capas comunitarias */
+function clearCommunityLayers() {
+  if (communityLayer) communityLayer.clearLayers();
+  if (communityHeatLayer && map.hasLayer(communityHeatLayer)) {
+    map.removeLayer(communityHeatLayer);
+  }
+}
 
 // ============================================
 // BOTÓN "CENTRAR EN MÍ"
@@ -106,17 +151,28 @@ const LocateControl = L.Control.extend({
 map.addControl(new LocateControl());
 
 // ============================================
-// PROCESAR NUEVA POSICIÓN (con detección de estabilidad)
+// RESIZEOBSERVER
 // ============================================
-/**
- * Recibe una lectura cruda del GPS, la guarda en el historial,
- * detecta si la posición es estable, calcula la precisión efectiva
- * y actualiza el marcador.
- */
+const resizeObserver = new ResizeObserver(() => {
+  setTimeout(() => {
+    if (map && typeof map.invalidateSize === 'function') {
+      map.invalidateSize();
+    }
+  }, 200);
+});
+const mapEl = document.getElementById('map');
+if (mapEl) resizeObserver.observe(mapEl);
+
+window.addEventListener('orientationchange', () => {
+  setTimeout(() => map.invalidateSize(), 300);
+});
+
+// ============================================
+// PROCESAR NUEVA POSICIÓN
+// ============================================
 function processNewPosition(pos) {
   const { latitude, longitude, accuracy } = pos.coords;
 
-  // Guardar en el historial
   positionHistory.push({
     lat: latitude,
     lng: longitude,
@@ -125,47 +181,39 @@ function processNewPosition(pos) {
   });
   if (positionHistory.length > 10) positionHistory.shift();
 
-  // Calcular precisión efectiva
   let effectiveAccuracy = accuracy;
 
   if (positionHistory.length >= STABILITY_MIN_SAMPLES) {
     const recent = positionHistory.slice(-STABILITY_MIN_SAMPLES);
-
-    // Centroide de las últimas lecturas
     const centerLat = recent.reduce((s, p) => s + p.lat, 0) / recent.length;
     const centerLng = recent.reduce((s, p) => s + p.lng, 0) / recent.length;
 
-    // Máxima distancia de cualquier lectura al centroide
     const maxSpread = Math.max(...recent.map(p =>
       haversineDistance(centerLat, centerLng, p.lat, p.lng)
     ));
 
     if (maxSpread < STABILITY_THRESHOLD_M) {
-      // Posición estable → tomar la mejor precisión vista
       const bestAccuracy = Math.min(...recent.map(p => p.accuracy));
       effectiveAccuracy = Math.max(bestAccuracy, maxSpread, 5);
     }
   }
 
-  // Actualizar estado global
   currentPosition = {
     lat: latitude,
     lng: longitude,
     accuracy: effectiveAccuracy
   };
 
-  // Dibujar
   showMyLocation(latitude, longitude, effectiveAccuracy);
   updateGpsChip(true, effectiveAccuracy);
 }
 
 // ============================================
-// MOSTRAR MI UBICACIÓN (estilo Google Maps)
+// MOSTRAR MI UBICACIÓN
 // ============================================
 function showMyLocation(lat, lng, accuracy) {
   myLocationLayer.clearLayers();
 
-  // Cap visual: nunca dibujar círculos gigantes
   const visualAccuracy = Math.min(accuracy, MAX_VISUAL_ACCURACY_M);
 
   if (visualAccuracy > 0) {
@@ -180,7 +228,6 @@ function showMyLocation(lat, lng, accuracy) {
     }).addTo(myLocationLayer);
   }
 
-  // Punto azul pequeño (estilo Google Maps)
   L.circleMarker([lat, lng], {
     radius: 7,
     color: '#ffffff',
@@ -191,8 +238,7 @@ function showMyLocation(lat, lng, accuracy) {
     .addTo(myLocationLayer)
     .bindPopup(
       '<b>📍 Tu ubicación</b><br>' +
-      `<small>Precisión: ±${Math.round(accuracy)} m</small><br>` +
-      '<small>Solo tú puedes verla. No se comparte.</small>'
+      `<small>Precisión: ±${Math.round(accuracy)} m</small>`
     );
 }
 
