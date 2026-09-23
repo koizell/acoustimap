@@ -13,14 +13,39 @@
   left: 50%;
   transform: translateX(-50%);
   z-index: 998;
-  width: calc(100% - 32px);
-  max-width: 400px;
+  width: min(440px, calc(100% - 32px));
+  max-height: 185px;
+  overflow: hidden;
   background: var(--card-bg);
   backdrop-filter: blur(16px);
   border-radius: 16px;
   padding: 14px;
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.22);
   border: 1px solid rgba(255, 255, 255, 0.4);
+}
+
+.stats-panel.monitoring {
+  max-height: 225px;
+}
+
+.stats-panel:not(.monitoring) .meter-container {
+  display: none;
+}
+
+.stats-panel:not(.monitoring) .avg-block {
+  margin-top: 0;
+}
+
+@media (min-width: 720px) and (max-height: 720px) {
+  .stats-panel.monitoring {
+    bottom: 82px;
+    max-height: 190px;
+    padding: 10px 12px;
+  }
+
+  .stats-panel.monitoring .db-value { font-size: 2.1rem; }
+  .stats-panel.monitoring .meter-container { margin: 3px 0 5px; }
+  .stats-panel.monitoring .avg-block { margin-top: 4px; padding: 8px 10px; }
 }
 
 /* Cabecera del panel */
