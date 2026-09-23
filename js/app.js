@@ -26,6 +26,15 @@ function toggleLegend() {
   legend.classList.toggle('collapsed');
 }
 
+function toggleStatsPanel() {
+  const panel = document.getElementById('stats-panel');
+  const toggle = document.getElementById('stats-toggle');
+  if (!panel || !toggle) return;
+  const expanded = panel.classList.toggle('expanded');
+  toggle.setAttribute('aria-expanded', String(expanded));
+  toggle.setAttribute('aria-label', expanded ? 'Ocultar detalles de medición' : 'Mostrar detalles de medición');
+}
+
 // ============================================
 // MODAL DE CONFIRMACIÓN DE COMPARTIR
 // ============================================

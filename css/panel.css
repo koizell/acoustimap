@@ -25,7 +25,7 @@
 }
 
 .stats-panel.monitoring {
-  max-height: 225px;
+  max-height: 270px;
 }
 
 .stats-panel:not(.monitoring) .meter-container {
@@ -36,10 +36,15 @@
   margin-top: 0;
 }
 
+.compact-reading,
+.stats-toggle {
+  display: none;
+}
+
 @media (min-width: 720px) and (max-height: 720px) {
   .stats-panel.monitoring {
     bottom: 82px;
-    max-height: 190px;
+    max-height: 230px;
     padding: 10px 12px;
   }
 
@@ -212,6 +217,15 @@
   max-width: 400px;
 }
 
+.stats-panel .main-actions {
+  position: static;
+  width: 100%;
+  max-width: none;
+  margin-top: 10px;
+  transform: none;
+  z-index: auto;
+}
+
 .action-btn {
   flex: 1;
   display: flex;
@@ -362,4 +376,91 @@
 
 .modal-btn.confirm:hover {
   background: #1d4ed8;
+}
+
+@media (max-width: 719px) {
+  .stats-panel {
+    transition: max-height 0.22s ease, bottom 0.22s ease;
+  }
+
+  .stats-panel .stats-header {
+    position: relative;
+    padding-right: 30px;
+  }
+
+  .stats-panel .stats-toggle {
+    position: absolute;
+    top: 0;
+    right: 0;
+    display: grid;
+    width: 26px;
+    height: 26px;
+    place-items: center;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: #e2e8f0;
+    color: #475569;
+    cursor: pointer;
+    font-size: 0.9rem;
+    font-weight: 800;
+  }
+
+  .stats-panel .compact-reading {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+    min-height: 24px;
+    color: var(--text-muted);
+  }
+
+  .stats-panel .compact-reading strong {
+    color: var(--text-main);
+    font-size: 1.25rem;
+  }
+
+  .stats-panel .compact-reading span {
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+  }
+
+  .stats-panel:not(.expanded) .meter-container,
+  .stats-panel:not(.expanded) .avg-block {
+    display: none;
+  }
+
+  .stats-panel .main-actions {
+    display: flex;
+    gap: 6px;
+    height: 34px;
+    margin-top: 6px;
+  }
+
+  .stats-panel .action-btn {
+    flex-direction: row;
+    gap: 4px;
+    min-height: 34px;
+    padding: 4px 6px;
+    border-radius: 8px;
+    font-size: 0.64rem;
+    box-shadow: none;
+  }
+
+  .stats-panel .action-icon { font-size: 0.85rem; }
+  .stats-panel .action-text { font-size: 0.64rem; }
+
+  .stats-panel.expanded .compact-reading {
+    display: none;
+  }
+
+  .stats-panel.expanded .stats-toggle {
+    transform: rotate(180deg);
+  }
+
+  body.dark-theme .stats-panel .stats-toggle {
+    background: #334155;
+    color: #e2e8f0;
+  }
 }

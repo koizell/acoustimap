@@ -24,6 +24,7 @@ async function toggleMonitoring() {
 
       isMonitoring = true;
       document.getElementById('stats-panel').classList.add('monitoring');
+      document.getElementById('compact-status').innerText = 'Midiendo en vivo';
 
       // ✅ Actualizar botón principal
       btn.classList.add('active');
@@ -46,6 +47,7 @@ async function toggleMonitoring() {
   } else {
     isMonitoring = false;
     document.getElementById('stats-panel').classList.remove('monitoring');
+    document.getElementById('compact-status').innerText = 'Listo para medir';
     if (stream) stream.getTracks().forEach((t) => t.stop());
     if (rafId) cancelAnimationFrame(rafId);
     rafId = null;
@@ -65,6 +67,7 @@ async function toggleMonitoring() {
 
     // Resetear UI del medidor
     document.getElementById('db-number').innerText = '--';
+    document.getElementById('compact-db').innerText = '-- dB';
     document.getElementById('db-bar').style.width = '0%';
     document.getElementById('db-status-text').innerText = 'Presiona Iniciar';
 
@@ -197,6 +200,7 @@ function updateMeter() {
   if (db < 30) db = 35;
 
   document.getElementById('db-number').innerText = `${db} dB`;
+  document.getElementById('compact-db').innerText = `${db} dB`;
   const percent = Math.min(100, Math.max(0, (db / 100) * 100));
   const dbBar = document.getElementById('db-bar');
   dbBar.style.width = `${percent}%`;
@@ -205,12 +209,15 @@ function updateMeter() {
   if (db < 55) {
     dbBar.style.backgroundColor = 'var(--green)';
     dbStatus.innerText = '🟢 Bajo (Confortable)';
+    document.getElementById('compact-status').innerText = 'Bajo';
   } else if (db <= 70) {
     dbBar.style.backgroundColor = 'var(--yellow)';
     dbStatus.innerText = '🟡 Moderado (Tráfico/Ocupado)';
+    document.getElementById('compact-status').innerText = 'Moderado';
   } else {
     dbBar.style.backgroundColor = 'var(--red)';
     dbStatus.innerText = '🔴 Alto (Ruido Molesto)';
+    document.getElementById('compact-status').innerText = 'Alto';
   }
 
   const now = performance.now();

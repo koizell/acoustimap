@@ -83,6 +83,12 @@
             <span id="status-text">Inactivo</span>
           </span>
           <span class="gps-chip" id="gps-chip">📡 GPS: sin permiso</span>
+          <button class="stats-toggle" id="stats-toggle" type="button" onclick="toggleStatsPanel()" aria-expanded="false" aria-label="Mostrar detalles de medición">⌃</button>
+        </div>
+
+        <div class="compact-reading" aria-live="polite">
+          <strong id="compact-db">-- dB</strong>
+          <span id="compact-status">Listo para medir</span>
         </div>
 
         <div class="meter-container">
@@ -109,18 +115,17 @@
             <span>Muestras <b id="sample-count">0</b></span>
           </div>
         </div>
+        <div class="main-actions">
+          <button class="action-btn primary" id="btn-toggle" onclick="openMicModal()">
+            <span class="action-icon">🎤</span>
+            <span class="action-text">Activar Micrófono</span>
+          </button>
+          <button class="action-btn secondary" id="btn-share" onclick="openShareModal()">
+            <span class="action-icon">📡</span>
+            <span class="action-text">Compartir en mapa</span>
+          </button>
+        </div>
       </div>
-
-      <!-- BOTONES DE ACCIÓN -->
-      <div class="main-actions">
-        <button class="action-btn primary" id="btn-toggle" onclick="openMicModal()">
-          <span class="action-icon">🎤</span>
-          <span class="action-text">Activar Micrófono</span>
-        </button>
-        <button class="action-btn secondary" id="btn-share" onclick="openShareModal()">
-          <span class="action-icon">📡</span>
-          <span class="action-text">Compartir en mapa</span>
-        </button>
       </div>
     </div>
 
