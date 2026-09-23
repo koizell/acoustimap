@@ -130,3 +130,72 @@
   .stats-panel { max-height: 46dvh; }
   .stats-panel.collapsed { max-height: 72px; }
 }
+
+/* ============================================================
+   FIX DEFINITIVO: panel colapsado solo con handle + botones
+   ============================================================ */
+@media (max-width: 719px) {
+
+  /* Panel colapsado: alto suficiente para handle + botones */
+  .stats-panel.collapsed {
+    max-height: 108px !important;
+    padding: 6px 12px calc(10px + env(safe-area-inset-bottom)) !important;
+    overflow: hidden !important;
+  }
+
+  /* En colapsado, OCULTAR la cabecera (badge + GPS) para dejar espacio */
+  .stats-panel.collapsed .stats-header {
+    display: none !important;
+  }
+
+  /* En colapsado, OCULTAR el contenido (medidor + promedio) */
+  .stats-panel.collapsed .stats-content {
+    display: none !important;
+  }
+
+  /* Los botones siempre visibles */
+  .stats-panel .main-actions {
+    display: flex !important;
+    flex-shrink: 0 !important;
+    margin-top: 0 !important;
+    padding-top: 0 !important;
+    border-top: none !important;
+  }
+
+  /* Cuando está expandido, mostrar todo de nuevo */
+  .stats-panel:not(.collapsed) .stats-header {
+    display: flex !important;
+  }
+
+  .stats-panel:not(.collapsed) .stats-content {
+    display: flex !important;
+  }
+
+  .stats-panel:not(.collapsed) .main-actions {
+    padding-top: 8px !important;
+    border-top: 1px solid #e2e8f0 !important;
+  }
+
+  /* El handle se ve siempre */
+  .stats-panel .stats-handle {
+    display: flex !important;
+    padding: 2px 0 8px !important;
+  }
+
+  /* Y el panel en general */
+  .stats-panel {
+    max-height: 42dvh !important;
+    padding: 8px 12px calc(10px + env(safe-area-inset-bottom)) !important;
+  }
+}
+
+/* ============================================================
+   FIX: iPhone/Android con barra de navegación inferior
+   ============================================================ */
+@supports (padding: env(safe-area-inset-bottom)) {
+  @media (max-width: 719px) {
+    .stats-panel {
+      bottom: calc(8px + env(safe-area-inset-bottom)) !important;
+    }
+  }
+}
