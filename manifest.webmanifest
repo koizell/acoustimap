@@ -1,0 +1,11 @@
+{
+  "name": "AcoustiMap",
+  "short_name": "AcoustiMap",
+  "description": "Mapa ciudadano de contaminación acústica",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#2563eb",
+  "lang": "es",
+  "icons": []
+}

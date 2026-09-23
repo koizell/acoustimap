@@ -4,6 +4,39 @@
  * Depende de: config.js, map.js (communityLayer).
  */
 
+let selectedTimeFilter = 'all';
+
+function normalizeDbForHeatmap(db) {
+  return Math.min(Math.max((db - 30) / (100 - 30), 0.05), 1.0);
+}
+
+function getTimeFilterRange(filter) {
+  if (filter === 'all') return null;
+
+  const now = new Date();
+  const start = new Date(now);
+  const end = new Date(now);
+
+  if (filter === 'morning') {
+    start.setHours(6, 0, 0, 0);
+    end.setHours(12, 0, 0, 0);
+  } else if (filter === 'afternoon') {
+    start.setHours(12, 0, 0, 0);
+    end.setHours(18, 0, 0, 0);
+  } else {
+    // Noche cruza medianoche: usar el intervalo nocturno en curso.
+    if (now.getHours() < 6) {
+      start.setDate(start.getDate() - 1);
+    } else {
+      end.setDate(end.getDate() + 1);
+    }
+    start.setHours(18, 0, 0, 0);
+    end.setHours(6, 0, 0, 0);
+  }
+
+  return { start: start.toISOString(), end: end.toISOString() };
+}
+
 // ============================================
 // DIBUJAR UN PUNTO COMUNITARIO
 // ============================================
@@ -104,6 +137,121 @@ function aggregatePoints(rows) {
 }
 
 // ============================================
+// EXPORTAR MEDICIONES COMO CSV
+// ============================================
+function escapeCsvValue(value) {
+  const text = value == null ? '' : String(value);
+  return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+}
+
+async function exportMeasurementsCsv() {
+  const button = document.getElementById('export-csv-btn');
+  if (!supabaseClient || button.disabled) return;
+
+  const originalText = button.innerText;
+  button.disabled = true;
+  button.innerText = 'Exportando…';
+
+  try {
+    const pageSize = 1000;
+    const rows = [];
+    let from = 0;
+
+    while (true) {
+      const { data, error } = await supabaseClient
+        .from('noise_measurements')
+        .select('id, latitude, longitude, db_level, category, created_at')
+        .order('created_at', { ascending: false })
+        .range(from, from + pageSize - 1);
+
+      if (error) throw error;
+      rows.push(...(data || []));
+      if (!data || data.length < pageSize) break;
+      from += pageSize;
+    }
+
+    const columns = ['id', 'latitude', 'longitude', 'db_level', 'category', 'created_at'];
+    const csv = [
+      columns.join(','),
+      ...rows.map((row) => columns.map((column) => escapeCsvValue(row[column])).join(','))
+    ].join('\r\n');
+
+    const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `acoustimap-mediciones-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  } catch (err) {
+    console.error('Error exportando mediciones:', err);
+    alert('No se pudieron exportar las mediciones.');
+  } finally {
+    button.disabled = false;
+    button.innerText = originalText;
+  }
+}
+
+async function exportMeasurementsGeoJson() {
+  const button = document.getElementById('export-geojson-btn');
+  if (!supabaseClient || button.disabled) return;
+
+  const originalText = button.innerText;
+  button.disabled = true;
+  button.innerText = 'Exportando…';
+
+  try {
+    const pageSize = 1000;
+    const features = [];
+    let from = 0;
+
+    while (true) {
+      const { data, error } = await supabaseClient
+        .from('noise_measurements')
+        .select('id, latitude, longitude, db_level, category, created_at')
+        .order('created_at', { ascending: false })
+        .range(from, from + pageSize - 1);
+
+      if (error) throw error;
+      (data || []).forEach((row) => {
+        features.push({
+          type: 'Feature',
+          geometry: { type: 'Point', coordinates: [row.longitude, row.latitude] },
+          properties: {
+            id: row.id,
+            db_level: row.db_level,
+            category: row.category,
+            created_at: row.created_at
+          }
+        });
+      });
+      if (!data || data.length < pageSize) break;
+      from += pageSize;
+    }
+
+    const blob = new Blob([JSON.stringify({ type: 'FeatureCollection', features }, null, 2)], {
+      type: 'application/geo+json;charset=utf-8;'
+    });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `acoustimap-mediciones-${new Date().toISOString().slice(0, 10)}.geojson`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  } catch (err) {
+    console.error('Error exportando GeoJSON:', err);
+    alert('No se pudieron exportar las mediciones.');
+  } finally {
+    button.disabled = false;
+    button.innerText = originalText;
+  }
+}
+
+// ============================================
 // CARGAR PUNTOS DESDE SUPABASE
 // ============================================
 async function loadCommunityPoints() {
@@ -126,10 +274,17 @@ async function loadCommunityPoints() {
       query = query.gte('created_at', since);
     }
 
+    const timeRange = getTimeFilterRange(selectedTimeFilter);
+    if (timeRange) {
+      query = query
+        .gte('created_at', timeRange.start)
+        .lt('created_at', timeRange.end);
+    }
+
     const { data, error } = await query;
     if (error) throw error;
 
-    communityLayer.clearLayers();
+    clearCommunityLayers();
 
     if (!data || data.length === 0) {
       counter.innerText = mapMode === 'live'
@@ -139,9 +294,13 @@ async function loadCommunityPoints() {
     }
 
     const aggregated = aggregatePoints(data);
-    aggregated.forEach((p) =>
-      addCommunityPoint(p.lat, p.lng, p.db, p.category, p.createdAt, p.sampleCount)
-    );
+    if (mapMode === 'live') {
+      setCommunityHeatPoints(aggregated);
+    } else {
+      aggregated.forEach((p) =>
+        addCommunityPoint(p.lat, p.lng, p.db, p.category, p.createdAt, p.sampleCount)
+      );
+    }
 
     const mostRecent = data[0].created_at;
     const modeLabel  = mapMode === 'live' ? 'En Vivo (24h)' : 'Historial (todo)';
@@ -172,24 +331,32 @@ async function sendMeasurementIfDue() {
   const snapped  = snapToGrid(currentPosition.lat, currentPosition.lng);
   const category = classifyDb(avg);
   const nowIso   = new Date().toISOString();
+  const measurement = {
+    latitude: snapped.lat,
+    longitude: snapped.lng,
+    db_level: avg,
+    category
+  };
 
   // Dibujar la zona inmediatamente en el mapa
-  addCommunityPoint(snapped.lat, snapped.lng, avg, category, nowIso, 1);
+  if (mapMode === 'live') {
+    addCommunityHeatPoint(snapped.lat, snapped.lng, avg);
+  } else {
+    addCommunityPoint(snapped.lat, snapped.lng, avg, category, nowIso, 1);
+  }
 
   let success = false;
   if (supabaseClient) {
-    const { error } = await supabaseClient.from('noise_measurements').insert({
-      latitude: snapped.lat,
-      longitude: snapped.lng,
-      db_level: avg,
-      category
-    });
+    const { error } = await supabaseClient.from('noise_measurements').insert(measurement);
     if (error) {
       console.error('Supabase insert error:', error);
+      if (typeof queueOfflineMeasurement === 'function') queueOfflineMeasurement(measurement);
+      success = true;
     } else {
       success = true;
     }
   } else {
+    if (typeof queueOfflineMeasurement === 'function') queueOfflineMeasurement(measurement);
     success = true;
   }
 
@@ -197,6 +364,7 @@ async function sendMeasurementIfDue() {
     sendWindowSum = 0;
     sendWindowCount = 0;
     lastSendTime = now;
+    if (typeof recordChallengeProgress === 'function') recordChallengeProgress(avg, new Date(nowIso));
   }
 }
 
@@ -208,6 +376,14 @@ function setMapMode(mode) {
   document.querySelectorAll('.mode-btn').forEach((b) => b.classList.remove('active'));
   const btn = document.getElementById(`mode-${mode}`);
   if (btn) btn.classList.add('active');
+  loadCommunityPoints();
+}
+
+function setTimeFilter(filter) {
+  selectedTimeFilter = filter;
+  document.querySelectorAll('.time-filter-btn').forEach((button) => {
+    button.classList.toggle('active', button.id === `time-${filter}`);
+  });
   loadCommunityPoints();
 }
 

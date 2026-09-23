@@ -29,7 +29,45 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
 }).addTo(map);
 
 const communityLayer  = L.layerGroup().addTo(map);
+const communityHeatLayer = L.heatLayer([], {
+  radius: 35,
+  blur: 25,
+  maxZoom: 17,
+  minOpacity: 0.15,
+  gradient: {
+    0.0: '#2563eb',
+    0.35: '#10b981',
+    0.55: '#f59e0b',
+    0.75: '#ef4444',
+    1.0: '#7f1d1d'
+  }
+});
 const myLocationLayer = L.layerGroup().addTo(map);
+
+function clearCommunityLayers() {
+  communityLayer.clearLayers();
+  communityHeatLayer.setLatLngs([]);
+  if (map.hasLayer(communityHeatLayer)) map.removeLayer(communityHeatLayer);
+}
+
+function setCommunityHeatPoints(points) {
+  const heatPoints = points.map((point) => [
+    point.lat,
+    point.lng,
+    normalizeDbForHeatmap(point.db)
+  ]);
+  communityHeatLayer.setLatLngs(heatPoints);
+  if (!map.hasLayer(communityHeatLayer)) communityHeatLayer.addTo(map);
+}
+
+function addCommunityHeatPoint(lat, lng, db) {
+  communityHeatLayer.addLatLng([
+    lat,
+    lng,
+    normalizeDbForHeatmap(db)
+  ]);
+  if (!map.hasLayer(communityHeatLayer)) communityHeatLayer.addTo(map);
+}
 
 // ============================================
 // RESIZEOBSERVER: recalcular el mapa al cambiar de tamaño

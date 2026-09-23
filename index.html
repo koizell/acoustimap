@@ -4,9 +4,11 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>AcoustiMap - Mapeo de Contaminación Acústica</title>
+    <link rel="manifest" href="manifest.webmanifest" />
 
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css" />
 
     <!-- Estilos modulares -->
     <link rel="stylesheet" href="css/base.css" />
@@ -15,6 +17,7 @@
     <link rel="stylesheet" href="css/panel.css" />
     <link rel="stylesheet" href="css/info.css" />
     <link rel="stylesheet" href="css/responsive.css" />
+    <link rel="stylesheet" href="css/features.css" />
   </head>
   <body>
     <header>
@@ -28,6 +31,14 @@
 
     <div id="map-view" class="tab-content active">
       <div id="map"></div>
+
+      <div class="time-filters" role="group" aria-label="Filtrar por franja horaria">
+        <span class="time-filters-label">Franja</span>
+        <button class="time-filter-btn active" id="time-all" onclick="setTimeFilter('all')">Todo</button>
+        <button class="time-filter-btn" id="time-morning" onclick="setTimeFilter('morning')">Mañana</button>
+        <button class="time-filter-btn" id="time-afternoon" onclick="setTimeFilter('afternoon')">Tarde</button>
+        <button class="time-filter-btn" id="time-night" onclick="setTimeFilter('night')">Noche</button>
+      </div>
 
       <!-- BOTÓN DE LEYENDA -->
       <button class="legend-toggle" id="legend-toggle" onclick="toggleLegend()" aria-label="Información del mapa">
@@ -50,6 +61,12 @@
             <span class="dot-blue"></span>
             Tu ubicación (solo tú)
           </div>
+          <button class="export-csv-btn" id="export-csv-btn" onclick="exportMeasurementsCsv()">
+            Exportar CSV
+          </button>
+          <button class="export-csv-btn" id="export-geojson-btn" onclick="exportMeasurementsGeoJson()">
+            Exportar GeoJSON
+          </button>
         </div>
       </div>
 
@@ -183,6 +200,8 @@
     </div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+    <script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
     <script src="js/config.local.js"></script>
@@ -191,5 +210,6 @@
     <script src="js/audio.js"></script>
     <script src="js/community.js"></script>
     <script src="js/app.js"></script>
+    <script src="js/features.js"></script>
   </body>
 </html>
