@@ -1,5 +1,7 @@
 /* ============================================================
    responsive.css
+   Media queries para adaptar el layout a móvil y escritorio.
+   SIEMPRE debe ser el último archivo en cargar.
    ============================================================ */
 
 /* ============================================================
@@ -12,9 +14,13 @@
 
   .stats-panel {
     max-width: 420px;
-    max-height: 70dvh;
+    max-height: 70vh;
     padding: 14px 16px;
   }
+
+  /* En PC no se necesita el handle: siempre expandido */
+  .stats-handle { display: none; }
+  .stats-panel.collapsed .stats-content { display: flex; }
 
   .db-value { font-size: 2.6rem; }
   .avg-value { font-size: 1.8rem; }
@@ -32,14 +38,14 @@
   .tab-long { display: none; }
   .tab-short { display: inline; }
 
-  /* Filtros compactos */
+  /* Filtros */
   .time-filters,
   .visual-filters {
     top: calc(var(--header-h) + 6px);
     font-size: 0.7rem;
   }
 
-  /* Leyenda reposicionada */
+  /* Leyenda */
   .legend-toggle {
     top: calc(var(--header-h) + 80px);
     right: 8px;
@@ -56,7 +62,7 @@
     max-width: none;
   }
 
-  /* ✅ Panel: 55dvh en móvil para que quepa con botones */
+  /* ✅ Panel más compacto */
   .stats-panel {
     bottom: 8px;
     left: 8px;
@@ -64,28 +70,37 @@
     width: auto;
     transform: none;
     max-width: none;
-    max-height: 55dvh;
-    padding: 10px 12px;
+    max-height: 42dvh;
+    padding: 8px 12px 10px;
     border-radius: 16px;
-    padding-bottom: calc(12px + env(safe-area-inset-bottom));
+    padding-bottom: calc(10px + env(safe-area-inset-bottom));
+    gap: 4px;
   }
 
-  .db-value { font-size: 2rem; }
-  .avg-value { font-size: 1.4rem; }
-  .meter-container { margin: 2px 0 4px; }
+  /* Mostrar handle en móvil */
+  .stats-handle { display: flex; }
+
+  /* Estado colapsado */
+  .stats-panel.collapsed {
+    max-height: 78px;
+    padding: 6px 12px 10px;
+  }
+
+  .stats-panel.collapsed .stats-content { display: none; }
+
+  /* Textos más pequeños */
+  .db-value { font-size: 1.9rem; }
+  .db-label { font-size: 0.66rem; margin-top: 2px; }
+  .db-bar-bg { height: 6px; margin-top: 6px; }
+
+  .meter-container { margin: 2px 0; }
+
   .avg-block { padding: 8px 10px; }
+  .avg-value { font-size: 1.35rem; }
+  .avg-meta { font-size: 0.65rem; margin-top: 6px; }
 
-  /* Botones en columna horizontal pero dentro del panel */
-  .main-actions {
-    gap: 6px;
-    padding-top: 6px;
-  }
-
-  .action-btn {
-    padding: 9px 6px;
-    font-size: 0.7rem;
-  }
-
+  .main-actions { gap: 6px; padding-top: 6px; }
+  .action-btn { padding: 9px 6px; font-size: 0.7rem; }
   .action-icon { font-size: 1rem; }
   .action-text { font-size: 0.68rem; }
 
@@ -109,9 +124,9 @@
 @media (max-width: 400px) {
   .brand { font-size: 0.85rem; }
   .tab-btn { padding: 5px 6px; font-size: 0.65rem; }
-  .db-value { font-size: 1.8rem; }
-  .avg-value { font-size: 1.3rem; }
+  .db-value { font-size: 1.7rem; }
+  .avg-value { font-size: 1.25rem; }
   .action-text { font-size: 0.62rem; }
-
-  .stats-panel { max-height: 60dvh; }
+  .stats-panel { max-height: 46dvh; }
+  .stats-panel.collapsed { max-height: 72px; }
 }

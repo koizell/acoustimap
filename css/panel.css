@@ -1,6 +1,6 @@
 /* ============================================================
    panel.css
-   Panel único (stats + botones) con layout flex-column.
+   Panel inferior (bottom sheet) con layout flex-column.
    Los botones quedan SIEMPRE visibles al fondo.
    ============================================================ */
 
@@ -12,50 +12,69 @@
   bottom: 12px;
   left: 50%;
   transform: translateX(-50%);
-  z-index: 998;
+  z-index: 1000;
   width: calc(100% - 24px);
-  max-width: 400px;
-  max-height: 60dvh; /* ⬅️ Limita la altura para que no tape el mapa */
+  max-width: 420px;
+  max-height: 65vh;
   background: var(--card-bg);
   backdrop-filter: blur(16px);
   border-radius: 16px;
-  padding: 12px 14px;
+  padding: 10px 14px;
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.22);
   border: 1px solid rgba(255, 255, 255, 0.4);
 
-  /* ✅ Flex column: header + contenido scrolleable + botones fijos */
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
+  transition: max-height 0.3s ease, padding 0.3s ease;
 }
 
-/* El contenido del medio scrollea si no cabe */
+/* Handle (visible en móvil) */
+.stats-handle {
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  cursor: pointer;
+  padding: 2px 0 6px;
+  flex-shrink: 0;
+}
+
+.handle-bar {
+  width: 38px;
+  height: 4px;
+  background: #cbd5e1;
+  border-radius: 999px;
+}
+
+.handle-label {
+  font-size: 0.62rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* Contenido scrolleable */
 .stats-content {
   display: flex;
   flex-direction: column;
   gap: 8px;
   overflow-y: auto;
-  overflow-x: hidden;
   flex: 1 1 auto;
-  min-height: 0; /* ⬅️ Necesario para que flex permita scroll */
+  min-height: 0;
   padding-right: 2px;
 }
 
-/* Scrollbar sutil */
 .stats-content::-webkit-scrollbar { width: 4px; }
 .stats-content::-webkit-scrollbar-thumb {
   background: #cbd5e1;
   border-radius: 4px;
 }
 
-/* Cuando está colapsado, se oculta el contenido del medio */
+/* Cuando está colapsado, oculta el contenido del medio */
 .stats-panel.collapsed .stats-content {
   display: none;
-}
-
-/* El botón toggle rota su flecha */
-.stats-panel.collapsed .stats-toggle {
-  transform: rotate(180deg);
 }
 
 /* ============================================================
@@ -66,8 +85,7 @@
   justify-content: space-between;
   align-items: center;
   gap: 6px;
-  flex-wrap: nowrap;
-  flex: 0 0 auto; /* No se estira */
+  flex-shrink: 0;
 }
 
 .status-badge {
@@ -114,44 +132,9 @@
 .gps-chip.medium { background: #fef3c7; color: #b45309; }
 .gps-chip.poor   { background: #fee2e2; color: #b91c1c; }
 
-.stats-toggle {
-  background: #f1f5f9;
-  border: none;
-  border-radius: 8px;
-  width: 28px;
-  height: 28px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  font-size: 14px;
-  color: var(--text-muted);
-  transition: transform 0.2s ease, background 0.2s;
-  flex: 0 0 auto;
-}
-
-.stats-toggle:hover {
-  background: #e2e8f0;
-}
-
 /* ============================================================
-   CONTENIDO DEL PANEL
+   CONTENIDO
    ============================================================ */
-.compact-reading {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  font-size: 0.75rem;
-  color: var(--text-muted);
-  padding: 4px 2px;
-}
-
-.compact-reading strong {
-  font-size: 1.1rem;
-  color: var(--text-main);
-  font-weight: 800;
-}
-
 .meter-container {
   text-align: center;
   margin: 4px 0;
@@ -250,13 +233,12 @@
 .avg-meta b { color: var(--text-main); }
 
 /* ============================================================
-   BOTONES DE ACCIÓN (dentro del panel, fijos al fondo)
+   BOTONES DE ACCIÓN
    ============================================================ */
 .main-actions {
   display: flex;
   gap: 8px;
-  flex: 0 0 auto; /* ⬅️ No se encoge, siempre visible */
-  margin-top: 2px;
+  flex-shrink: 0;
   padding-top: 8px;
   border-top: 1px solid #e2e8f0;
 }
@@ -280,11 +262,7 @@
   min-width: 0;
 }
 
-.action-btn.primary {
-  background: var(--primary);
-  color: #fff;
-}
-
+.action-btn.primary { background: var(--primary); color: #fff; }
 .action-btn.primary:hover { background: #1d4ed8; }
 
 .action-btn.secondary {
@@ -292,7 +270,6 @@
   color: var(--primary);
   border: 2px solid var(--primary);
 }
-
 .action-btn.secondary:hover { background: #eff6ff; }
 
 .action-btn.active {
@@ -301,10 +278,7 @@
   border-color: #dc2626 !important;
 }
 
-.action-icon {
-  font-size: 1.1rem;
-  flex: 0 0 auto;
-}
+.action-icon { font-size: 1.1rem; flex: 0 0 auto; }
 
 .action-text {
   font-size: 0.72rem;
@@ -331,10 +305,7 @@
   padding: 20px;
 }
 
-.modal-overlay.visible {
-  opacity: 1;
-  pointer-events: auto;
-}
+.modal-overlay.visible { opacity: 1; pointer-events: auto; }
 
 .modal-content {
   background: #fff;
