@@ -112,6 +112,16 @@
 .feature-panel .danger-action { color: #b91c1c; }
 .feature-list { display: grid; gap: 6px; margin: 8px 0 12px; padding: 0; list-style: none; }
 .feature-list li { padding: 8px; border-radius: 7px; background: rgba(226, 232, 240, 0.65); font-size: 0.75rem; }
+.feature-list li img { display: block; width: min(100%, 240px); max-height: 180px; object-fit: cover; margin-top: 8px; border-radius: 7px; }
+.feature-panel label,
+.stats-feature-content label { display: block; margin: 8px 0 3px; color: var(--text-muted); font-size: 0.75rem; font-weight: 700; }
+.feature-panel button:disabled,
+.stats-feature-content button:disabled { opacity: 0.6; cursor: wait; }
+.feature-status svg { display: block; width: min(100%, 360px); height: auto; margin: 8px 0; overflow: visible; }
+.feature-status:focus-visible,
+.feature-panel button:focus-visible,
+.stats-feature-content button:focus-visible,
+.stats-section-btn:focus-visible { outline: 3px solid #60a5fa; outline-offset: 2px; }
 .challenge-item {
   position: relative;
   overflow: hidden;
@@ -184,7 +194,6 @@
 .stats-feature-content select {
   display: block;
   width: 100%;
-  min-height: 100px;
   margin: 12px 0;
   padding: 12px;
   border: 1px solid #cbd5e1;
@@ -193,8 +202,10 @@
   color: var(--text-main);
   font: inherit;
   font-size: 0.85rem;
-  resize: vertical;
 }
+.stats-feature-content textarea { min-height: 100px; resize: vertical; }
+.stats-feature-content input,
+.stats-feature-content select { min-height: 42px; }
 .stats-feature-content button {
   min-height: 38px;
   padding: 8px 13px;
@@ -288,6 +299,11 @@ body.dark-theme .info-copy,
 body.dark-theme .info-header p,
 body.dark-theme .info-card p,
 body.dark-theme .info-card small { color: #cbd5e1; }
+body.dark-theme .stats-feature-content p,
+body.dark-theme .stats-feature-content label { color: #cbd5e1; }
+body.dark-theme .feature-menu-items { background: #0f172a; }
+body.dark-theme header { background: #020617; border-color: #334155; }
+body.dark-theme .stats-feature-content .feature-status { color: #cbd5e1; }
 
 @media (max-width: 719px) {
   .feature-toolbar { top: calc(var(--header-h) + 56px); right: 8px; left: auto; }
@@ -321,6 +337,12 @@ body.dark-theme .info-card small { color: #cbd5e1; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .challenge-item,
-  .challenge-fill { animation: none; }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
 }

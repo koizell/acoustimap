@@ -13,7 +13,11 @@ function switchTab(tabId, btn) {
   if (tab) tab.classList.add('active');
   if (btn) btn.classList.add('active');
   if (tabId === 'map-view') {
-    setTimeout(() => map.invalidateSize(), 200);
+    setTimeout(() => {
+      map.invalidateSize();
+      if (typeof activateComparisonLayer === 'function') activateComparisonLayer();
+      if (typeof loadCommunityPoints === 'function') loadCommunityPoints();
+    }, 200);
   }
 }
 
@@ -22,7 +26,9 @@ function switchTab(tabId, btn) {
 // ============================================
 function toggleLegend() {
   const legend = document.getElementById('map-legend');
-  if (legend) legend.classList.toggle('collapsed');
+  if (!legend) return;
+  legend.classList.toggle('collapsed');
+  document.getElementById('legend-toggle')?.setAttribute('aria-expanded', String(!legend.classList.contains('collapsed')));
 }
 
 // ============================================
@@ -37,7 +43,32 @@ function toggleStatsPanel() {
 
   const label = document.getElementById('stats-handle-label');
   if (label) label.innerText = isCollapsed ? 'Mostrar detalles' : 'Ocultar detalles';
+  const handle = panel.querySelector('.stats-handle');
+  if (handle) handle.setAttribute('aria-expanded', String(!isCollapsed));
 }
+
+function updateMapAttributionClearance() {
+  const mapView = document.getElementById('map-view');
+  const panel = document.getElementById('stats-panel');
+  if (!mapView || !panel) return;
+
+  if (window.matchMedia('(max-width: 719px)').matches) {
+    mapView.style.setProperty(
+      '--map-attribution-clearance',
+      `${Math.ceil(panel.getBoundingClientRect().height + 18)}px`
+    );
+  } else {
+    mapView.style.removeProperty('--map-attribution-clearance');
+  }
+}
+
+window.addEventListener('resize', updateMapAttributionClearance);
+document.getElementById('stats-panel')?.addEventListener('transitionend', (event) => {
+  if (event.target === event.currentTarget && event.propertyName === 'max-height') {
+    updateMapAttributionClearance();
+  }
+});
+requestAnimationFrame(updateMapAttributionClearance);
 
 // ============================================
 // MODALES

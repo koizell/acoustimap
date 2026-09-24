@@ -16,7 +16,7 @@
 }
 
 .info-tab-content {
-  padding: 28px 20px 44px;
+  padding: calc(var(--header-h) + 28px) 20px 44px;
 }
 
 .info-header {
@@ -86,7 +86,7 @@
 
 @media (max-width: 719px) {
   .info-tab-content {
-    padding: 18px 12px 32px;
+    padding: calc(var(--header-h) + 18px) 12px 32px;
   }
 
   .info-wrapper {

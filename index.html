@@ -6,10 +6,11 @@
     <title>AcoustiMap - Mapeo de Contaminación Acústica</title>
     <link rel="manifest" href="manifest.webmanifest" />
 
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎙️</text></svg>" />
+    <link rel="icon" href="assets/icon.svg" type="image/svg+xml" />
 
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css" />
 
     <!-- Estilos modulares -->
     <link rel="stylesheet" href="css/base.css" />
@@ -41,23 +42,23 @@
       <!-- Filtros de franja horaria -->
       <div class="time-filters" role="group" aria-label="Filtrar por franja horaria">
         <span class="time-filters-label">Franja</span>
-        <button class="time-filter-btn active" id="time-all" onclick="setTimeFilter('all')">Todo</button>
-        <button class="time-filter-btn" id="time-morning" onclick="setTimeFilter('morning')">Mañana</button>
-        <button class="time-filter-btn" id="time-afternoon" onclick="setTimeFilter('afternoon')">Tarde</button>
-        <button class="time-filter-btn" id="time-night" onclick="setTimeFilter('night')">Noche</button>
+        <button class="time-filter-btn active" id="time-all" aria-pressed="true" onclick="setTimeFilter('all')">Todo</button>
+        <button class="time-filter-btn" id="time-morning" aria-pressed="false" onclick="setTimeFilter('morning')">Mañana</button>
+        <button class="time-filter-btn" id="time-afternoon" aria-pressed="false" onclick="setTimeFilter('afternoon')">Tarde</button>
+        <button class="time-filter-btn" id="time-night" aria-pressed="false" onclick="setTimeFilter('night')">Noche</button>
       </div>
 
       <!-- Filtros visuales -->
       <div class="visual-filters" role="group" aria-label="Forma de visualizar el mapa">
-        <button class="visual-filter-btn active" id="visual-heatmap" onclick="setCommunityVisualMode('heatmap')">🌡️ Heatmap</button>
-        <button class="visual-filter-btn" id="visual-zones" onclick="setCommunityVisualMode('zones')">📍 Zonas</button>
+        <button class="visual-filter-btn active" id="visual-heatmap" aria-pressed="true" onclick="setCommunityVisualMode('heatmap')">🌡️ Heatmap</button>
+        <button class="visual-filter-btn" id="visual-zones" aria-pressed="false" onclick="setCommunityVisualMode('zones')">📍 Zonas</button>
       </div>
 
       <!-- Botón de leyenda -->
-      <button class="legend-toggle" id="legend-toggle" onclick="toggleLegend()" aria-label="Información del mapa">ℹ️</button>
+      <button class="legend-toggle" id="legend-toggle" onclick="toggleLegend()" aria-label="Información del mapa" aria-controls="map-legend" aria-expanded="false">ℹ️</button>
 
       <!-- Leyenda colapsable -->
-      <div class="map-legend collapsed" id="map-legend">
+      <div class="map-legend collapsed" id="map-legend" role="region" aria-label="Información del mapa">
         <div class="legend-header">
           <span>Información</span>
           <button class="legend-close" onclick="toggleLegend()">✕</button>
@@ -83,10 +84,10 @@
 
       <!-- PANEL DE ESTADÍSTICAS -->
       <div class="stats-panel collapsed" id="stats-panel">
-        <div class="stats-handle" onclick="toggleStatsPanel()">
+        <button class="stats-handle" type="button" onclick="toggleStatsPanel()" aria-expanded="false" aria-controls="stats-content">
           <span class="handle-bar"></span>
           <span class="handle-label" id="stats-handle-label">Mostrar detalles</span>
-        </div>
+        </button>
 
         <div class="stats-header">
           <span class="status-badge" id="status-badge">
@@ -96,7 +97,7 @@
           <span class="gps-chip" id="gps-chip">📡 GPS: sin permiso</span>
         </div>
 
-        <div class="stats-content">
+        <div class="stats-content" id="stats-content">
           <!-- Medidor principal -->
           <div class="meter-container">
             <div class="db-display">
@@ -143,9 +144,9 @@
 
     <!-- MODAL: COMPARTIR -->
     <div class="modal-overlay" id="share-modal">
-      <div class="modal-content">
+      <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="share-modal-title">
         <div class="modal-icon">📍</div>
-        <h2>Compartir ubicación</h2>
+        <h2 id="share-modal-title">Compartir ubicación</h2>
         <p class="modal-text">
           Tu ubicación se <b>ancla a una cuadrícula de ~70 m</b> antes de enviarse a la base de datos.
           Tú verás tu posición exacta en azul; los demás solo verán la zona.
@@ -162,9 +163,9 @@
 
     <!-- MODAL: MICRÓFONO -->
     <div class="modal-overlay" id="mic-modal">
-      <div class="modal-content">
+      <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="mic-modal-title">
         <div class="modal-icon">🎤</div>
-        <h2>Activar micrófono</h2>
+        <h2 id="mic-modal-title">Activar micrófono</h2>
         <p class="modal-text">
           La app usará tu micrófono para <b>medir el nivel de ruido</b> en decibelios (dB).
           <br><br>
@@ -227,18 +228,19 @@
           <button class="stats-back-btn" onclick="switchTab('map-view', document.querySelector('.tab-btn'))">🗺️ Volver al mapa</button>
         </div>
         <div class="stats-section-nav" role="tablist" aria-label="Secciones de estadísticas">
-          <button class="stats-section-btn active" onclick="openStatsTab('stats')">📈 Resumen</button>
-          <button class="stats-section-btn" onclick="openStatsTab('report')">📝 Reportar ruido</button>
-          <button class="stats-section-btn" onclick="openStatsTab('compare')">↔️ Comparar meses</button>
-          <button class="stats-section-btn" onclick="openStatsTab('challenges')">🎯 Retos</button>
+          <button class="stats-section-btn active" id="stats-tab-stats" role="tab" aria-selected="true" aria-controls="stats-feature-content" onclick="openStatsTab('stats')">📈 Resumen</button>
+          <button class="stats-section-btn" id="stats-tab-report" role="tab" aria-selected="false" aria-controls="stats-feature-content" onclick="openStatsTab('report')">📝 Reportar ruido</button>
+          <button class="stats-section-btn" id="stats-tab-compare" role="tab" aria-selected="false" aria-controls="stats-feature-content" onclick="openStatsTab('compare')">↔️ Comparar meses</button>
+          <button class="stats-section-btn" id="stats-tab-challenges" role="tab" aria-selected="false" aria-controls="stats-feature-content" onclick="openStatsTab('challenges')">🎯 Retos</button>
         </div>
-        <div id="stats-feature-content" class="stats-feature-content"></div>
+        <div id="stats-feature-content" class="stats-feature-content" role="tabpanel" aria-labelledby="stats-tab-stats" tabindex="0"></div>
       </div>
     </div>
 
     <!-- Librerías externas -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+    <script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
     <!-- Scripts internos -->

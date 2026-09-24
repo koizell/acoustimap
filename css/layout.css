@@ -11,6 +11,7 @@ header {
   top: 0;
   left: 0;
   right: 0;
+  height: var(--header-h);
   z-index: 1200;
   background: rgba(15, 23, 42, 0.9);
   backdrop-filter: blur(12px);

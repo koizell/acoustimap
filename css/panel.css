@@ -140,19 +140,33 @@
   margin: 4px 0;
 }
 
+.db-display {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 6px;
+}
+
 .db-value {
+  display: inline-block;
   font-size: 2.4rem;
   font-weight: 800;
   color: var(--text-main);
   line-height: 1;
 }
 
-.db-label {
-  font-size: 0.72rem;
+.db-unit {
+  font-size: 1rem;
+  font-weight: 700;
   color: var(--text-muted);
-  font-weight: 600;
-  text-transform: uppercase;
+}
+
+.db-status {
   margin-top: 4px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
 }
 
 .db-bar-bg {

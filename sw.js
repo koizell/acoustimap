@@ -1,4 +1,4 @@
-const CACHE_NAME = 'acoustimap-shell-v17';
+const CACHE_NAME = 'acoustimap-shell-v20';
 const APP_SHELL = [
   './',
   './index.html',
@@ -15,11 +15,27 @@ const APP_SHELL = [
   './js/community.js',
   './js/app.js',
   './js/features.js',
-  './manifest.webmanifest'
+  './manifest.webmanifest',
+  './assets/icon.svg'
 ];
 
 self.addEventListener('install', (event) => {
-  event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL)));
+  event.waitUntil((async () => {
+    const cache = await caches.open(CACHE_NAME);
+    await cache.addAll(APP_SHELL);
+    // Libraries CDN: best-effort cache. A CDN outage must not block app install.
+    await Promise.allSettled([
+      'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js',
+      'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',
+      'https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js',
+      'https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js',
+      'https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css',
+      'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2'
+    ].map(async (url) => {
+      const response = await fetch(url, { mode: 'cors' });
+      if (response.ok) await cache.put(url, response);
+    }));
+  })());
   self.skipWaiting();
 });
 
@@ -33,7 +49,6 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-
   const url = new URL(event.request.url);
 
   // ✅ Ignorar esquemas no soportados (chrome-extension, moz-extension, etc.)
@@ -46,12 +61,24 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  if (event.request.method !== 'GET') return;
   event.respondWith(
-    caches.match(event.request).then((cached) => cached || fetch(event.request).then((response) => {
-      const copy = response.clone();
-      caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
-      return response;
-    }).catch(() => caches.match('./index.html')))
+    (async () => {
+      const cached = await caches.match(event.request);
+      if (cached) return cached;
+      try {
+        const response = await fetch(event.request);
+        if (response.ok && (url.origin === self.location.origin || /(^|\.)tile\.openstreetmap\.org$/.test(url.hostname))) {
+          const cache = await caches.open(CACHE_NAME);
+          await cache.put(event.request, response.clone());
+        }
+        return response;
+      } catch (error) {
+        if (event.request.mode === 'navigate') {
+          const shell = await caches.match('./index.html');
+          if (shell) return shell;
+        }
+        return new Response('', { status: 503, statusText: 'Offline' });
+      }
+    })()
   );
 });

@@ -24,7 +24,6 @@ async function toggleMonitoring() {
 
       isMonitoring = true;
       document.getElementById('stats-panel').classList.add('monitoring');
-      document.getElementById('compact-status').innerText = 'Midiendo en vivo';
 
       // ✅ Actualizar botón principal
       btn.classList.add('active');
@@ -47,7 +46,6 @@ async function toggleMonitoring() {
   } else {
     isMonitoring = false;
     document.getElementById('stats-panel').classList.remove('monitoring');
-    document.getElementById('compact-status').innerText = 'Listo para medir';
     if (stream) stream.getTracks().forEach((t) => t.stop());
     if (rafId) cancelAnimationFrame(rafId);
     rafId = null;
@@ -67,9 +65,8 @@ async function toggleMonitoring() {
 
     // Resetear UI del medidor
     document.getElementById('db-number').innerText = '--';
-    document.getElementById('compact-db').innerText = '-- dB';
     document.getElementById('db-bar').style.width = '0%';
-    document.getElementById('db-status-text').innerText = 'Presiona Iniciar';
+    document.getElementById('db-status-text').innerText = 'Presiona para empezar';
 
     // ✅ Guardar resumen antes de detener
     await saveSessionSummary();
@@ -149,7 +146,6 @@ function updateAvgUI() {
 // GUARDAR RESUMEN DE SESIÓN EN SUPABASE
 // ============================================
 async function saveSessionSummary() {
-  if (!supabaseClient) return;
   if (session.count === 0) return;
   if (!sharingEnabled) return;
   if (!currentPosition) return;
@@ -159,6 +155,8 @@ async function saveSessionSummary() {
   const snapped = snapToGrid(currentPosition.lat, currentPosition.lng);
 
   const sessionData = {
+    id: crypto.randomUUID(),
+    client_id: typeof featureClientId === 'string' ? featureClientId : null,
     latitude:     snapped.lat,
     longitude:    snapped.lng,
     avg_db:       avg,
@@ -169,17 +167,27 @@ async function saveSessionSummary() {
   };
 
   try {
+    if (!supabaseClient && typeof enqueueOfflineRecord === 'function') {
+      await enqueueOfflineRecord('noise_sessions', sessionData);
+      return;
+    }
+    if (!navigator.onLine && typeof enqueueOfflineRecord === 'function') {
+      await enqueueOfflineRecord('noise_sessions', sessionData);
+      return;
+    }
     const { error } = await supabaseClient
       .from('noise_sessions')
       .insert(sessionData);
 
     if (error) {
       console.warn('No se pudo guardar el resumen de sesión:', error.message);
+      if ((typeof isOfflineError === 'function' ? isOfflineError(error) : !navigator.onLine) && typeof enqueueOfflineRecord === 'function') await enqueueOfflineRecord('noise_sessions', sessionData);
     } else {
       console.log('✅ Resumen de sesión guardado:', sessionData);
     }
   } catch (err) {
     console.warn('Error al guardar resumen de sesión:', err);
+    if ((typeof isOfflineError === 'function' ? isOfflineError(err) : !navigator.onLine) && typeof enqueueOfflineRecord === 'function') await enqueueOfflineRecord('noise_sessions', sessionData);
   }
 }
 
@@ -199,8 +207,7 @@ function updateMeter() {
   let db = Math.round(20 * Math.log10(average || 1) + 25);
   if (db < 30) db = 35;
 
-  document.getElementById('db-number').innerText = `${db} dB`;
-  document.getElementById('compact-db').innerText = `${db} dB`;
+  document.getElementById('db-number').innerText = db;
   const percent = Math.min(100, Math.max(0, (db / 100) * 100));
   const dbBar = document.getElementById('db-bar');
   dbBar.style.width = `${percent}%`;
@@ -209,15 +216,12 @@ function updateMeter() {
   if (db < 55) {
     dbBar.style.backgroundColor = 'var(--green)';
     dbStatus.innerText = '🟢 Bajo (Confortable)';
-    document.getElementById('compact-status').innerText = 'Bajo';
   } else if (db <= 70) {
     dbBar.style.backgroundColor = 'var(--yellow)';
     dbStatus.innerText = '🟡 Moderado (Tráfico/Ocupado)';
-    document.getElementById('compact-status').innerText = 'Moderado';
   } else {
     dbBar.style.backgroundColor = 'var(--red)';
     dbStatus.innerText = '🔴 Alto (Ruido Molesto)';
-    document.getElementById('compact-status').innerText = 'Alto';
   }
 
   const now = performance.now();
@@ -232,7 +236,7 @@ function updateMeter() {
 
     sendWindowSum += db;
     sendWindowCount += 1;
-    sendMeasurementIfDue();
+    sendMeasurementIfDue().catch((error) => console.warn('No se pudo enviar la medición:', error));
   }
 
   rafId = requestAnimationFrame(updateMeter);

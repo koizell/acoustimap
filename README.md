@@ -85,8 +85,9 @@ acoustimap/
 │   ├── audio.js        · micrófono y dB
 │   ├── community.js    · Supabase
 │   └── app.js          · UI y eventos
-└── sql/
-    └── setup.sql       · esquema + RLS + cron
+├── migrations/
+│   └── 20260923_complete_features.sql · funciones ciudadanas + Storage + RLS
+└── setup.sql           · esquema base + RLS + cron
 ```
 
 > ⚠️ El micrófono y la geolocalización requieren **HTTPS** en producción.
@@ -107,9 +108,17 @@ acoustimap/
 2. Crea una rama: `git checkout -b feature/nueva-funcionalidad`.
 3. Commits descriptivos y **pull request**.
 
-**Ideas:** temas visuales, gráficos históricos, multi-idioma, exportar a CSV, heatmap, PWA offline.
+Las mediciones requieren HTTPS para usar el micrófono y la geolocalización. La sincronización de datos guardados offline ocurre cuando la aplicación vuelve a estar abierta y conectada.
 
 ---
+
+## Migración de funciones ciudadanas
+
+Después de ejecutar `setup.sql`, ejecuta una sola vez [`migrations/20260923_complete_features.sql`](migrations/20260923_complete_features.sql) en el SQL Editor de Supabase. Añade atribución anónima por navegador a las mediciones, soporte opcional de fotos en reportes, confirmaciones idempotentes, políticas RLS y retención de datos compatible con la comparación mensual. La migración crea el bucket público `noise-report-photos` con límite de 5 MB y tipos JPG, PNG y WebP.
+
+El `client_id` es un identificador aleatorio guardado en el navegador; sirve para mostrar retos en ese dispositivo, no verifica la identidad de una persona. Las mediciones antiguas quedan sin atribución. Las fotos de los reportes son públicas porque los reportes también se muestran en la aplicación.
+
+Para comprobar los cambios locales: `npm test` y `node --check` sobre los scripts de `js/` y `sw.js`. La migración debe ejecutarse en Supabase antes de habilitar estas funciones en el sitio publicado.
 
 ## Licencia
 

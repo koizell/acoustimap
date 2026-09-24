@@ -5,7 +5,7 @@
   "scripts": {
     "build:config": "node build-config.js",
     "dev": "npx serve .",
-    "test": "echo \"No tests specified\" && exit 0"
+    "test": "node --test"
   },
   "keywords": [
     "noise",

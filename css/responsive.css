@@ -39,15 +39,19 @@
   .tab-short { display: inline; }
 
   /* Filtros */
-  .time-filters,
-  .visual-filters {
+  .time-filters {
     top: calc(var(--header-h) + 6px);
+    font-size: 0.7rem;
+  }
+
+  .visual-filters {
+    top: calc(var(--header-h) + 58px);
     font-size: 0.7rem;
   }
 
   /* Leyenda */
   .legend-toggle {
-    top: calc(var(--header-h) + 80px);
+    top: calc(var(--header-h) + 98px);
     right: 8px;
     width: 34px;
     height: 34px;
@@ -55,7 +59,7 @@
   }
 
   .map-legend {
-    top: calc(var(--header-h) + 78px);
+    top: calc(var(--header-h) + 98px);
     right: 50px;
     left: 8px;
     min-width: auto;
@@ -80,17 +84,10 @@
   /* Mostrar handle en móvil */
   .stats-handle { display: flex; }
 
-  /* Estado colapsado */
-  .stats-panel.collapsed {
-    max-height: 78px;
-    padding: 6px 12px 10px;
-  }
-
-  .stats-panel.collapsed .stats-content { display: none; }
-
   /* Textos más pequeños */
   .db-value { font-size: 1.9rem; }
-  .db-label { font-size: 0.66rem; margin-top: 2px; }
+  .db-unit { font-size: 0.85rem; }
+  .db-status { font-size: 0.66rem; margin-top: 2px; }
   .db-bar-bg { height: 6px; margin-top: 6px; }
 
   .meter-container { margin: 2px 0; }
@@ -116,6 +113,9 @@
     line-height: 28px !important;
     font-size: 15px !important;
   }
+
+  /* Mantiene visible la atribución del mapa por encima del panel inferior. */
+  .leaflet-bottom.leaflet-right { bottom: var(--map-attribution-clearance, 112px); }
 }
 
 /* ============================================================
@@ -127,8 +127,6 @@
   .db-value { font-size: 1.7rem; }
   .avg-value { font-size: 1.25rem; }
   .action-text { font-size: 0.62rem; }
-  .stats-panel { max-height: 46dvh; }
-  .stats-panel.collapsed { max-height: 72px; }
 }
 
 /* ============================================================
@@ -180,6 +178,11 @@
   .stats-panel .stats-handle {
     display: flex !important;
     padding: 2px 0 8px !important;
+    width: 100%;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
   }
 
   /* Y el panel en general */
@@ -198,4 +201,8 @@
       bottom: calc(8px + env(safe-area-inset-bottom)) !important;
     }
   }
+}
+
+@media (max-width: 400px) {
+  .stats-panel:not(.collapsed) { max-height: 46dvh !important; }
 }

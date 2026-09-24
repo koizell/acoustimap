@@ -7,6 +7,7 @@
 let selectedTimeFilter = 'all';
 let selectedVisualMode = 'heatmap';
 let lastAggregatedPoints = [];
+let communityLoadToken = 0;
 
 
 function getTimeFilterRange(filter) {
@@ -136,6 +137,10 @@ function aggregatePoints(rows) {
 }
 
 function renderCommunityPoints(points) {
+  if (comparisonMode && document.getElementById('map-view')?.classList.contains('active')) {
+    activateComparisonLayer();
+    return;
+  }
   clearCommunityLayers();
   if (selectedVisualMode === 'heatmap') {
     setCommunityHeatPoints(points);
@@ -149,7 +154,9 @@ function renderCommunityPoints(points) {
 function setCommunityVisualMode(mode) {
   selectedVisualMode = mode;
   document.querySelectorAll('.visual-filter-btn').forEach((button) => {
-    button.classList.toggle('active', button.id === `visual-${mode}`);
+    const active = button.id === `visual-${mode}`;
+    button.classList.toggle('active', active);
+    button.setAttribute('aria-pressed', String(active));
   });
   if (lastAggregatedPoints.length) renderCommunityPoints(lastAggregatedPoints);
 }
@@ -274,6 +281,8 @@ async function exportMeasurementsGeoJson() {
 // ============================================
 async function loadCommunityPoints() {
   const counter = document.getElementById('community-count');
+  const requestToken = ++communityLoadToken;
+  if (!counter) return;
 
   if (!supabaseClient) {
     counter.innerText = 'Sin datos comunitarios aún';
@@ -301,6 +310,7 @@ async function loadCommunityPoints() {
 
     const { data, error } = await query;
     if (error) throw error;
+    if (requestToken !== communityLoadToken) return;
 
     clearCommunityLayers();
 
@@ -323,6 +333,7 @@ async function loadCommunityPoints() {
       `Última actualización: ${timeAgo(mostRecent)}`;
 
   } catch (err) {
+    if (requestToken !== communityLoadToken) return;
     console.error('Error cargando mediciones:', err);
     counter.innerText = 'Error al cargar datos';
   }
@@ -346,10 +357,12 @@ async function sendMeasurementIfDue() {
   const category = classifyDb(avg);
   const nowIso   = new Date().toISOString();
   const measurement = {
+    id: crypto.randomUUID(),
     latitude: snapped.lat,
     longitude: snapped.lng,
     db_level: avg,
-    category
+    category,
+    client_id: typeof featureClientId === 'string' ? featureClientId : null
   };
 
   // Dibujar la zona inmediatamente en el mapa
@@ -373,22 +386,34 @@ async function sendMeasurementIfDue() {
 
   let success = false;
   if (supabaseClient) {
-    const { error } = await supabaseClient.from('noise_measurements').insert(measurement);
+    let error;
+    try {
+      ({ error } = await supabaseClient.from('noise_measurements').insert(measurement));
+    } catch (requestError) {
+      error = requestError;
+    }
     if (error) {
       console.error('Supabase insert error:', error);
-      if (typeof queueOfflineMeasurement === 'function') queueOfflineMeasurement(measurement);
-      success = true;
+      if (typeof isOfflineError === 'function' ? isOfflineError(error) : !navigator.onLine) {
+        await queueOfflineMeasurement(measurement);
+        success = true;
+      }
     } else {
       success = true;
     }
   } else {
-    if (typeof queueOfflineMeasurement === 'function') queueOfflineMeasurement(measurement);
-    success = true;
+    if (typeof queueOfflineMeasurement === 'function') {
+      await queueOfflineMeasurement(measurement);
+      success = true;
+    }
   }
 
   if (success) {
     sendWindowSum = 0;
     sendWindowCount = 0;
+    lastSendTime = now;
+  } else {
+    // No repetir una inserción rechazada en cada frame del medidor.
     lastSendTime = now;
   }
 }
@@ -407,7 +432,9 @@ function setMapMode(mode) {
 function setTimeFilter(filter) {
   selectedTimeFilter = filter;
   document.querySelectorAll('.time-filter-btn').forEach((button) => {
-    button.classList.toggle('active', button.id === `time-${filter}`);
+    const active = button.id === `time-${filter}`;
+    button.classList.toggle('active', active);
+    button.setAttribute('aria-pressed', String(active));
   });
   loadCommunityPoints();
 }
