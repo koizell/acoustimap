@@ -52,13 +52,13 @@ function ensureHeatLayer() {
     radius: 35,
     blur: 25,
     maxZoom: 17,
-    minOpacity: 0.15,
+    minOpacity: 0.22,
     gradient: {
-      0.0: '#2563eb',
-      0.35: '#10b981',
-      0.55: '#f59e0b',
-      0.75: '#ef4444',
-      1.0: '#7f1d1d'
+      0.0: '#22c55e',
+      0.35: '#84cc16',
+      0.55: '#facc15',
+      0.75: '#f97316',
+      1.0: '#dc2626'
     }
   });
 
@@ -221,9 +221,9 @@ function showMyLocation(lat, lng, accuracy) {
       radius: visualAccuracy,
       color: '#2563eb',
       weight: 1,
-      opacity: 0.35,
+      opacity: 0.25,
       fillColor: '#2563eb',
-      fillOpacity: 0.1,
+      fillOpacity: 0.04,
       interactive: false
     }).addTo(myLocationLayer);
   }
