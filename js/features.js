@@ -16,6 +16,33 @@ const featureClientId = (() => {
   }
 })();
 
+const CHALLENGE_STORE = 'acoustimap-local-challenge-measurements';
+
+function getLocalChallengeMeasurements() {
+  try {
+    const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000;
+    const rows = JSON.parse(localStorage.getItem(CHALLENGE_STORE) || '[]');
+    return rows.filter((row) => Date.parse(row.created_at) >= cutoff);
+  } catch (_) {
+    return [];
+  }
+}
+
+function recordLocalChallengeMeasurement(measurement) {
+  try {
+    const rows = getLocalChallengeMeasurements();
+    rows.push({
+      latitude: measurement.latitude,
+      longitude: measurement.longitude,
+      db_level: measurement.db_level,
+      created_at: measurement.created_at
+    });
+    localStorage.setItem(CHALLENGE_STORE, JSON.stringify(rows.slice(-5000)));
+  } catch (error) {
+    console.warn('No se pudo guardar el progreso local:', error);
+  }
+}
+
 let featureRows = [];
 let comparisonLayer = null;
 let currentComparisonLayer = null;
@@ -187,7 +214,7 @@ function panelFrame(title, content, panel) {
   return `${closeButton}<h2>${title}</h2>${content}`;
 }
 
-async function fetchFeatureMeasurements(start, end, clientId = null) {
+async function fetchFeatureMeasurements(start, end) {
   if (!supabaseClient) throw new Error('Supabase no está configurado.');
   const rows = [];
   const pageSize = 1000;
@@ -195,12 +222,11 @@ async function fetchFeatureMeasurements(start, end, clientId = null) {
   while (true) {
     let query = supabaseClient
       .from('noise_measurements')
-      .select('latitude, longitude, db_level, category, created_at, client_id')
+      .select('latitude, longitude, db_level, category, created_at')
       .order('created_at', { ascending: false })
       .range(from, from + pageSize - 1);
     if (start) query = query.gte('created_at', start.toISOString());
     if (end) query = query.lt('created_at', end.toISOString());
-    if (clientId) query = query.eq('client_id', clientId);
     const { data, error } = await query;
     if (error) throw error;
     rows.push(...(data || []));
@@ -245,7 +271,7 @@ async function comparePeriods(panel) {
     if (!panelIsCurrent(panel, 'compare')) return;
     comparisonRows = { current, previous };
     const status = panel.querySelector('.feature-status');
-    status.textContent = difference == null ? noDataMessage() : `${t('current')}: ${currentAvg} dB · ${t('previous')}: ${previousAvg} dB · ${t('difference')}: ${difference > 0 ? '+' : ''}${difference} dB`;
+    status.textContent = difference == null ? noDataMessage() : `${t('current')}: ${currentAvg} · ${t('previous')}: ${previousAvg} · ${t('difference')}: ${difference > 0 ? '+' : ''}${difference} puntos del índice`;
     panel.querySelector('.comparison-actions')?.removeAttribute('hidden');
   } catch (error) {
     console.error('Error comparando periodos:', error);
@@ -275,7 +301,7 @@ function activateComparisonLayer() {
   if (communityHeatLayer && map.hasLayer(communityHeatLayer)) map.removeLayer(communityHeatLayer);
   if (map.hasLayer(comparisonLayer)) map.removeLayer(comparisonLayer);
   if (map.hasLayer(currentComparisonLayer)) map.removeLayer(currentComparisonLayer);
-  const layer = mode === 'previous' ? comparisonLayer : currentComparisonLayer;
+  const layer = comparisonMode === 'previous' ? comparisonLayer : currentComparisonLayer;
   layer.setLatLngs(points);
   layer.addTo(map);
 }
@@ -330,7 +356,7 @@ async function analyzeDrawnZone(polygon) {
     const rows = await fetchFeatureMeasurements(start, end);
     const selected = rows.filter((row) => pointInPolygon({ lat: row.latitude, lng: row.longitude }, polygon));
     if (!panelIsCurrent(panel, 'stats')) return;
-    panel.querySelector('.feature-status').textContent = selected.length ? `${t('average')}: ${averageDb(selected)} dB · ${selected.length} ${t('measurements')} (30 días)` : noDataMessage();
+    panel.querySelector('.feature-status').textContent = selected.length ? `${t('average')} del índice: ${averageDb(selected)} · ${selected.length} ${t('measurements')} (30 días)` : noDataMessage();
     renderTrendChart(panel, selected);
   } catch (error) {
     console.error('Error analizando zona:', error);
@@ -373,7 +399,7 @@ async function loadCitizenReports(panel) {
   data.forEach((report) => {
     const item = document.createElement('li');
     const detail = document.createElement('span');
-    detail.textContent = `${report.db_level == null ? 'Sin medición' : `${report.db_level} dB`} · ${report.note} · ${timeAgo(report.created_at)}`;
+    detail.textContent = `${report.db_level == null ? 'Sin medición' : `Índice ${report.db_level}`} · ${report.note} · ${timeAgo(report.created_at)}`;
     item.appendChild(detail);
     if (report.photo_path) {
       const { data: photo } = supabaseClient.storage.from('noise-report-photos').getPublicUrl(report.photo_path);
@@ -385,6 +411,15 @@ async function loadCitizenReports(panel) {
     }
     list.appendChild(item);
   });
+}
+
+function buildReportRecord(id, position, db, note, photoType) {
+  const extension = photoType === 'image/png' ? 'png' : photoType === 'image/webp' ? 'webp' : 'jpg';
+  const photoPath = photoType ? `${id}/${id}.${extension}` : null;
+  return {
+    photoPath,
+    payload: { id, latitude: position.lat, longitude: position.lng, db_level: db, note, photo_path: photoPath }
+  };
 }
 
 async function submitReport() {
@@ -407,17 +442,17 @@ async function submitReport() {
   const parsedDb = Number.parseInt(document.getElementById('db-number')?.innerText, 10);
   const db = Number.isInteger(parsedDb) && parsedDb >= 20 && parsedDb <= 140 ? parsedDb : null;
   const reportId = crypto.randomUUID();
+  const reportRecord = buildReportRecord(reportId, snapped, db, note, photo?.type);
   const button = panel.querySelector('#send-report');
   button.disabled = true;
   status.textContent = u('sending');
-  let photoPath = null;
+  const photoPath = reportRecord.photoPath;
   try {
     if (photo) {
-      photoPath = `${featureClientId}/${reportId}.${photo.type === 'image/png' ? 'png' : photo.type === 'image/webp' ? 'webp' : 'jpg'}`;
       const { error: uploadError } = await supabaseClient.storage.from('noise-report-photos').upload(photoPath, photo, { contentType: photo.type, upsert: false });
       if (uploadError) throw uploadError;
     }
-    const { error } = await supabaseClient.from('noise_reports').insert({ id: reportId, latitude: snapped.lat, longitude: snapped.lng, db_level: db, note, client_id: featureClientId, photo_path: photoPath });
+    const { error } = await supabaseClient.from('noise_reports').insert(reportRecord.payload);
     if (error) throw error;
     status.textContent = t('sent');
     noteInput.value = '';
@@ -426,7 +461,7 @@ async function submitReport() {
   } catch (error) {
     if (isOfflineError(error) && typeof enqueueOfflineRecord === 'function') {
       try {
-        await enqueueOfflineRecord('noise_reports', { id: reportId, latitude: snapped.lat, longitude: snapped.lng, db_level: db, note, client_id: featureClientId, photo_path: null }, photo);
+        await enqueueOfflineRecord('noise_reports', { ...reportRecord.payload, photo_path: null }, photo);
         status.textContent = u('queuedReport');
         noteInput.value = '';
         if (photoInput) photoInput.value = '';
@@ -436,7 +471,7 @@ async function submitReport() {
     } else {
       status.textContent = error.message || 'No se pudo enviar el reporte. Comprueba la conexión y la configuración de Supabase.';
     }
-    if (photoPath) await supabaseClient.storage.from('noise-report-photos').remove([photoPath]).catch(() => {});
+    // Un proceso programado retira las fotos sin reporte; el cliente anónimo no puede borrarlas.
     console.error('Error enviando reporte:', error);
   } finally {
     if (button?.isConnected) button.disabled = false;
@@ -444,7 +479,7 @@ async function submitReport() {
 }
 
 function renderStatsPanel(panel) {
-  panel.innerHTML = panelFrame(t('stats'), `<div class="feature-status" role="status" aria-live="polite">${t('loading')}</div><div class="stats-metrics"><div><strong id="metric-total">--</strong><span>${t('measurements')} · ${u('last30')}</span></div><div><strong id="metric-average">--</strong><span>${t('average')} dB</span></div><div><strong id="metric-high">--</strong><span>&gt; 70 dB</span></div></div><div class="stats-columns"><section><h2>${t('loudest')}</h2><ul class="feature-list" id="loudest-list"></ul></section><section><h2>${t('quietest')}</h2><ul class="feature-list" id="quietest-list"></ul></section></div><h2>${t('alerts')}</h2><ul class="feature-list" id="alerts-list"></ul><h2>${u('trendTitle')}</h2><p>${u('trendHelp')}</p><div class="panel-actions"><button type="button" id="select-trend-location">${u('chooseArea')}</button></div><div id="zone-trend" class="feature-status">${u('noZone')}</div><h2>Reportes ciudadanos</h2><ul class="feature-list" id="citizen-reports-list"><li>${t('loading')}</li></ul><div class="panel-actions"><button type="button" id="select-confirm-location">${u('chooseConfirm')}</button><button type="button" id="confirm-noise">🔊 ${t('confirm')}</button></div><p id="confirm-status" role="status" aria-live="polite">${t('confirmHelp')}</p>`, panel);
+  panel.innerHTML = panelFrame(t('stats'), `<div class="feature-status" role="status" aria-live="polite">${t('loading')}</div><div class="stats-metrics"><div><strong id="metric-total">--</strong><span>${t('measurements')} · ${u('last30')}</span></div><div><strong id="metric-average">--</strong><span>${t('average')} del índice</span></div><div><strong id="metric-high">--</strong><span>Índice &gt; 70</span></div></div><div class="stats-columns"><section><h2>${t('loudest')}</h2><ul class="feature-list" id="loudest-list"></ul></section><section><h2>${t('quietest')}</h2><ul class="feature-list" id="quietest-list"></ul></section></div><h2>${t('alerts')}</h2><ul class="feature-list" id="alerts-list"></ul><h2>${u('trendTitle')}</h2><p>${u('trendHelp')}</p><div class="panel-actions"><button type="button" id="select-trend-location">${u('chooseArea')}</button></div><div id="zone-trend" class="feature-status">${u('noZone')}</div><h2>Reportes ciudadanos</h2><ul class="feature-list" id="citizen-reports-list"><li>${t('loading')}</li></ul><div class="panel-actions"><button type="button" id="select-confirm-location">${u('chooseConfirm')}</button><button type="button" id="confirm-noise">🔊 ${t('confirm')}</button></div><p id="confirm-status" role="status" aria-live="polite">${t('confirmHelp')}</p>`, panel);
   panel.querySelector('[data-close]')?.addEventListener('click', closeFeaturePanel);
   panel.querySelector('#confirm-noise').addEventListener('click', confirmNoise);
   panel.querySelector('#select-confirm-location').addEventListener('click', () => {
@@ -468,7 +503,7 @@ function appendRanking(list, rows) {
   }
   rows.forEach((row) => {
     const item = document.createElement('li');
-    item.textContent = `${row.db} dB · ${row.count} ${t('measurements')} · ${row.lat.toFixed(4)}, ${row.lng.toFixed(4)}`;
+    item.textContent = `Índice ${row.db} · ${row.count} ${t('measurements')} · ${row.lat.toFixed(4)}, ${row.lng.toFixed(4)}`;
     list.appendChild(item);
   });
 }
@@ -507,7 +542,7 @@ async function loadStats(panel) {
     }).slice(0, 3);
     const alertList = panel.querySelector('#alerts-list');
     if (!alerts.length) alertList.innerHTML = `<li>${t('noAlerts')}</li>`;
-    alerts.forEach((zone) => { const item = document.createElement('li'); item.textContent = `⚠️ ${averageDb(zone.dailyLevels.get([...zone.days].sort().at(-1)).map((db_level) => ({ db_level })))} dB · 3 días consecutivos`; alertList.appendChild(item); });
+    alerts.forEach((zone) => { const item = document.createElement('li'); item.textContent = `⚠️ Índice ${averageDb(zone.dailyLevels.get([...zone.days].sort().at(-1)).map((db_level) => ({ db_level })))} · 3 días consecutivos`; alertList.appendChild(item); });
     panel.querySelector('.feature-status').textContent = featureRows.length ? `${zones.length} zonas analizadas` : noDataMessage();
   } catch (error) {
     console.error('Error cargando estadísticas:', error);
@@ -523,16 +558,12 @@ async function confirmNoise() {
   const position = selectedMapPoint || currentPosition;
   const status = document.getElementById('confirm-status');
   if (!position || (!supabaseClient && navigator.onLine)) { if (status) status.textContent = !position ? u('chooseMapPoint') : 'Supabase no está configurado.'; return; }
-  const snapped = snapToGrid(position.lat, position.lng);
   const keyTime = new Date();
   keyTime.setMinutes(0, 0, 0);
   const measurementTime = keyTime.toISOString();
-  const confirmation = {
-    id: crypto.randomUUID(), latitude: snapped.lat, longitude: snapped.lng,
-    measurement_time: measurementTime, client_id: featureClientId,
-    confirmation_key: `${featureClientId}:${snapped.lat.toFixed(5)}:${snapped.lng.toFixed(5)}:${measurementTime}`
-  };
+  let confirmation;
   try {
+    confirmation = await buildConfirmation(position, measurementTime);
     const { error } = await supabaseClient.from('noise_confirmations').insert(confirmation);
     if (error && error.code === '23505') {
       if (status) status.textContent = 'Ya confirmaste el ruido en esta zona durante esta hora.';
@@ -542,11 +573,22 @@ async function confirmNoise() {
     if (status) status.textContent = t('confirmed');
     await loadZoneConfirmations(position);
   } catch (error) {
-    if (isOfflineError(error) && typeof enqueueOfflineRecord === 'function') {
+    if (confirmation && isOfflineError(error) && typeof enqueueOfflineRecord === 'function') {
       await enqueueOfflineRecord('noise_confirmations', confirmation);
       if (status) status.textContent = 'Confirmación guardada y pendiente de conexión.';
     } else if (status) status.textContent = error.message || 'No se pudo confirmar el ruido.';
   }
+}
+
+async function buildConfirmation(position, measurementTime) {
+  const snapped = snapToGrid(position.lat, position.lng);
+  const value = `${featureClientId}:${snapped.lat.toFixed(5)}:${snapped.lng.toFixed(5)}:${measurementTime}`;
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
+  const key = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
+  return {
+    id: crypto.randomUUID(), latitude: snapped.lat, longitude: snapped.lng,
+    measurement_time: measurementTime, confirmation_key: key
+  };
 }
 
 async function loadZoneConfirmations(position) {
@@ -576,11 +618,11 @@ function renderTrendChart(container, rows) {
   const coords = series.map((item, index) => `${20 + index * (260 / Math.max(series.length - 1, 1))},${100 - ((item.db - min) / range) * 70}`).join(' ');
   target.textContent = '';
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-  svg.setAttribute('viewBox', '0 0 300 120'); svg.setAttribute('role', 'img'); svg.setAttribute('aria-label', `Tendencia de ruido: ${series.map((item) => `${item.date}: ${item.db} dB`).join(', ')}`);
+  svg.setAttribute('viewBox', '0 0 300 120'); svg.setAttribute('role', 'img'); svg.setAttribute('aria-label', `Tendencia del índice: ${series.map((item) => `${item.date}: ${item.db}`).join(', ')}`);
   const polyline = document.createElementNS(svg.namespaceURI, 'polyline');
   polyline.setAttribute('points', coords); polyline.setAttribute('fill', 'none'); polyline.setAttribute('stroke', '#2563eb'); polyline.setAttribute('stroke-width', '4'); polyline.setAttribute('stroke-linecap', 'round'); polyline.setAttribute('stroke-linejoin', 'round');
   svg.appendChild(polyline); target.appendChild(svg);
-  const caption = document.createElement('p'); caption.textContent = `${series[0].date} – ${series.at(-1).date} · ${min}–${max} dB`; target.appendChild(caption);
+  const caption = document.createElement('p'); caption.textContent = `${series[0].date} – ${series.at(-1).date} · índice ${min}–${max}`; target.appendChild(caption);
 }
 
 async function loadZoneTrend(position) {
@@ -613,8 +655,7 @@ function renderChallengesPanel(panel) {
 
 async function loadChallengeProgress(list, challenges) {
   try {
-    const start = new Date(); start.setDate(start.getDate() - 30);
-    const rows = await fetchFeatureMeasurements(start, new Date(), featureClientId);
+    const rows = getLocalChallengeMeasurements();
     const rushByZone = new Map();
     const nightRows = [];
     const quietLocations = new Set();
@@ -681,14 +722,14 @@ function rotateLanguage() {
 
 function updateStaticLanguage() {
   const details = {
-    es: { intro: 'Entiende el impacto del ruido y cómo los datos ciudadanos ayudan a mejorar la ciudad.', cardDescriptions: ['La exposición prolongada al ruido puede afectar el sueño, la concentración y la salud cardiovascular.', 'AcoustiMap ayuda a identificar zonas de riesgo acústico para orientar decisiones de prevención.', 'Las mediciones anónimas aportan evidencia ciudadana para una planificación urbana más sostenible.'], badges: ['Salud', 'ODS 3', 'ODS 11'], cardLabels: ['Bienestar', 'Salud', 'Ciudad'], legend: 'Información' },
-    en: { intro: 'Understand how noise affects health and how citizen data can improve the city.', cardDescriptions: ['Long-term noise exposure can affect sleep, concentration, and cardiovascular health.', 'AcoustiMap helps identify noise risk areas to guide prevention.', 'Anonymous measurements provide evidence for more sustainable urban planning.'], badges: ['Health', 'SDG 3', 'SDG 11'], cardLabels: ['Wellbeing', 'Health', 'City'], legend: 'Map information' },
-    pt: { intro: 'Entenda o impacto do ruído e como os dados cidadãos podem melhorar a cidade.', cardDescriptions: ['A exposição prolongada ao ruído pode afetar o sono, a concentração e a saúde cardiovascular.', 'O AcoustiMap ajuda a identificar áreas de risco acústico para orientar a prevenção.', 'Medições anônimas fornecem evidências para um planejamento urbano mais sustentável.'], badges: ['Saúde', 'ODS 3', 'ODS 11'], cardLabels: ['Bem-estar', 'Saúde', 'Cidade'], legend: 'Informações do mapa' }
+    es: { intro: 'Entiende el ruido de tu entorno y cómo los datos ciudadanos ayudan a mejorar la ciudad.', cardDescriptions: ['La exposición prolongada al ruido puede afectar el sueño, la concentración y la salud cardiovascular.', 'AcoustiMap muestra patrones relativos de ruido; su índice no permite evaluar exposición ni riesgo clínico.', 'Las mediciones anónimas aportan información ciudadana para una planificación urbana más sostenible.'], badges: ['Salud', 'ODS 3', 'ODS 11'], cardLabels: ['Bienestar', 'Salud', 'Ciudad'], legend: 'Información' },
+    en: { intro: 'Explore local noise patterns and how citizen data can improve the city.', cardDescriptions: ['Long-term noise exposure can affect sleep, concentration, and cardiovascular health.', 'AcoustiMap shows relative noise patterns; its index cannot assess exposure or clinical risk.', 'Anonymous measurements provide information for more sustainable urban planning.'], badges: ['Health', 'SDG 3', 'SDG 11'], cardLabels: ['Wellbeing', 'Health', 'City'], legend: 'Map information' },
+    pt: { intro: 'Explore padrões de ruído e como os dados cidadãos podem melhorar a cidade.', cardDescriptions: ['A exposição prolongada ao ruído pode afetar o sono, a concentração e a saúde cardiovascular.', 'O AcoustiMap mostra padrões relativos de ruído; o índice não avalia exposição nem risco clínico.', 'Medições anônimas fornecem informações para um planejamento urbano mais sustentável.'], badges: ['Saúde', 'ODS 3', 'ODS 11'], cardLabels: ['Bem-estar', 'Saúde', 'Cidade'], legend: 'Informações do mapa' }
   }[currentLanguage];
   const copy = {
-    es: { map: 'Mapa', health: 'Salud + ODS', healthShort: 'Salud', stats: 'Estadísticas', statsShort: 'Stats', title: 'Salud y ODS', intro: 'Entiende el impacto del ruido y cómo los datos ciudadanos ayudan a mejorar la ciudad.', detail: 'Mostrar detalles', hide: 'Ocultar detalles', all: 'Todo', morning: 'Mañana', afternoon: 'Tarde', night: 'Noche', exportCsv: 'Exportar CSV', exportGeo: 'Exportar GeoJSON', statsTitle: 'Estadísticas del ruido', statsIntro: 'Explora tendencias, reportes y zonas persistentes sin salir de la aplicación.', back: 'Volver al mapa', tabs: ['Resumen', 'Reportar ruido', 'Comparar meses', 'Retos'], privacy: 'Privacidad por diseño', privacyCopy: 'AcoustiMap no graba audio, no requiere login y guarda las coordenadas ancladas a una cuadrícula aproximada de 70 m.', mapHelp: 'Cómo interpretar el mapa', mapHelpCopy: 'Verde indica niveles bajos, amarillo niveles moderados y rojo niveles altos. El heatmap muestra patrones, no la ubicación exacta de las personas.', cardTitles: ['Menos ruido, más descanso', 'Ciudades más saludables', 'Participación local'] },
-    en: { map: 'Map', health: 'Health + SDGs', healthShort: 'Health', stats: 'Statistics', statsShort: 'Stats', title: 'Health and SDGs', intro: 'Understand how noise affects health and how citizen data can improve the city.', detail: 'Show details', hide: 'Hide details', all: 'All', morning: 'Morning', afternoon: 'Afternoon', night: 'Night', exportCsv: 'Export CSV', exportGeo: 'Export GeoJSON', statsTitle: 'Noise statistics', statsIntro: 'Explore trends, reports, and persistent areas without leaving the app.', back: 'Back to map', tabs: ['Summary', 'Report noise', 'Compare months', 'Challenges'], privacy: 'Privacy by design', privacyCopy: 'AcoustiMap does not record audio, requires no login, and stores coordinates snapped to an approximate 70 m grid.', mapHelp: 'How to read the map', mapHelpCopy: 'Green indicates low levels, yellow moderate levels, and red high levels. The heatmap shows patterns, not people’s exact locations.', cardTitles: ['Less noise, better rest', 'Healthier cities', 'Local participation'] },
-    pt: { map: 'Mapa', health: 'Saúde + ODS', healthShort: 'Saúde', stats: 'Estatísticas', statsShort: 'Stats', title: 'Saúde e ODS', intro: 'Entenda o impacto do ruído e como os dados cidadãos podem melhorar a cidade.', detail: 'Mostrar detalhes', hide: 'Ocultar detalhes', all: 'Tudo', morning: 'Manhã', afternoon: 'Tarde', night: 'Noite', exportCsv: 'Exportar CSV', exportGeo: 'Exportar GeoJSON', statsTitle: 'Estatísticas de ruído', statsIntro: 'Explore tendências, relatos e áreas persistentes sem sair do aplicativo.', back: 'Voltar ao mapa', tabs: ['Resumo', 'Relatar ruído', 'Comparar meses', 'Desafios'], privacy: 'Privacidade desde o início', privacyCopy: 'O AcoustiMap não grava áudio, não exige login e salva coordenadas em uma grade aproximada de 70 m.', mapHelp: 'Como interpretar o mapa', mapHelpCopy: 'Verde indica níveis baixos, amarelo moderados e vermelho altos. O mapa de calor mostra padrões, não a localização exata das pessoas.', cardTitles: ['Menos ruído, mais descanso', 'Cidades mais saudáveis', 'Participação local'] }
+    es: { map: 'Mapa', health: 'Salud + ODS', healthShort: 'Salud', stats: 'Estadísticas', statsShort: 'Stats', title: 'Salud y ODS', intro: 'Entiende el impacto del ruido y cómo los datos ciudadanos ayudan a mejorar la ciudad.', detail: 'Mostrar detalles', hide: 'Ocultar detalles', all: 'Todo', morning: 'Mañana', afternoon: 'Tarde', night: 'Noche', exportCsv: 'Exportar CSV', exportGeo: 'Exportar GeoJSON', statsTitle: 'Estadísticas del ruido', statsIntro: 'Explora tendencias, reportes y zonas persistentes sin salir de la aplicación.', back: 'Volver al mapa', tabs: ['Resumen', 'Reportar ruido', 'Comparar meses', 'Retos'], privacy: 'Privacidad por diseño', privacyCopy: 'AcoustiMap no graba audio, no requiere login y guarda las coordenadas ancladas a una cuadrícula aproximada de 70 m.', mapHelp: 'Cómo interpretar el mapa', mapHelpCopy: 'Verde indica valores bajos, amarillo moderados y rojo altos del índice relativo. No equivale a decibelios calibrados ni evalúa exposición.', cardTitles: ['Menos ruido, más descanso', 'Ciudades más saludables', 'Participación local'] },
+    en: { map: 'Map', health: 'Health + SDGs', healthShort: 'Health', stats: 'Statistics', statsShort: 'Stats', title: 'Health and SDGs', intro: 'Understand how noise affects health and how citizen data can improve the city.', detail: 'Show details', hide: 'Hide details', all: 'All', morning: 'Morning', afternoon: 'Afternoon', night: 'Night', exportCsv: 'Export CSV', exportGeo: 'Export GeoJSON', statsTitle: 'Noise statistics', statsIntro: 'Explore trends, reports, and persistent areas without leaving the app.', back: 'Back to map', tabs: ['Summary', 'Report noise', 'Compare months', 'Challenges'], privacy: 'Privacy by design', privacyCopy: 'AcoustiMap does not record audio, requires no login, and stores coordinates snapped to an approximate 70 m grid.', mapHelp: 'How to read the map', mapHelpCopy: 'Green shows low, yellow moderate, and red high relative index values. This is not calibrated decibel data and cannot assess exposure.', cardTitles: ['Less noise, better rest', 'Healthier cities', 'Local participation'] },
+    pt: { map: 'Mapa', health: 'Saúde + ODS', healthShort: 'Saúde', stats: 'Estatísticas', statsShort: 'Stats', title: 'Saúde e ODS', intro: 'Entenda o impacto do ruído e como os dados cidadãos podem melhorar a cidade.', detail: 'Mostrar detalhes', hide: 'Ocultar detalhes', all: 'Tudo', morning: 'Manhã', afternoon: 'Tarde', night: 'Noite', exportCsv: 'Exportar CSV', exportGeo: 'Exportar GeoJSON', statsTitle: 'Estatísticas de ruído', statsIntro: 'Explore tendências, relatos e áreas persistentes sem sair do aplicativo.', back: 'Voltar ao mapa', tabs: ['Resumo', 'Relatar ruído', 'Comparar meses', 'Desafios'], privacy: 'Privacidade desde o início', privacyCopy: 'O AcoustiMap não grava áudio, não exige login e salva coordenadas em uma grade aproximada de 70 m.', mapHelp: 'Como interpretar o mapa', mapHelpCopy: 'Verde indica valores baixos, amarelo moderados e vermelho altos do índice relativo. Não equivale a decibéis calibrados nem avalia exposição.', cardTitles: ['Menos ruído, mais descanso', 'Cidades mais saudáveis', 'Participação local'] }
   }[currentLanguage];
   const nav = document.querySelectorAll('.tab-btn');
   if (nav[0]) nav[0].textContent = `🗺️ ${copy.map}`;
@@ -793,9 +834,19 @@ async function flushOfflineMeasurements() {
     const records = (await getOfflineRecords()).sort((a, b) => a.queuedAt.localeCompare(b.queuedAt));
     for (const record of records) {
       try {
-        let payload = record.payload;
+        let payload = { ...record.payload };
+        delete payload.client_id;
+        if (Number.isFinite(payload.latitude) && Number.isFinite(payload.longitude)) {
+          const snapped = snapToGrid(payload.latitude, payload.longitude);
+          payload.latitude = snapped.lat;
+          payload.longitude = snapped.lng;
+        }
+        if (record.table === 'noise_confirmations') {
+          const rebuilt = await buildConfirmation(payload, payload.measurement_time);
+          payload.confirmation_key = rebuilt.confirmation_key;
+        }
         if (record.table === 'noise_reports' && record.photo) {
-          const photoPath = `${featureClientId}/${payload.id}.${record.photo.type === 'image/png' ? 'png' : record.photo.type === 'image/webp' ? 'webp' : 'jpg'}`;
+          const photoPath = buildReportRecord(payload.id, { lat: payload.latitude, lng: payload.longitude }, payload.db_level, payload.note, record.photo.type).photoPath;
           const { error: uploadError } = await supabaseClient.storage.from('noise-report-photos').upload(photoPath, record.photo, { contentType: record.photo.type, upsert: false });
           if (uploadError && uploadError.statusCode !== '409' && uploadError.status !== 409 && uploadError.code !== 'Duplicate') throw uploadError;
           payload = { ...payload, photo_path: photoPath };
@@ -835,7 +886,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch((error) => console.warn('PWA no disponible:', error));
   try {
     const legacy = JSON.parse(localStorage.getItem('acoustimap-pending-measurements') || '[]');
-    const migration = await Promise.allSettled(legacy.map((measurement) => queueOfflineMeasurement({ ...measurement, id: measurement.id || crypto.randomUUID(), client_id: measurement.client_id || featureClientId })));
+    const migration = await Promise.allSettled(legacy.map((measurement) => queueOfflineMeasurement({ ...measurement, id: measurement.id || crypto.randomUUID() })));
     if (legacy.length && migration.every((result) => result.status === 'fulfilled')) localStorage.removeItem('acoustimap-pending-measurements');
   } catch (error) { console.warn('No se pudo migrar la cola local antigua:', error); }
   flushOfflineMeasurements();

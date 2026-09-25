@@ -1,6 +1,6 @@
 /**
  * audio.js
- * Captura de micrófono, cálculo de dB, promedio de sesión y guardado de resumen.
+ * Captura de micrófono, índice relativo de ruido y resumen de sesión.
  * Depende de: config.js. Llama a sendMeasurementIfDue() (community.js).
  */
 
@@ -156,7 +156,6 @@ async function saveSessionSummary() {
 
   const sessionData = {
     id: crypto.randomUUID(),
-    client_id: typeof featureClientId === 'string' ? featureClientId : null,
     latitude:     snapped.lat,
     longitude:    snapped.lng,
     avg_db:       avg,
@@ -204,6 +203,7 @@ function updateMeter() {
   for (let i = 0; i < dataArray.length; i++) sum += dataArray[i];
   const average = sum / dataArray.length;
 
+  // Indicador relativo sin calibración de presión sonora (no dB SPL).
   let db = Math.round(20 * Math.log10(average || 1) + 25);
   if (db < 30) db = 35;
 
@@ -215,13 +215,13 @@ function updateMeter() {
   const dbStatus = document.getElementById('db-status-text');
   if (db < 55) {
     dbBar.style.backgroundColor = 'var(--green)';
-    dbStatus.innerText = '🟢 Bajo (Confortable)';
+    dbStatus.innerText = '🟢 Índice bajo';
   } else if (db <= 70) {
     dbBar.style.backgroundColor = 'var(--yellow)';
-    dbStatus.innerText = '🟡 Moderado (Tráfico/Ocupado)';
+    dbStatus.innerText = '🟡 Índice moderado';
   } else {
     dbBar.style.backgroundColor = 'var(--red)';
-    dbStatus.innerText = '🔴 Alto (Ruido Molesto)';
+    dbStatus.innerText = '🔴 Índice alto';
   }
 
   const now = performance.now();

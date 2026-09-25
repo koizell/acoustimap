@@ -1,6 +1,9 @@
 -- AcoustiMap: completar el contrato de datos para participación y análisis.
+-- Migración histórica: aplicar esta primero y luego
+-- 20260925_privacy_and_retention.sql antes de publicar el frontend actual.
 -- Ejecutar una vez en Supabase SQL Editor con un rol administrador.
--- Las mediciones antiguas conservan client_id NULL; las nuevas deben incluirlo.
+-- Esta etapa histórica exigía client_id en escrituras nuevas; la migración
+-- 20260925_privacy_and_retention.sql elimina ese requisito y los datos previos.
 
 begin;
 

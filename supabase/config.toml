@@ -1,0 +1,4 @@
+project_id = "acoustimap"
+
+[functions.cleanup-noise-photos]
+verify_jwt = false

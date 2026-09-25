@@ -1,131 +1,76 @@
-# 🎙️ AcoustiMap
+# AcoustiMap
 
-> **Mapeo colaborativo de contaminación acústica urbana.**
-> Convierte tu dispositivo en un sensor acústico ciudadano: mide el ruido, compártelo de forma anónima y visualiza zonas de riesgo sonoro en un mapa en tiempo real.
+Mapa colaborativo de patrones de ruido. [Abrir demo](https://koizell.github.io/acoustimap/).
 
-[![Demo](https://img.shields.io/badge/demo-en%20vivo-success?logo=github)](https://koizell.github.io/acoustimap/)
-[![Supabase](https://img.shields.io/badge/Supabase-PostgreSQL-3ECF8E?logo=supabase)](https://supabase.com)
-[![Leaflet](https://img.shields.io/badge/Leaflet-1.9.4-199900?logo=leaflet)](https://leafletjs.com)
-[![Licencia](https://img.shields.io/badge/Licencia-MIT-blue.svg)](#licencia)
+## Qué mide
 
-🌐 **Demo en vivo:** [https://koizell.github.io/acoustimap/](https://koizell.github.io/acoustimap/)
+La aplicación usa la Web Audio API para calcular un **índice relativo de ruido** en tiempo real. No graba audio. La escala conserva los umbrales históricos de la interfaz: bajo (<55), moderado (55–70) y alto (>70). **Los valores no son decibelios calibrados (dB SPL)** y no sirven para evaluar exposición, cumplimiento normativo ni riesgo para la salud. Los dispositivos y navegadores pueden producir valores distintos ante el mismo sonido.
 
----
+Con consentimiento, se envía cada 10 segundos el promedio del índice, la categoría y una ubicación anclada a una cuadrícula aproximada de 70 m. El mapa consulta celdas agregadas del área visible: últimas 24 horas en «En vivo» o hasta 90 días en «Historial», y vuelve a consultar al moverlo. Las franjas usan la hora de Colombia (UTC−5) para todos los visitantes. También permite comparar meses, registrar reportes y exportar CSV o GeoJSON. Las exportaciones llaman `noise_index` al valor. La columna de base de datos `db_level` conserva su nombre anterior por compatibilidad, pero representa el mismo índice relativo.
 
-## 🎯 ¿Qué es?
+## Privacidad y retención
 
-**AcoustiMap** permite medir el nivel de ruido ambiental con el micrófono de tu dispositivo y compartirlo **de forma anónima** en un mapa comunitario. El proyecto visibiliza la contaminación acústica urbana y aporta datos ciudadanos a los ODS de la ONU.
+- El audio y la ubicación exacta no se envían al servidor. La base de datos valida la cuadrícula de las coordenadas nuevas.
+- No se envía un identificador estable del navegador. Los retos personales se calculan en el almacenamiento local de ese dispositivo; se pierden si se limpia ese almacenamiento.
+- Las confirmaciones usan una clave SHA-256 derivada de un secreto local, celda y hora. Las fotos se guardan bajo el UUID aleatorio de cada reporte. Las fotos adjuntas a reportes son públicas mientras el reporte esté vigente.
+- Mediciones y sesiones se conservan 90 días; confirmaciones, 24 horas; reportes, 30 días. Una Edge Function borra las fotos mediante Storage API antes de borrar sus reportes. También retira fotos huérfanas después de un día.
+- La migración borra los `client_id` históricos, ancla las coordenadas antiguas a la cuadrícula y restringe las escrituras nuevas. Los enlaces de fotos antiguas que incluían ese identificador se retiran del reporte; la limpieza programada elimina esos archivos del bucket.
 
----
+## Desarrollo local
 
-## ⚙️ Cómo funciona
+Sirve el repositorio desde localhost para probar la interfaz. El micrófono y la geolocalización requieren un contexto seguro (HTTPS o localhost). Ejecuta `npm test` y `node --check` en los scripts de `js/` y en `sw.js` antes de publicar.
 
-1. **Mides** → La app analiza el micrófono con la Web Audio API (no graba audio).
-2. **Calcula** → Convierte la intensidad en decibelios (dB) en tiempo real.
-3. **Compartes** → Si lo autorizas, tu ubicación se ancla a una cuadrícula de ~70 m y se envía a Supabase cada 10 s.
-4. **Visualizas** → El mapa muestra zonas de ruido clasificadas por color:
-   - 🟢 **< 55 dB** · Bajo
-   - 🟡 **55 – 70 dB** · Moderado
-   - 🔴 **> 70 dB** · Alto
-5. **Se limpia solo** → Un cron job borra mediciones huérfanas cada hora.
+## Publicación en GitHub Pages
 
----
+El flujo [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) publica la rama `main` en [koizell.github.io/acoustimap](https://koizell.github.io/acoustimap/). Necesita los secretos de Actions `SUPABASE_URL` y `SUPABASE_ANON_KEY` para generar `js/config.local.js` durante el build. Aplica y verifica primero las migraciones de Supabase de la sección siguiente; después publica el frontend. El service worker cambia de versión para renovar los recursos guardados; si había una pestaña abierta antes del despliegue, recárgala.
 
-## 🔐 Privacidad por diseño
+## Despliegue de Supabase
 
-| Dato | ¿Se guarda? |
-|---|---|
-| 🎵 Audio | ❌ Nunca |
-| 📍 Ubicación exacta | ❌ Nunca sale del dispositivo |
-| 📍 Ubicación difuminada (~70 m) | ✅ Sí, en Supabase |
-| 📊 Nivel de dB | ✅ Sí |
-| 🆔 Identidad del usuario | ❌ Nunca |
+Para un proyecto nuevo, ejecuta en el SQL Editor de Supabase, en este orden:
 
-**Consentimiento explícito:** antes de enviar nada, aparece un modal explicando qué se comparte y qué no.
+1. [`setup.sql`](setup.sql)
+2. [`migrations/20260923_complete_features.sql`](migrations/20260923_complete_features.sql)
+3. [`migrations/20260925_privacy_and_retention.sql`](migrations/20260925_privacy_and_retention.sql)
 
----
+En un proyecto que ya tenga las dos primeras migraciones, ejecuta solo la tercera. Revisa cualquier política RLS adicional creada manualmente: las políticas permisivas de `INSERT` se combinan con OR y pueden eludir las restricciones nuevas. La migración retira las políticas conocidas del repositorio.
 
-## 🚀 Uso
+Aplica la migración de privacidad y confirma que `noise_map_cells` responde **antes** de publicar este frontend: el mapa nuevo depende de esa función. Después de publicar, recarga las pestañas que hubieran quedado abiertas con la versión anterior; sus fotos usaban rutas con identificadores antiguos y ya no se aceptan en Storage.
 
-1. Abre la [demo](https://koizell.github.io/acoustimap/).
-2. Pulsa **🎤 Activar Micrófono** y acepta el permiso.
-3. Pulsa **📡 Compartir en mapa** y acepta el modal de privacidad.
-4. Explora el mapa: zoom, leyenda (ℹ️), botón 📍 para centrar y toggle **En Vivo / Historial**.
-5. Detén con **⏹️ Detener** para guardar el resumen de la sesión.
+Después despliega la Edge Function `cleanup-noise-photos` desde [`supabase/functions/cleanup-noise-photos`](supabase/functions/cleanup-noise-photos) con Supabase CLI y configura un secreto aleatorio `PHOTO_CLEANUP_TOKEN` en los secretos de la función. La función tiene `verify_jwt = false` en [`supabase/config.toml`](supabase/config.toml) y exige ese token en la cabecera `x-cleanup-token` de cada petición; no pongas el token en el frontend.
 
----
+Crea en Supabase Vault `acoustimap_project_url` (la URL de tu proyecto) y `acoustimap_photo_cleanup_token` (el mismo token de la función). Ejecuta luego [`migrations/20260925_schedule_photo_cleanup.sql`](migrations/20260925_schedule_photo_cleanup.sql). Esta migración configura una invocación por hora mediante `pg_cron` y `pg_net`. La tarea de limpieza de filas sin fotos de `setup.sql` permanece activa.
 
-## 🧰 Stack
+### Comprobación posterior al despliegue
 
-| Capa | Tecnología |
-|---|---|
-| Frontend | HTML5, CSS3, JavaScript (Vanilla) |
-| Mapas | Leaflet + OpenStreetMap |
-| Audio | Web Audio API |
-| Backend | Supabase (PostgreSQL) |
-| Hosting | GitHub Pages |
+En el SQL Editor, confirma que las funciones y los trabajos programados existen:
 
----
+```sql
+select jobname, schedule from cron.job
+where jobname in ('cleanup-old-noise', 'cleanup-noise-photos');
 
-## 📁 Estructura
+select conname, convalidated from pg_constraint
+where conname like 'noise_%_grid_check' or conname like 'noise_%_no_client_check'
+order by conname;
 
-```
-acoustimap/
-├── index.html
-├── css/
-│   ├── base.css        · variables y reset
-│   ├── layout.css      · header y tabs
-│   ├── map.css         · mapa, leyenda, tooltips
-│   ├── panel.css       · botones, stats, modal
-│   ├── info.css        · pestañas Salud y ODS
-│   └── responsive.css  · media queries
-├── js/
-│   ├── config.js       · credenciales y utilidades
-│   ├── map.js          · mapa y marcador
-│   ├── audio.js        · micrófono y dB
-│   ├── community.js    · Supabase
-│   └── app.js          · UI y eventos
-├── migrations/
-│   └── 20260923_complete_features.sql · funciones ciudadanas + Storage + RLS
-└── setup.sql           · esquema base + RLS + cron
+with latitude_cell as (
+  select (floor(4.6 / (70.0 / 111000.0)) + 0.5) * (70.0 / 111000.0) as lat
+), snapped as (
+  select lat,
+    (floor(-74.1 / (70.0 / (111000.0 * cos(radians(lat))))) + 0.5)
+    * (70.0 / (111000.0 * cos(radians(lat)))) as lng
+  from latitude_cell
+)
+select public.is_noise_grid_cell(lat, lng) as snapped_cell_is_valid,
+  public.is_noise_grid_cell(4.6, -74.1) as exact_point_is_valid
+from snapped;
 ```
 
-> ⚠️ El micrófono y la geolocalización requieren **HTTPS** en producción.
+Los trabajos deben aparecer, las restricciones de cuadrícula e identificador deben tener `convalidated = true`, `snapped_cell_is_valid` debe ser `true` y `exact_point_is_valid`, `false`. Comprueba además que `select * from public.noise_map_cells(now() - interval '1 day', now(), 8.7, 8.8, -75.9, -75.8, 'all') limit 1;` se ejecuta sin error. Desde el navegador, comprueba que el mapa carga, vuelve a consultar al moverlo, una medición se comparte una sola vez por intervalo, las franjas de historial incluyen días anteriores según la hora de Colombia, la comparación mensual abre sin errores, y un reporte con foto se ve. Para comprobar la limpieza sin esperar 30 días, se puede invocar la función con el token y verificar sus contadores; no alteres las fechas de reportes de producción para probarla.
 
+## Stack
 
-## 🌍 ODS relacionados
-
-| ODS | Aporte |
-|---|---|
-| **ODS 3** — Salud y Bienestar | Visibiliza zonas de riesgo acústico |
-| **ODS 11** — Ciudades Sostenibles | Datos ciudadanos para planificación urbana |
-
----
-
-## 🤝 Contribuir
-
-1. Haz un **fork**.
-2. Crea una rama: `git checkout -b feature/nueva-funcionalidad`.
-3. Commits descriptivos y **pull request**.
-
-Las mediciones requieren HTTPS para usar el micrófono y la geolocalización. La sincronización de datos guardados offline ocurre cuando la aplicación vuelve a estar abierta y conectada.
-
----
-
-## Migración de funciones ciudadanas
-
-Después de ejecutar `setup.sql`, ejecuta una sola vez [`migrations/20260923_complete_features.sql`](migrations/20260923_complete_features.sql) en el SQL Editor de Supabase. Añade atribución anónima por navegador a las mediciones, soporte opcional de fotos en reportes, confirmaciones idempotentes, políticas RLS y retención de datos compatible con la comparación mensual. La migración crea el bucket público `noise-report-photos` con límite de 5 MB y tipos JPG, PNG y WebP.
-
-El `client_id` es un identificador aleatorio guardado en el navegador; sirve para mostrar retos en ese dispositivo, no verifica la identidad de una persona. Las mediciones antiguas quedan sin atribución. Las fotos de los reportes son públicas porque los reportes también se muestran en la aplicación.
-
-Para comprobar los cambios locales: `npm test` y `node --check` sobre los scripts de `js/` y `sw.js`. La migración debe ejecutarse en Supabase antes de habilitar estas funciones en el sitio publicado.
+HTML, CSS y JavaScript sin framework; Leaflet y OpenStreetMap; Supabase PostgreSQL, Storage y Edge Functions; GitHub Pages.
 
 ## Licencia
 
 MIT © [Koizell](https://github.com/koizell)
-
----
-
-<p align="center">
-  <sub>Hecho con 🎙️ y conciencia ambiental en Colombia.</sub>
-</p>

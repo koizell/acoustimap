@@ -40,8 +40,8 @@
       <div id="map"></div>
 
       <!-- Filtros de franja horaria -->
-      <div class="time-filters" role="group" aria-label="Filtrar por franja horaria">
-        <span class="time-filters-label">Franja</span>
+      <div class="time-filters" role="group" aria-label="Filtrar por franja horaria de Colombia">
+        <span class="time-filters-label" title="Hora de Colombia (UTC−5)">Hora CO</span>
         <button class="time-filter-btn active" id="time-all" aria-pressed="true" onclick="setTimeFilter('all')">Todo</button>
         <button class="time-filter-btn" id="time-morning" aria-pressed="false" onclick="setTimeFilter('morning')">Mañana</button>
         <button class="time-filter-btn" id="time-afternoon" aria-pressed="false" onclick="setTimeFilter('afternoon')">Tarde</button>
@@ -64,9 +64,10 @@
           <button class="legend-close" onclick="toggleLegend()">✕</button>
         </div>
         <div class="legend-body">
-          <div><span class="dot" style="background: #10b981"></span>&lt; 55 dB · Bajo</div>
-          <div><span class="dot" style="background: #f59e0b"></span>55 - 70 dB · Moderado</div>
-          <div><span class="dot" style="background: #ef4444"></span>&gt; 70 dB · Alto</div>
+          <div><span class="dot" style="background: #10b981"></span>Índice &lt; 55 · Bajo</div>
+          <div><span class="dot" style="background: #f59e0b"></span>Índice 55–70 · Moderado</div>
+          <div><span class="dot" style="background: #ef4444"></span>Índice &gt; 70 · Alto</div>
+          <p>Escala relativa orientativa; no equivale a dB físicos ni sirve para evaluar exposición.</p>
           <hr class="legend-divider">
           <div class="legend-count" id="community-count">Cargando datos…</div>
           <div class="legend-me">
@@ -102,7 +103,7 @@
           <div class="meter-container">
             <div class="db-display">
               <span class="db-value" id="db-number">--</span>
-              <span class="db-unit">dB</span>
+              <span class="db-unit">índice</span>
             </div>
             <div class="db-status" id="db-status-text">Presiona para empezar</div>
             <div class="db-bar-bg">
@@ -118,7 +119,7 @@
             </div>
             <div class="avg-main">
               <span class="avg-value" id="avg-number">--</span>
-              <span class="avg-unit">dB</span>
+              <span class="avg-unit">índice</span>
               <span class="avg-tag" id="avg-tag">Sin datos</span>
             </div>
             <div class="avg-meta">
@@ -152,7 +153,7 @@
           Tú verás tu posición exacta en azul; los demás solo verán la zona.
         </p>
         <div class="modal-note">
-          🔒 <b>Privacidad garantizada:</b> Tu audio nunca se graba ni transmite. Solo se guarda el nivel de ruido.
+          🔒 <b>Datos compartidos:</b> Tu audio nunca se graba ni transmite. Se guarda el índice relativo y la celda aproximada.
         </div>
         <div class="modal-actions">
           <button class="modal-btn cancel" onclick="closeShareModal()">Cancelar</button>
@@ -167,7 +168,7 @@
         <div class="modal-icon">🎤</div>
         <h2 id="mic-modal-title">Activar micrófono</h2>
         <p class="modal-text">
-          La app usará tu micrófono para <b>medir el nivel de ruido</b> en decibelios (dB).
+          La app usará tu micrófono para calcular un <b>índice relativo de ruido</b>. No es una medición calibrada en decibelios y no sirve para evaluar la exposición acústica.
           <br><br>
           <b>No se graba audio.</b> Solo se analiza la intensidad del sonido en tiempo real.
         </p>
@@ -201,7 +202,7 @@
           <div class="info-card moderado">
             <div class="card-header"><span class="badge yellow">🌍 ODS 3</span><strong>Salud</strong></div>
             <h3>Ciudades más saludables</h3>
-            <p>AcoustiMap ayuda a identificar zonas de riesgo acústico para orientar decisiones de prevención.</p>
+            <p>AcoustiMap muestra diferencias relativas entre zonas para orientar nuevas mediciones con equipos calibrados.</p>
           </div>
           <div class="info-card alto">
             <div class="card-header"><span class="badge red">🏙️ ODS 11</span><strong>Ciudad</strong></div>

@@ -10,33 +10,6 @@ let lastAggregatedPoints = [];
 let communityLoadToken = 0;
 
 
-function getTimeFilterRange(filter) {
-  if (filter === 'all') return null;
-
-  const now = new Date();
-  const start = new Date(now);
-  const end = new Date(now);
-
-  if (filter === 'morning') {
-    start.setHours(6, 0, 0, 0);
-    end.setHours(12, 0, 0, 0);
-  } else if (filter === 'afternoon') {
-    start.setHours(12, 0, 0, 0);
-    end.setHours(18, 0, 0, 0);
-  } else {
-    // Noche cruza medianoche: usar el intervalo nocturno en curso.
-    if (now.getHours() < 6) {
-      start.setDate(start.getDate() - 1);
-    } else {
-      end.setDate(end.getDate() + 1);
-    }
-    start.setHours(18, 0, 0, 0);
-    end.setHours(6, 0, 0, 0);
-  }
-
-  return { start: start.toISOString(), end: end.toISOString() };
-}
-
 // ============================================
 // DIBUJAR UN PUNTO COMUNITARIO
 // ============================================
@@ -45,7 +18,7 @@ function addCommunityPoint(lat, lng, db, category, createdAt, sampleCount = 1) {
   const when  = createdAt ? timeAgo(createdAt) : 'ahora';
 
   const popupHtml = [
-    `<b>${db} dB</b>`,
+    `<b>Índice ${db}</b>`,
     `Categoría: <b>${category}</b>`,
     `<small>Última medición: ${when}</small>`,
     sampleCount > 1 ? `<small>${sampleCount} mediciones acumuladas</small>` : ''
@@ -195,10 +168,10 @@ async function exportMeasurementsCsv() {
       from += pageSize;
     }
 
-    const columns = ['id', 'latitude', 'longitude', 'db_level', 'category', 'created_at'];
+    const columns = ['id', 'latitude', 'longitude', 'noise_index', 'category', 'created_at'];
     const csv = [
       columns.join(','),
-      ...rows.map((row) => columns.map((column) => escapeCsvValue(row[column])).join(','))
+      ...rows.map((row) => columns.map((column) => escapeCsvValue(column === 'noise_index' ? row.db_level : row[column])).join(','))
     ].join('\r\n');
 
     const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8;' });
@@ -246,7 +219,7 @@ async function exportMeasurementsGeoJson() {
           geometry: { type: 'Point', coordinates: [row.longitude, row.latitude] },
           properties: {
             id: row.id,
-            db_level: row.db_level,
+            noise_index: row.db_level,
             category: row.category,
             created_at: row.created_at
           }
@@ -290,31 +263,30 @@ async function loadCommunityPoints() {
   }
 
   try {
-    let query = supabaseClient
-      .from('noise_measurements')
-      .select('latitude, longitude, db_level, category, created_at')
-      .order('created_at', { ascending: false })
-      .limit(1000);
-
-    if (mapMode === 'live') {
-      const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-      query = query.gte('created_at', since);
+    const rows = [];
+    const pageSize = 1000;
+    const since = new Date(Date.now() - (mapMode === 'live' ? 1 : 90) * 24 * 60 * 60 * 1000).toISOString();
+    const until = new Date().toISOString();
+    const bounds = map.getBounds();
+    const queryParams = {
+      p_since: since, p_until: until,
+      p_south: bounds.getSouth(), p_north: bounds.getNorth(),
+      p_west: bounds.getWest(), p_east: bounds.getEast(),
+      p_time_filter: selectedTimeFilter
+    };
+    for (let from = 0; ; from += pageSize) {
+      const { data: page, error } = await supabaseClient
+        .rpc('noise_map_cells', queryParams)
+        .range(from, from + pageSize - 1);
+      if (error) throw error;
+      rows.push(...(page || []));
+      if (!page || page.length < pageSize || requestToken !== communityLoadToken) break;
     }
-
-    const timeRange = getTimeFilterRange(selectedTimeFilter);
-    if (timeRange) {
-      query = query
-        .gte('created_at', timeRange.start)
-        .lt('created_at', timeRange.end);
-    }
-
-    const { data, error } = await query;
-    if (error) throw error;
     if (requestToken !== communityLoadToken) return;
 
     clearCommunityLayers();
 
-    if (!data || data.length === 0) {
+    if (rows.length === 0) {
       lastAggregatedPoints = [];
       counter.innerText = mapMode === 'live'
         ? 'Sin mediciones recientes (<24h)'
@@ -322,14 +294,19 @@ async function loadCommunityPoints() {
       return;
     }
 
-    const aggregated = aggregatePoints(data);
+    const aggregated = rows.map((row) => ({
+      lat: row.latitude, lng: row.longitude, db: row.db_level,
+      category: row.category, createdAt: row.created_at,
+      sampleCount: Number(row.sample_count)
+    }));
     lastAggregatedPoints = aggregated;
     renderCommunityPoints(aggregated);
 
-    const mostRecent = data[0].created_at;
-    const modeLabel  = mapMode === 'live' ? 'En Vivo (24h)' : 'Historial (todo)';
+    const mostRecent = rows[0].created_at;
+    const modeLabel  = mapMode === 'live' ? 'En Vivo (24h)' : 'Historial (90 días)';
+    const measurementCount = aggregated.reduce((sum, point) => sum + point.sampleCount, 0);
     counter.innerText =
-      `${modeLabel} · ${aggregated.length} zonas · ${data.length} mediciones\n` +
+      `${modeLabel} · ${aggregated.length} zonas · ${measurementCount} mediciones\n` +
       `Última actualización: ${timeAgo(mostRecent)}`;
 
   } catch (err) {
@@ -341,7 +318,12 @@ async function loadCommunityPoints() {
 
 // Carga inicial + refresco automático
 loadCommunityPoints();
-setInterval(loadCommunityPoints, REFRESH_INTERVAL_MS);
+setInterval(() => { if (mapMode === 'live') loadCommunityPoints(); }, REFRESH_INTERVAL_MS);
+let mapReloadTimer;
+map.on('moveend', () => {
+  clearTimeout(mapReloadTimer);
+  mapReloadTimer = setTimeout(loadCommunityPoints, 200);
+});
 
 // ============================================
 // ENVIAR MEDICIÓN A SUPABASE
@@ -349,10 +331,17 @@ setInterval(loadCommunityPoints, REFRESH_INTERVAL_MS);
 async function sendMeasurementIfDue() {
   const now = Date.now();
   if (!sharingEnabled || !currentPosition) return;
+  if (sendMeasurementIfDue.pending) return;
   if (now - lastSendTime < SEND_INTERVAL_MS) return;
   if (sendWindowCount === 0) return;
 
   const avg = Math.round(sendWindowSum / sendWindowCount);
+  const windowSum = sendWindowSum;
+  const windowCount = sendWindowCount;
+  sendWindowSum = 0;
+  sendWindowCount = 0;
+  lastSendTime = now;
+  sendMeasurementIfDue.pending = true;
   const snapped  = snapToGrid(currentPosition.lat, currentPosition.lng);
   const category = classifyDb(avg);
   const nowIso   = new Date().toISOString();
@@ -361,30 +350,11 @@ async function sendMeasurementIfDue() {
     latitude: snapped.lat,
     longitude: snapped.lng,
     db_level: avg,
-    category,
-    client_id: typeof featureClientId === 'string' ? featureClientId : null
+    category
   };
 
-  // Dibujar la zona inmediatamente en el mapa
-  if (mapMode === 'live') {
-    if (selectedVisualMode === 'heatmap') {
-      addCommunityHeatPoint(snapped.lat, snapped.lng, avg);
-    } else {
-      addCommunityPoint(snapped.lat, snapped.lng, avg, category, nowIso, 1);
-    }
-    lastAggregatedPoints.push({
-      lat: snapped.lat,
-      lng: snapped.lng,
-      db: avg,
-      category,
-      createdAt: nowIso,
-      sampleCount: 1
-    });
-  } else {
-    addCommunityPoint(snapped.lat, snapped.lng, avg, category, nowIso, 1);
-  }
-
   let success = false;
+  try {
   if (supabaseClient) {
     let error;
     try {
@@ -408,13 +378,31 @@ async function sendMeasurementIfDue() {
     }
   }
 
+  if (success && typeof recordLocalChallengeMeasurement === 'function') {
+    recordLocalChallengeMeasurement({ ...measurement, created_at: nowIso });
+  }
   if (success) {
-    sendWindowSum = 0;
-    sendWindowCount = 0;
-    lastSendTime = now;
-  } else {
-    // No repetir una inserción rechazada en cada frame del medidor.
-    lastSendTime = now;
+    if (mapMode === 'live') {
+      if (selectedVisualMode === 'heatmap') {
+        addCommunityHeatPoint(snapped.lat, snapped.lng, avg);
+      } else {
+        addCommunityPoint(snapped.lat, snapped.lng, avg, category, nowIso, 1);
+      }
+      lastAggregatedPoints.push({
+        lat: snapped.lat, lng: snapped.lng, db: avg, category,
+        createdAt: nowIso, sampleCount: 1
+      });
+    } else {
+      addCommunityPoint(snapped.lat, snapped.lng, avg, category, nowIso, 1);
+    }
+  }
+
+  } finally {
+    if (!success) {
+      sendWindowSum += windowSum;
+      sendWindowCount += windowCount;
+    }
+    sendMeasurementIfDue.pending = false;
   }
 }
 

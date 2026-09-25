@@ -13,10 +13,6 @@ const context = {
   Date
 };
 vm.runInNewContext(`${source}\nthis.testApi = { classifyDb, snapToGrid, haversineDistance, normalizeDbForHeatmap };`, context);
-const communitySource = fs.readFileSync(path.join(__dirname, '..', 'js', 'community.js'), 'utf8');
-const timeFilterSource = communitySource.match(/function getTimeFilterRange\(filter\) \{[\s\S]*?\n\}/)[0];
-const timeContext = { Date };
-vm.runInNewContext(`${timeFilterSource}\nthis.getTimeFilterRange = getTimeFilterRange;`, timeContext);
 
 test('clasifica los límites de ruido sin solaparlos', () => {
   const { classifyDb } = context.testApi;
@@ -35,21 +31,17 @@ test('ancla coordenadas a una celda de aproximadamente 70 m', () => {
   assert.ok(snapped.lng >= -75.89 && snapped.lng <= -75.87);
 });
 
+test('el punto difundido permanece en la misma celda al validarlo de nuevo', () => {
+  const { snapToGrid } = context.testApi;
+  const first = snapToGrid(8.75, -75.88);
+  const second = snapToGrid(first.lat, first.lng);
+  assert.ok(Math.abs(first.lat - second.lat) < 1e-7);
+  assert.ok(Math.abs(first.lng - second.lng) < 1e-7);
+});
+
 test('normaliza el heatmap dentro del rango permitido', () => {
   const { normalizeDbForHeatmap } = context.testApi;
   assert.equal(normalizeDbForHeatmap(0), 0.05);
   assert.equal(normalizeDbForHeatmap(100), 1);
   assert.equal(normalizeDbForHeatmap(200), 1);
-});
-
-test('los filtros horarios devuelven intervalos completos y el nocturno cruza medianoche', () => {
-  const { getTimeFilterRange } = timeContext;
-  assert.equal(getTimeFilterRange('all'), null);
-  const morning = getTimeFilterRange('morning');
-  assert.equal(new Date(morning.end) - new Date(morning.start), 6 * 60 * 60 * 1000);
-  assert.equal(new Date(morning.start).getHours(), 6);
-  const night = getTimeFilterRange('night');
-  assert.equal(new Date(night.end) - new Date(night.start), 12 * 60 * 60 * 1000);
-  assert.equal(new Date(night.start).getHours(), 18);
-  assert.equal(new Date(night.end).getHours(), 6);
 });

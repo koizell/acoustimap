@@ -87,14 +87,11 @@ function timeAgo(iso) {
 }
 
 function snapToGrid(lat, lng) {
-  const latRad = lat * Math.PI / 180;
   const metersPerDegLat = 111000;
-  const metersPerDegLng = 111000 * Math.cos(latRad);
-
   const cellLat = CELL_SIZE_M / metersPerDegLat;
-  const cellLng = CELL_SIZE_M / metersPerDegLng;
-
   const snappedLat = (Math.floor(lat / cellLat) + 0.5) * cellLat;
+  const metersPerDegLng = 111000 * Math.cos(snappedLat * Math.PI / 180);
+  const cellLng = CELL_SIZE_M / metersPerDegLng;
   const snappedLng = (Math.floor(lng / cellLng) + 0.5) * cellLng;
 
   return { lat: snappedLat, lng: snappedLng };
