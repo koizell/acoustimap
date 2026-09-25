@@ -91,10 +91,10 @@ function setCommunityHeatPoints(points) {
   // Esperar a que el mapa esté listo antes de añadir
   waitForMapSize(() => {
     try {
-      layer.setLatLngs(heatData);
       if (!map.hasLayer(layer)) {
         layer.addTo(map);
       }
+      layer.setLatLngs(heatData);
     } catch (e) {
       console.warn('Error actualizando heatmap:', e.message);
     }
@@ -110,10 +110,10 @@ function addCommunityHeatPoint(lat, lng, db) {
 
   waitForMapSize(() => {
     try {
+      if (!map.hasLayer(layer)) layer.addTo(map);
       const current = layer._latlngs || [];
       current.push([lat, lng, intensity]);
       layer.setLatLngs(current);
-      if (!map.hasLayer(layer)) layer.addTo(map);
     } catch (e) {
       console.warn('Error añadiendo punto al heatmap:', e.message);
     }

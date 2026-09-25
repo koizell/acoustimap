@@ -150,3 +150,53 @@ test('map requests aggregated cells for the visible area and selected time windo
   assert.equal(rendered[0].sampleCount, 18);
   assert.match(counter.innerText, /30 mediciones/);
 });
+
+test('initial heatmap data mounts the Leaflet layer before redraw', () => {
+  const warnings = [];
+  const layer = {
+    attached: false,
+    setLatLngs(points) {
+      if (!this.attached) throw new TypeError("Cannot read properties of null (reading '_animating')");
+      this.points = points;
+    },
+    addTo() { this.attached = true; return this; }
+  };
+  const context = {
+    communityLayer: { clearLayers() {} },
+    ensureHeatLayer: () => layer,
+    map: { hasLayer: () => layer.attached },
+    normalizeDbForHeatmap: () => 0.5,
+    waitForMapSize: (callback) => callback(),
+    console: { warn: (...args) => warnings.push(args) }
+  };
+  vm.runInNewContext(`${functionSource('map.js', 'setCommunityHeatPoints')}\nthis.run = setCommunityHeatPoints;`, context);
+  context.run([{ lat: 8.75, lng: -75.88, db: 55 }]);
+  assert.equal(layer.attached, true);
+  assert.deepEqual(Array.from(layer.points[0]), [8.75, -75.88, 0.5]);
+  assert.equal(warnings.length, 0);
+});
+
+test('a newly shared point mounts the heat layer before redraw', () => {
+  const warnings = [];
+  const layer = {
+    attached: false,
+    _latlngs: [],
+    setLatLngs(points) {
+      if (!this.attached) throw new TypeError("Cannot read properties of null (reading '_animating')");
+      this.points = points;
+    },
+    addTo() { this.attached = true; return this; }
+  };
+  const context = {
+    ensureHeatLayer: () => layer,
+    map: { hasLayer: () => layer.attached },
+    normalizeDbForHeatmap: () => 0.5,
+    waitForMapSize: (callback) => callback(),
+    console: { warn: (...args) => warnings.push(args) }
+  };
+  vm.runInNewContext(`${functionSource('map.js', 'addCommunityHeatPoint')}\nthis.run = addCommunityHeatPoint;`, context);
+  context.run(8.75, -75.88, 55);
+  assert.equal(layer.attached, true);
+  assert.deepEqual(Array.from(layer.points[0]), [8.75, -75.88, 0.5]);
+  assert.equal(warnings.length, 0);
+});
