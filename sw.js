@@ -1,4 +1,5 @@
-const CACHE_NAME = 'acoustimap-shell-v29';
+const CACHE_NAME = 'acoustimap-shell-v30';
+const ASSET_VERSION = '30';
 const APP_SHELL = [
   './',
   './index.html',
@@ -18,7 +19,7 @@ const APP_SHELL = [
   './js/features.js',
   './manifest.webmanifest',
   './assets/icon.svg'
-];
+].map((path) => path === './' || path === './index.html' ? path : `${path}?v=${ASSET_VERSION}`);
 
 self.addEventListener('install', (event) => {
   event.waitUntil((async () => {
