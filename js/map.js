@@ -128,6 +128,16 @@ function clearCommunityLayers() {
   }
 }
 
+/** Leaflet.heat cannot redraw its canvas while the map is display:none. */
+function suspendMapHeatLayers() {
+  const layers = [communityHeatLayer];
+  if (typeof comparisonLayer !== 'undefined') layers.push(comparisonLayer);
+  if (typeof currentComparisonLayer !== 'undefined') layers.push(currentComparisonLayer);
+  layers.forEach((layer) => {
+    if (layer && map.hasLayer(layer)) map.removeLayer(layer);
+  });
+}
+
 // ============================================
 // BOTÓN "CENTRAR EN MÍ"
 // ============================================

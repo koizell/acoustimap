@@ -7,6 +7,7 @@
 // NAVEGACIÓN ENTRE PESTAÑAS
 // ============================================
 function switchTab(tabId, btn) {
+  if (tabId !== 'map-view') suspendMapHeatLayers();
   document.querySelectorAll('.tab-content').forEach((t) => t.classList.remove('active'));
   document.querySelectorAll('.tab-btn').forEach((b) => b.classList.remove('active'));
   const tab = document.getElementById(tabId);

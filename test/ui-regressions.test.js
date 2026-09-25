@@ -27,6 +27,47 @@ test('hidden or zero-size map does not invalidate the heat canvas', () => {
   assert.equal(invalidations, 1);
 });
 
+test('leaving the map detaches heat canvases before the map is hidden', () => {
+  const attached = new Set();
+  let mapVisible = true;
+  const mapView = {
+    classList: {
+      remove() {
+        assert.equal(attached.size, 0, 'heat layers must be detached before hiding the map');
+        mapVisible = false;
+      },
+      add() { mapVisible = true; }
+    }
+  };
+  const statsView = { classList: { remove() {}, add() {} } };
+  const context = {
+    document: {
+      querySelectorAll: (selector) => selector === '.tab-content' ? [mapView, statsView] : [],
+      getElementById: (id) => id === 'map-view' ? mapView : statsView
+    },
+    map: {
+      hasLayer: (layer) => attached.has(layer),
+      removeLayer: (layer) => attached.delete(layer)
+    },
+    setTimeout: (fn) => fn(),
+    invalidateMapIfVisible: () => assert.equal(mapVisible, true),
+    activateComparisonLayer: () => {},
+    loadCommunityPoints: () => {}
+  };
+  vm.runInNewContext(`let communityHeatLayer = { name: 'community' };
+let comparisonLayer = { name: 'previous' };
+let currentComparisonLayer = { name: 'current' };
+this.layers = [communityHeatLayer, comparisonLayer, currentComparisonLayer];
+${functionSource('map.js', 'suspendMapHeatLayers')}
+${functionSource('app.js', 'switchTab')}
+this.run = switchTab;`, context);
+  // Use the layers created in the VM, as those are the ones the functions see.
+  attached.clear();
+  context.layers.forEach((layer) => attached.add(layer));
+  context.run('stats-view');
+  assert.equal(attached.size, 0);
+});
+
 test('late statistics response cannot write into the replaced zone panel', async () => {
   let release;
   const pending = new Promise((resolve) => { release = resolve; });
