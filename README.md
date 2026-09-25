@@ -15,15 +15,29 @@ Es una herramienta de **ciencia ciudadana** para visibilizar la contaminación a
 - **Medir** el nivel de ruido de su entorno con el micrófono.
 - **Compartir** esa medición de forma anónima en un mapa comunitario.
 - **Explorar** las zonas de ruido de la ciudad en tiempo real.
-- **Contribuir** con datos que ayudan a entender mejor el problema del ruido urbano.
+- **Reportar** problemas específicos de ruido (obras, fiestas, tráfico).
+- **Consultar estadísticas** y tendencias por zona.
+- **Descargar los datos** para análisis propio.
 
 ---
 
-## 🚀 Cómo usarlo
+## 🗺️ Las 3 secciones de la app
+
+La aplicación tiene 3 pestañas principales en la parte superior:
+
+| Pestaña | Para qué sirve |
+|---|---|
+| **🗺️ Mapa** | Medir ruido y explorar zonas comunitarias |
+| **📚 Salud + ODS** | Información sobre ruido, salud y ODS |
+| **📊 Stats** | Estadísticas, reportes y comparativas |
+
+---
+
+## 🚀 Cómo usar la pestaña Mapa
 
 ### 1. Activar el micrófono
 
-Al abrir la app, pulsa el botón **🎤 Activar** y acepta el permiso de micrófono que te pedirá el navegador.
+Pulsa el botón **🎤 Activar** y acepta el permiso que te pedirá el navegador.
 
 > **🔒 Tu privacidad está protegida:** el micrófono solo se usa para calcular la intensidad del sonido. **No se graba audio. No se transmite audio. No se guarda audio.**
 
@@ -31,36 +45,81 @@ Al abrir la app, pulsa el botón **🎤 Activar** y acepta el permiso de micróf
 
 Verás en pantalla:
 
-- **Nivel instantáneo** en tiempo real.
+- **Nivel instantáneo** en tiempo real (grande y destacado).
 - **Promedio** de tu sesión, con mínimo, máximo y número de muestras.
 - Una **clasificación por color**:
-  - 🟢 **Bajo** (< 55) · Entorno confortable
-  - 🟡 **Moderado** (55 – 70) · Ligeramente molesto
-  - 🔴 **Alto** (> 70) · Ruido dañino
+  - 🟢 **Bajo** (< 55 dB) · Entorno confortable
+  - 🟡 **Moderado** (55 – 70 dB) · Ligeramente molesto
+  - 🔴 **Alto** (> 70 dB) · Ruido dañino
 
 ### 3. Compartir en el mapa (opcional)
 
-Si quieres aportar tu medición al mapa comunitario, pulsa **📡 Compartir**. Aparecerá un aviso de privacidad explicándote qué se comparte y qué no. Solo si aceptas, tu medición se enviará de forma anónima.
+Si quieres aportar tu medición al mapa, pulsa **📡 Compartir**. Aparecerá un aviso de privacidad. Solo si aceptas, tu medición se enviará de forma anónima.
 
 ### 4. Explorar el mapa
 
-- **🟢🟡🔴 Colores:** indican el nivel de ruido de cada zona.
-- **Heatmap:** vista de calor con las zonas más ruidosas.
-- **Zonas:** vista de puntos con los niveles individuales.
-- **Franja horaria:** filtra por mañana, tarde o noche.
-- **ℹ️ Leyenda:** información sobre los colores y datos.
+- **🎨 Heatmap:** vista de calor con las zonas más ruidosas.
+- **📍 Zonas:** vista de puntos con niveles individuales.
+- **Franja horaria:** filtra por Todo / Mañana / Tarde / Noche.
+- **ℹ️ Leyenda:** colores, contador de mediciones y botones de exportación.
 - **📍 Centrar:** vuelve a tu ubicación actual.
+- **Zoom:** botones `+` y `−` arriba a la izquierda.
 
-### 5. Consultar estadísticas
+---
 
-En la pestaña **📊 Stats** encontrarás:
+## 📊 Cómo usar la pestaña Stats
 
-- Resumen general del ruido en la ciudad.
-- Ranking de zonas más ruidosas y más silenciosas.
-- Alertas de ruido persistente.
-- Opción para **reportar** un problema de ruido específico.
-- Comparación entre meses.
-- **Exportar los datos** en CSV o GeoJSON.
+Esta es la sección más completa. Tiene 4 subsecciones:
+
+### 📈 Resumen
+
+Vista general con:
+
+- **Total de mediciones** registradas en la ciudad.
+- **Promedio general** de dB.
+- **Niveles altos** detectados.
+- **Zonas más ruidosas** (Top 3 con sus coordenadas y número de mediciones).
+- **Zonas más silenciosas** (Top 3).
+- **Alertas persistentes:** zonas que llevan varios días con niveles altos.
+
+### 📝 Reportar ruido
+
+Puedes dejar un **reporte ciudadano** sobre un problema específico:
+
+- Escribe una nota corta describiendo el origen del ruido (obra, fiesta, tráfico pesado, etc.).
+- Añade la ubicación (se difumina igual que las mediciones).
+- El reporte queda visible para toda la comunidad.
+
+> Los reportes ciudadanos **humanizan los datos**: no solo dicen "72 dB" sino también *"obra en la calle desde las 7 AM"*.
+
+### ↔️ Comparar meses
+
+Visualiza **dos periodos de tiempo en paralelo** para ver si el ruido ha mejorado o empeorado en una zona específica.
+
+- Selecciona el mes A y el mes B.
+- El mapa muestra las diferencias con colores.
+- Útil para evaluar el impacto de políticas urbanas o cambios de tráfico.
+
+### 🎯 Retos
+
+Pequeños **desafíos de medición** que gamifican la participación:
+
+- "Mide tu calle 3 veces esta semana"
+- "Encuentra la zona más silenciosa de tu barrio"
+- "Reporta un ruido molesto persistente"
+
+Cada reto completado genera datos más consistentes y te ayuda a explorar tu ciudad.
+
+---
+
+## 📤 Exportar datos
+
+Desde la leyenda del mapa puedes descargar las mediciones de la comunidad en dos formatos:
+
+- **📄 CSV** → ideal para Excel o Google Sheets.
+- **🌐 GeoJSON** → ideal para software de mapas (QGIS, ArcGIS, etc.).
+
+Perfecto para estudiantes, investigadores o funcionarios que quieran hacer su propio análisis.
 
 ---
 
@@ -93,16 +152,22 @@ Tu ubicación real **nunca sale de tu dispositivo**. Lo que se envía es una coo
 
 ---
 
-## ⚠️ Importante: qué mide AcoustiMap
+## ⚠️ Qué mide y qué no mide
 
 AcoustiMap calcula un **índice relativo de ruido**, no decibelios calibrados profesionalmente.
 
-- **No es un sonómetro certificado.**
-- **No sirve para evaluar cumplimiento normativo.**
-- **No reemplaza una medición profesional.**
-- **Los valores pueden variar** según el dispositivo y el navegador.
+**✅ Sirve para:**
+- Comparar zonas de la ciudad.
+- Identificar patrones horarios.
+- Detectar zonas crónicamente ruidosas.
+- Generar datos ciudadanos abiertos.
 
-Su propósito es **visibilizar patrones de ruido urbano** de forma colaborativa, no realizar mediciones de precisión.
+**❌ No sirve para:**
+- Certificar cumplimiento normativo.
+- Reemplazar un sonómetro profesional.
+- Denuncias legales formales.
+
+Su propósito es **visibilizar patrones de ruido urbano** de forma colaborativa.
 
 ---
 
@@ -110,8 +175,8 @@ Su propósito es **visibilizar patrones de ruido urbano** de forma colaborativa,
 
 AcoustiMap contribuye a los **Objetivos de Desarrollo Sostenible** de la ONU:
 
-- **ODS 3 (Salud y Bienestar):** ayuda a identificar zonas de riesgo acústico.
-- **ODS 11 (Ciudades Sostenibles):** aporta datos ciudadanos para la planificación urbana.
+- **ODS 3 (Salud y Bienestar):** ayuda a identificar zonas de riesgo acústico que afectan el descanso y la salud cardiovascular.
+- **ODS 11 (Ciudades Sostenibles):** aporta datos ciudadanos para la planificación urbana y el control del tráfico.
 
 ---
 
@@ -133,7 +198,16 @@ Sí, funciona en navegadores modernos (Chrome, Firefox, Edge, Safari). Requiere 
 No son decibelios calibrados. Son un índice relativo útil para comparar zonas, no para mediciones profesionales.
 
 **¿Cuánto tiempo se guardan mis datos?**
-Las mediciones se conservan un máximo de 90 días. Las confirmaciones, 24 horas. Los reportes, 30 días.
+- Mediciones: máximo 24 horas si no hay actividad cercana.
+- Confirmaciones: 24 horas.
+- Reportes: 30 días.
+- Sesiones: 7 días.
+
+**¿Puedo usar los datos para un trabajo académico?**
+Sí. Puedes exportar los datos en CSV o GeoJSON y citar el proyecto. El código es open source bajo licencia MIT.
+
+**¿Cómo aporto al proyecto?**
+Puedes contribuir en [GitHub](https://github.com/koizell/acoustimap) con mejoras, traducciones o nuevas funcionalidades.
 
 ---
 
