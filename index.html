@@ -50,9 +50,12 @@
       </div>
 
       <!-- Filtros visuales -->
-      <div class="visual-filters" role="group" aria-label="Forma de visualizar el mapa">
-        <button class="visual-filter-btn active" id="visual-heatmap" aria-pressed="true" onclick="setCommunityVisualMode('heatmap')">Mapa de calor</button>
-        <button class="visual-filter-btn" id="visual-zones" aria-pressed="false" onclick="setCommunityVisualMode('zones')">Puntos</button>
+      <div class="visual-filters" role="group" aria-label="Periodo y visualización del mapa">
+        <button class="mode-btn active" id="mode-history" aria-pressed="true" onclick="setMapMode('history')"><span class="control-long">Historial · 90 días</span><span class="control-short">90 días</span></button>
+        <button class="mode-btn" id="mode-live" aria-pressed="false" onclick="setMapMode('live')"><span class="control-long">En vivo · 24 h</span><span class="control-short">24 h</span></button>
+        <span class="filter-divider" aria-hidden="true"></span>
+        <button class="visual-filter-btn active" id="visual-heatmap" aria-pressed="true" onclick="setCommunityVisualMode('heatmap')"><span class="control-long">Mapa de calor</span><span class="control-short">Calor</span></button>
+        <button class="visual-filter-btn" id="visual-zones" aria-pressed="false" onclick="setCommunityVisualMode('zones')"><span class="control-long">Puntos</span><span class="control-short">Puntos</span></button>
       </div>
 
       <!-- Botón de leyenda -->

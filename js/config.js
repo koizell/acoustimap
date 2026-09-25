@@ -47,7 +47,7 @@ const STABILITY_MIN_SAMPLES   = 4;
 // ============================================
 // ESTADO COMPARTIDO
 // ============================================
-let mapMode         = 'live';
+let mapMode         = 'history';
 let isMonitoring    = false;
 let sharingEnabled  = false;
 let currentPosition = null;

@@ -813,6 +813,11 @@ function updateStaticLanguage() {
     en: { index: 'index', min: 'Min', max: 'Max', samples: 'Samples', locate: 'Center on my location' },
     pt: { index: 'índice', min: 'Mín', max: 'Máx', samples: 'Amostras', locate: 'Centralizar na minha localização' }
   }[currentLanguage];
+  const periodLabels = {
+    es: { history: 'Historial · 90 días', historyShort: '90 días', live: 'En vivo · 24 h', liveShort: '24 h', heatShort: 'Calor', pointsShort: 'Puntos', group: 'Periodo y visualización del mapa' },
+    en: { history: 'History · 90 days', historyShort: '90 days', live: 'Live · 24 h', liveShort: '24 h', heatShort: 'Heat', pointsShort: 'Points', group: 'Map period and display mode' },
+    pt: { history: 'Histórico · 90 dias', historyShort: '90 dias', live: 'Ao vivo · 24 h', liveShort: '24 h', heatShort: 'Calor', pointsShort: 'Pontos', group: 'Período e visualização do mapa' }
+  }[currentLanguage];
   const nav = document.querySelectorAll('.tab-btn');
   if (nav[0]) nav[0].textContent = copy.map;
   if (nav[1]) nav[1].innerHTML = `<span class="tab-long">${copy.health}</span><span class="tab-short">${copy.healthShort}</span>`;
@@ -836,8 +841,15 @@ function updateStaticLanguage() {
   const handle = document.getElementById('stats-handle-label');
   if (handle) handle.textContent = document.getElementById('stats-panel')?.classList.contains('collapsed') ? copy.detail : copy.hide;
   [['time-all', copy.all], ['time-morning', copy.morning], ['time-afternoon', copy.afternoon], ['time-night', copy.night]].forEach(([id, value]) => { const el = document.getElementById(id); if (el) el.textContent = value; });
-  const heat = document.getElementById('visual-heatmap'); if (heat) heat.textContent = copy.visualHeat;
-  const zones = document.getElementById('visual-zones'); if (zones) zones.textContent = copy.visualZones;
+  [
+    ['mode-history', periodLabels.history, periodLabels.historyShort],
+    ['mode-live', periodLabels.live, periodLabels.liveShort],
+    ['visual-heatmap', copy.visualHeat, periodLabels.heatShort],
+    ['visual-zones', copy.visualZones, periodLabels.pointsShort]
+  ].forEach(([id, long, short]) => {
+    const button = document.getElementById(id);
+    if (button) button.innerHTML = `<span class="control-long">${long}</span><span class="control-short">${short}</span>`;
+  });
   const csv = document.getElementById('export-csv-btn'); if (csv) csv.textContent = copy.exportCsv;
   const geo = document.getElementById('export-geojson-btn'); if (geo) geo.textContent = copy.exportGeo;
   const legendTitle = document.querySelector('.legend-header span'); if (legendTitle) legendTitle.textContent = details.legend;
@@ -845,7 +857,7 @@ function updateStaticLanguage() {
   const statsTabs = document.querySelector('.stats-section-nav'); if (statsTabs) statsTabs.setAttribute('aria-label', m('statsTabLabel'));
   const timeGroup = document.querySelector('.time-filters'); if (timeGroup) timeGroup.setAttribute('aria-label', extra.timeGroup);
   const timeLabel = document.querySelector('.time-filters-label'); if (timeLabel) timeLabel.textContent = extra.timeLabel;
-  const visualGroup = document.querySelector('.visual-filters'); if (visualGroup) visualGroup.setAttribute('aria-label', extra.visualGroup);
+  const visualGroup = document.querySelector('.visual-filters'); if (visualGroup) visualGroup.setAttribute('aria-label', periodLabels.group);
   const legend = document.getElementById('map-legend'); if (legend) legend.setAttribute('aria-label', details.legend);
   document.querySelectorAll('.legend-body > div').forEach((element, index) => {
     if (index < 3 && element.lastChild) element.lastChild.textContent = [extra.low, extra.medium, extra.high][index];

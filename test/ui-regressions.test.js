@@ -71,3 +71,26 @@ test('comparison keeps map actions hidden when one period has no measurements', 
   assert.match(status.textContent, /^Faltan mediciones/);
   assert.equal(actions.hidden, true);
 });
+
+test('map period control selects history or live data and refreshes once', () => {
+  const buttons = ['history', 'live'].map((mode) => ({
+    id: `mode-${mode}`,
+    classList: { active: false, toggle(_name, active) { this.active = active; } },
+    setAttribute(name, value) { if (name === 'aria-pressed') this.pressed = value; }
+  }));
+  let refreshes = 0;
+  const context = {
+    mapMode: 'history',
+    document: { querySelectorAll: () => buttons },
+    loadCommunityPoints: () => { refreshes++; }
+  };
+  vm.runInNewContext(`${functionSource('community.js', 'setMapMode')}\nthis.run = setMapMode;`, context);
+  context.run('live');
+  assert.equal(context.mapMode, 'live');
+  assert.equal(buttons[0].pressed, 'false');
+  assert.equal(buttons[1].pressed, 'true');
+  assert.equal(refreshes, 1);
+  context.run('invalid');
+  assert.equal(context.mapMode, 'live');
+  assert.equal(refreshes, 1);
+});

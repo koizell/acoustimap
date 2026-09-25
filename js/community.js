@@ -421,10 +421,13 @@ async function sendMeasurementIfDue() {
 // CAMBIAR MODO EN VIVO / HISTORIAL
 // ============================================
 function setMapMode(mode) {
+  if (!['history', 'live'].includes(mode) || mode === mapMode) return;
   mapMode = mode;
-  document.querySelectorAll('.mode-btn').forEach((b) => b.classList.remove('active'));
-  const btn = document.getElementById(`mode-${mode}`);
-  if (btn) btn.classList.add('active');
+  document.querySelectorAll('.mode-btn').forEach((button) => {
+    const active = button.id === `mode-${mode}`;
+    button.classList.toggle('active', active);
+    button.setAttribute('aria-pressed', String(active));
+  });
   loadCommunityPoints();
 }
 

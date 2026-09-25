@@ -30,9 +30,14 @@ header {
 .visual-filters { border-color: rgba(64, 99, 105, 0.18); border-radius: 12px; box-shadow: 0 8px 25px rgba(21, 46, 53, 0.14); }
 .time-filters-label { text-transform: none; letter-spacing: 0; }
 .time-filter-btn,
-.visual-filter-btn { min-height: 34px; border-radius: 8px; }
+.visual-filter-btn,
+.mode-btn { min-height: 34px; border-radius: 8px; }
 .time-filter-btn.active,
 .visual-filter-btn.active { background: var(--primary); color: white; }
+.mode-btn { padding: 6px 10px; border: 0; background: transparent; color: #49666b; cursor: pointer; font: 700 0.75rem Inter, sans-serif; white-space: nowrap; }
+.mode-btn.active { background: #e4f4ee; color: #075e59; }
+.filter-divider { align-self: stretch; width: 1px; margin: 4px 3px; background: #c7d8d6; }
+.control-short { display: none; }
 .feature-menu-toggle { background: #173b43 !important; border-color: #173b43 !important; }
 
 .stats-tab-content,
@@ -107,6 +112,8 @@ body.dark-theme .comparison-summary div:last-child strong { color: #f1faf7; }
 body.dark-theme .comparison-summary span,
 body.dark-theme .comparison-summary small { color: #cee1e0; }
 body.dark-theme .stats-feature-content .ranking-map-button { background: #294c53; color: #e5f1f0; }
+body.dark-theme .mode-btn { color: #cfdfdf; }
+body.dark-theme .mode-btn.active { background: #1d534a; color: #f4fbf8; }
 
 @media (max-width: 719px) {
   :root { --header-h: 100px; }
@@ -121,12 +128,15 @@ body.dark-theme .stats-feature-content .ranking-map-button { background: #294c53
   .time-filters { top: calc(var(--header-h) + 8px); left: 8px; right: 8px; display: grid; grid-template-columns: auto repeat(4, minmax(0, 1fr)); gap: 2px; transform: none; padding: 4px; }
   .time-filters-label { padding: 0 5px; font-size: 0.7rem; white-space: nowrap; }
   .time-filter-btn { min-height: 38px; padding: 6px 2px; font-size: 0.75rem; }
-  .visual-filters { top: calc(var(--header-h) + 61px); gap: 2px; padding: 3px; }
-  .visual-filter-btn { min-height: 37px; padding: 6px 9px; font-size: 0.72rem; }
-  .feature-toolbar { top: calc(var(--header-h) + 62px); right: 8px; }
+  .visual-filters { top: calc(var(--header-h) + 61px); gap: 1px; max-width: calc(100% - 16px); padding: 3px; }
+  .visual-filter-btn,
+  .mode-btn { min-height: 37px; padding: 6px 9px; font-size: 0.72rem; }
+  .control-long { display: none; }
+  .control-short { display: inline; }
+  .feature-toolbar { top: calc(var(--header-h) + 111px); right: 8px; }
   .feature-menu-toggle { width: 42px; height: 42px; }
-  .legend-toggle { top: calc(var(--header-h) + 111px); right: 8px; width: 40px; height: 40px; }
-  .map-legend { top: calc(var(--header-h) + 111px); right: 52px; left: 8px; }
+  .legend-toggle { top: calc(var(--header-h) + 111px); right: 58px; width: 40px; height: 40px; }
+  .map-legend { top: calc(var(--header-h) + 160px); right: 8px; left: 8px; }
   .leaflet-top.leaflet-left { top: calc(var(--header-h) + 107px) !important; }
 
   .stats-page { width: calc(100% - 28px); padding: 22px 0 38px; }
@@ -166,4 +176,6 @@ body.dark-theme .stats-feature-content .ranking-map-button { background: #294c53
   .stats-section-btn { font-size: 0.68rem; }
   .time-filter-btn { font-size: 0.68rem; }
   .time-filters-label { font-size: 0.66rem; }
+  .visual-filter-btn,
+  .mode-btn { padding: 6px; font-size: 0.68rem; }
 }
