@@ -4,6 +4,16 @@
  * Depende de: config.js. Llama a sendMeasurementIfDue() (community.js).
  */
 
+const meterCopy = {
+  es: { stop: 'Detener', activate: 'Activar', measuring: 'Midiendo en vivo', idle: 'Inactivo', denied: 'Permiso de micrófono denegado o no soportado.', start: 'Presiona para empezar', noData: 'Sin datos', low: 'Bajo', moderate: 'Moderado', high: 'Alto', lowIndex: 'Índice bajo', moderateIndex: 'Índice moderado', highIndex: 'Índice alto' },
+  en: { stop: 'Stop', activate: 'Enable', measuring: 'Measuring live', idle: 'Inactive', denied: 'Microphone permission was denied or is unavailable.', start: 'Press to start', noData: 'No data', low: 'Low', moderate: 'Moderate', high: 'High', lowIndex: 'Low index', moderateIndex: 'Moderate index', highIndex: 'High index' },
+  pt: { stop: 'Parar', activate: 'Ativar', measuring: 'Medindo ao vivo', idle: 'Inativo', denied: 'A permissão do microfone foi negada ou não está disponível.', start: 'Toque para começar', noData: 'Sem dados', low: 'Baixo', moderate: 'Moderado', high: 'Alto', lowIndex: 'Índice baixo', moderateIndex: 'Índice moderado', highIndex: 'Índice alto' }
+};
+
+function meterText(key) {
+  return (meterCopy[document.documentElement.lang] || meterCopy.es)[key];
+}
+
 // ============================================
 // TOGGLE MICRÓFONO
 // ============================================
@@ -27,12 +37,12 @@ async function toggleMonitoring() {
 
       // ✅ Actualizar botón principal
       btn.classList.add('active');
-      btn.innerHTML = '<span class="action-icon">⏹️</span><span class="action-text">Detener</span>';
+      btn.innerHTML = `<span class="action-icon">⏹️</span><span class="action-text">${meterText('stop')}</span>`;
 
       // ✅ Actualizar badge de estado
       badge.classList.add('active');
       pulse.style.display = 'inline-block';
-      statusText.innerText = 'Midiendo en Vivo';
+      statusText.innerText = meterText('measuring');
 
       // ✅ Activar Wake Lock
       await requestWakeLock();
@@ -41,7 +51,7 @@ async function toggleMonitoring() {
       updateMeter();
     } catch (err) {
       console.error(err);
-      alert('Permiso de micrófono denegado o no soportado.');
+      alert(meterText('denied'));
     }
   } else {
     isMonitoring = false;
@@ -56,17 +66,17 @@ async function toggleMonitoring() {
 
     // ✅ Restaurar botón principal
     btn.classList.remove('active');
-    btn.innerHTML = '<span class="action-icon">🎤</span><span class="action-text">Activar Micrófono</span>';
+    btn.innerHTML = `<span class="action-icon">🎤</span><span class="action-text">${meterText('activate')}</span>`;
 
     // ✅ Restaurar badge de estado
     badge.classList.remove('active');
     pulse.style.display = 'none';
-    statusText.innerText = 'Inactivo';
+    statusText.innerText = meterText('idle');
 
     // Resetear UI del medidor
     document.getElementById('db-number').innerText = '--';
     document.getElementById('db-bar').style.width = '0%';
-    document.getElementById('db-status-text').innerText = 'Presiona para empezar';
+    document.getElementById('db-status-text').innerText = meterText('start');
 
     // ✅ Guardar resumen antes de detener
     await saveSessionSummary();
@@ -122,7 +132,7 @@ function updateAvgUI() {
 
   if (session.count === 0) {
     avgEl.innerText = '--';
-    tagEl.innerText = 'Sin datos';
+    tagEl.innerText = meterText('noData');
     tagEl.className = 'avg-tag';
     minEl.innerText = '--';
     maxEl.innerText = '--';
@@ -134,7 +144,7 @@ function updateAvgUI() {
   avgEl.innerText = avg;
 
   const cat = classifyDb(avg);
-  tagEl.innerText = cat === 'bajo' ? '🟢 Bajo' : cat === 'moderado' ? '🟡 Moderado' : '🔴 Alto';
+  tagEl.innerText = cat === 'bajo' ? `🟢 ${meterText('low')}` : cat === 'moderado' ? `🟡 ${meterText('moderate')}` : `🔴 ${meterText('high')}`;
   tagEl.className = 'avg-tag ' + cat;
 
   minEl.innerText = session.min;
@@ -215,13 +225,13 @@ function updateMeter() {
   const dbStatus = document.getElementById('db-status-text');
   if (db < 55) {
     dbBar.style.backgroundColor = 'var(--green)';
-    dbStatus.innerText = '🟢 Índice bajo';
+    dbStatus.innerText = `🟢 ${meterText('lowIndex')}`;
   } else if (db <= 70) {
     dbBar.style.backgroundColor = 'var(--yellow)';
-    dbStatus.innerText = '🟡 Índice moderado';
+    dbStatus.innerText = `🟡 ${meterText('moderateIndex')}`;
   } else {
     dbBar.style.backgroundColor = 'var(--red)';
-    dbStatus.innerText = '🔴 Índice alto';
+    dbStatus.innerText = `🔴 ${meterText('highIndex')}`;
   }
 
   const now = performance.now();

@@ -78,12 +78,16 @@ function classifyDb(db) {
 
 function timeAgo(iso) {
   const diff = (Date.now() - new Date(iso).getTime()) / 1000;
-  if (diff < 5)       return 'ahora';
-  if (diff < 60)      return `hace ${Math.floor(diff)}s`;
-  if (diff < 3600)    return `hace ${Math.floor(diff / 60)}m`;
-  if (diff < 86400)   return `hace ${Math.floor(diff / 3600)}h`;
-  if (diff < 2592000) return `hace ${Math.floor(diff / 86400)}d`;
-  return `hace ${Math.floor(diff / 2592000)}mes`;
+  if (!Number.isFinite(diff)) return '';
+  const selectedLanguage = localStorage.getItem('acoustimap-language') || document.documentElement.lang;
+  const locale = ['es', 'en', 'pt'].includes(selectedLanguage) ? selectedLanguage : 'es';
+  const relative = new Intl.RelativeTimeFormat(locale, { numeric: 'auto', style: 'short' });
+  if (diff < 5) return relative.format(0, 'second');
+  if (diff < 60) return relative.format(-Math.floor(diff), 'second');
+  if (diff < 3600) return relative.format(-Math.floor(diff / 60), 'minute');
+  if (diff < 86400) return relative.format(-Math.floor(diff / 3600), 'hour');
+  if (diff < 2592000) return relative.format(-Math.floor(diff / 86400), 'day');
+  return relative.format(-Math.floor(diff / 2592000), 'month');
 }
 
 function snapToGrid(lat, lng) {

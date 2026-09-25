@@ -14,7 +14,7 @@ function switchTab(tabId, btn) {
   if (btn) btn.classList.add('active');
   if (tabId === 'map-view') {
     setTimeout(() => {
-      map.invalidateSize();
+      invalidateMapIfVisible();
       if (typeof activateComparisonLayer === 'function') activateComparisonLayer();
       if (typeof loadCommunityPoints === 'function') loadCommunityPoints();
     }, 200);
@@ -114,25 +114,35 @@ function updateActionButtons() {
 // ============================================
 // COMPARTIR UBICACIÓN
 // ============================================
+const sharingCopy = {
+  es: { unsupported: '❌ Geolocalización no soportada.', searching: '⏳ Buscando señal GPS…', sharing: '✅ Compartiendo.', denied: '❌ No se obtuvo la ubicación. Revisa el permiso y la señal GPS.', disabled: '🔒 Compartir desactivado.', noPermission: 'sin permiso', locating: 'buscando…' },
+  en: { unsupported: '❌ Geolocation is unavailable.', searching: '⏳ Looking for a GPS signal…', sharing: '✅ Sharing.', denied: '❌ Location unavailable. Check your permission and GPS signal.', disabled: '🔒 Sharing turned off.', noPermission: 'no permission', locating: 'locating…' },
+  pt: { unsupported: '❌ Geolocalização indisponível.', searching: '⏳ Procurando sinal GPS…', sharing: '✅ Compartilhando.', denied: '❌ Localização indisponível. Verifique a permissão e o sinal GPS.', disabled: '🔒 Compartilhamento desativado.', noPermission: 'sem permissão', locating: 'procurando…' }
+};
+
+function sharingText(key) {
+  return (sharingCopy[document.documentElement.lang] || sharingCopy.es)[key];
+}
+
 function toggleSharing() {
   const status = document.getElementById('share-status');
   sharingEnabled = !sharingEnabled;
 
   if (sharingEnabled) {
     if (!navigator.geolocation) {
-      if (status) status.innerText = '❌ Geolocalización no soportada.';
+      if (status) status.innerText = sharingText('unsupported');
       sharingEnabled = false;
       updateActionButtons();
       return;
     }
-    if (status) status.innerHTML = '⏳ Buscando señal GPS…';
+    if (status) status.innerText = sharingText('searching');
     positionHistory = [];
 
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         processNewPosition(pos);
         map.setView([currentPosition.lat, currentPosition.lng], 17);
-        if (status) status.innerHTML = '✅ Compartiendo.';
+        if (status) status.innerText = sharingText('sharing');
         updateActionButtons();
         lastSendTime = 0;
         loadCommunityPoints();
@@ -147,7 +157,7 @@ function toggleSharing() {
       },
       (err) => {
         console.warn(err);
-        if (status) status.innerText = '❌ Permiso denegado.';
+        if (status) status.innerText = sharingText('denied');
         sharingEnabled = false;
         updateActionButtons();
         updateGpsChip(false);
@@ -155,7 +165,7 @@ function toggleSharing() {
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     );
   } else {
-    if (status) status.innerHTML = '🔒 Compartir desactivado.';
+    if (status) status.innerText = sharingText('disabled');
     updateGpsChip(false);
     hideMyLocation();
     currentPosition = null;
@@ -176,7 +186,7 @@ function updateGpsChip(active, accuracy) {
   if (!chip) return;
 
   if (!active) {
-    chip.innerText = '📡 GPS: sin permisos';
+    chip.innerText = `📡 GPS: ${sharingText('noPermission')}`;
     chip.classList.remove('ok', 'medium', 'poor');
     return;
   }
@@ -185,7 +195,7 @@ function updateGpsChip(active, accuracy) {
   chip.classList.remove('ok', 'medium', 'poor');
 
   if (!accuracy || accuracy > 40) {
-    chip.innerText = `📡 GPS: ${accText || 'buscando…'} ❌`;
+    chip.innerText = `📡 GPS: ${accText || sharingText('locating')} ❌`;
     chip.classList.add('poor');
   } else if (accuracy > 15) {
     chip.innerText = `📡 GPS: ${accText} ⚠️`;

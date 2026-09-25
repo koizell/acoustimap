@@ -20,17 +20,18 @@
     <link rel="stylesheet" href="css/info.css" />
     <link rel="stylesheet" href="css/responsive.css" />
     <link rel="stylesheet" href="css/features.css" />
+    <link rel="stylesheet" href="css/experience.css" />
   </head>
   <body>
     <header>
-      <div class="brand">🎙️ Acousti<span>Map</span></div>
+      <div class="brand"><img src="assets/icon.svg" width="32" height="32" alt="" />Acousti<span>Map</span></div>
       <div class="nav-tabs">
-        <button class="tab-btn active" onclick="switchTab('map-view', this)">🗺️ Mapa</button>
+        <button class="tab-btn active" onclick="switchTab('map-view', this)">Mapa</button>
         <button class="tab-btn" onclick="switchTab('health-view', this)" aria-label="Salud y ODS">
-          📚 <span class="tab-long">Salud + ODS</span><span class="tab-short">Salud</span>
+          <span class="tab-long">Salud y ODS</span><span class="tab-short">Salud</span>
         </button>
         <button class="tab-btn" onclick="switchTab('stats-view', this); openStatsTab('stats')">
-          📊 <span class="tab-long">Estadísticas</span><span class="tab-short">Stats</span>
+          <span class="tab-long">Estadísticas</span><span class="tab-short">Datos</span>
         </button>
       </div>
     </header>
@@ -50,8 +51,8 @@
 
       <!-- Filtros visuales -->
       <div class="visual-filters" role="group" aria-label="Forma de visualizar el mapa">
-        <button class="visual-filter-btn active" id="visual-heatmap" aria-pressed="true" onclick="setCommunityVisualMode('heatmap')">🌡️ Heatmap</button>
-        <button class="visual-filter-btn" id="visual-zones" aria-pressed="false" onclick="setCommunityVisualMode('zones')">📍 Zonas</button>
+        <button class="visual-filter-btn active" id="visual-heatmap" aria-pressed="true" onclick="setCommunityVisualMode('heatmap')">Mapa de calor</button>
+        <button class="visual-filter-btn" id="visual-zones" aria-pressed="false" onclick="setCommunityVisualMode('zones')">Puntos</button>
       </div>
 
       <!-- Botón de leyenda -->
@@ -222,17 +223,15 @@
       <div class="stats-page">
         <div class="stats-page-header">
           <div>
-            <span class="eyebrow">Datos ciudadanos</span>
-            <h1>Estadísticas del ruido</h1>
-            <p>Explora tendencias, reportes y zonas persistentes sin salir de la aplicación.</p>
+            <h1>Datos del ruido</h1>
+            <p>Mediciones ciudadanas, tendencias y reportes de tu zona.</p>
           </div>
-          <button class="stats-back-btn" onclick="switchTab('map-view', document.querySelector('.tab-btn'))">🗺️ Volver al mapa</button>
         </div>
         <div class="stats-section-nav" role="tablist" aria-label="Secciones de estadísticas">
-          <button class="stats-section-btn active" id="stats-tab-stats" role="tab" aria-selected="true" aria-controls="stats-feature-content" onclick="openStatsTab('stats')">📈 Resumen</button>
-          <button class="stats-section-btn" id="stats-tab-report" role="tab" aria-selected="false" aria-controls="stats-feature-content" onclick="openStatsTab('report')">📝 Reportar ruido</button>
-          <button class="stats-section-btn" id="stats-tab-compare" role="tab" aria-selected="false" aria-controls="stats-feature-content" onclick="openStatsTab('compare')">↔️ Comparar meses</button>
-          <button class="stats-section-btn" id="stats-tab-challenges" role="tab" aria-selected="false" aria-controls="stats-feature-content" onclick="openStatsTab('challenges')">🎯 Retos</button>
+          <button class="stats-section-btn active" id="stats-tab-stats" role="tab" aria-selected="true" aria-controls="stats-feature-content" onclick="openStatsTab('stats')">Resumen</button>
+          <button class="stats-section-btn" id="stats-tab-report" role="tab" aria-selected="false" aria-controls="stats-feature-content" onclick="openStatsTab('report')">Reportar</button>
+          <button class="stats-section-btn" id="stats-tab-compare" role="tab" aria-selected="false" aria-controls="stats-feature-content" onclick="openStatsTab('compare')">Comparar</button>
+          <button class="stats-section-btn" id="stats-tab-challenges" role="tab" aria-selected="false" aria-controls="stats-feature-content" onclick="openStatsTab('challenges')">Retos</button>
         </div>
         <div id="stats-feature-content" class="stats-feature-content" role="tabpanel" aria-labelledby="stats-tab-stats" tabindex="0"></div>
       </div>

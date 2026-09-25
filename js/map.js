@@ -49,8 +49,8 @@ function ensureHeatLayer() {
   if (communityHeatLayer) return communityHeatLayer;
 
   communityHeatLayer = L.heatLayer([], {
-    radius: 35,
-    blur: 25,
+    radius: 48,
+    blur: 36,
     maxZoom: 17,
     minOpacity: 0.22,
     gradient: {
@@ -153,18 +153,22 @@ map.addControl(new LocateControl());
 // ============================================
 // RESIZEOBSERVER
 // ============================================
+function invalidateMapIfVisible() {
+  const element = document.getElementById('map');
+  const view = document.getElementById('map-view');
+  if (!element || !view?.classList.contains('active') || element.offsetWidth < 1 || element.offsetHeight < 1) return false;
+  map.invalidateSize({ pan: false });
+  return true;
+}
+
 const resizeObserver = new ResizeObserver(() => {
-  setTimeout(() => {
-    if (map && typeof map.invalidateSize === 'function') {
-      map.invalidateSize();
-    }
-  }, 200);
+  setTimeout(invalidateMapIfVisible, 200);
 });
 const mapEl = document.getElementById('map');
 if (mapEl) resizeObserver.observe(mapEl);
 
 window.addEventListener('orientationchange', () => {
-  setTimeout(() => map.invalidateSize(), 300);
+  setTimeout(invalidateMapIfVisible, 300);
 });
 
 // ============================================
@@ -238,7 +242,7 @@ function showMyLocation(lat, lng, accuracy) {
     .addTo(myLocationLayer)
     .bindPopup(
       '<b>📍 Tu ubicación</b><br>' +
-      `<small>Precisión: ±${Math.round(accuracy)} m</small>`
+      `<small>${({ es: 'Precisión', en: 'Accuracy', pt: 'Precisão' }[document.documentElement.lang] || 'Precisión')}: ±${Math.round(accuracy)} m</small>`
     );
 }
 

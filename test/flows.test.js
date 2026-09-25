@@ -135,6 +135,7 @@ test('map requests aggregated cells for the visible area and selected time windo
     renderCommunityPoints: (points) => { rendered = points; },
     clearCommunityLayers() {},
     timeAgo: () => 'hace tiempo',
+    communityText: (key) => ({ history: 'Historial (90 días)', zones: 'zonas', measurements: 'mediciones', updated: 'Última actualización' })[key] || key,
     console
   };
   vm.runInNewContext(`${functionSource('community.js', 'loadCommunityPoints')}\nthis.run = loadCommunityPoints;`, context);

@@ -44,6 +44,8 @@ body {
   100% { opacity: 1; }
 }
 
+[hidden] { display: none !important; }
+
 button:focus-visible,
 a:focus-visible,
 input:focus-visible,

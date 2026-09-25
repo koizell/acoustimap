@@ -9,19 +9,32 @@ let selectedVisualMode = 'heatmap';
 let lastAggregatedPoints = [];
 let communityLoadToken = 0;
 
+const communityCopy = {
+  es: { now: 'ahora', index: 'Índice', category: 'Categoría', lastMeasurement: 'Última medición', cumulative: 'mediciones acumuladas', exporting: 'Exportando…', exportError: 'No se pudieron exportar las mediciones.', noCommunity: 'Sin datos comunitarios aún', noLive: 'Sin mediciones recientes (<24 h)', noHistory: 'Aún no hay mediciones en el historial', live: 'En vivo (24 h)', history: 'Historial (90 días)', zones: 'zonas', measurements: 'mediciones', updated: 'Última actualización', loadError: 'Error al cargar datos', low: 'bajo', moderate: 'moderado', high: 'alto' },
+  en: { now: 'now', index: 'Index', category: 'Category', lastMeasurement: 'Last measurement', cumulative: 'measurements combined', exporting: 'Exporting…', exportError: 'Measurements could not be exported.', noCommunity: 'No community data yet', noLive: 'No recent measurements (<24 h)', noHistory: 'No measurements in history yet', live: 'Live (24 h)', history: 'History (90 days)', zones: 'areas', measurements: 'measurements', updated: 'Last updated', loadError: 'Could not load data', low: 'low', moderate: 'moderate', high: 'high' },
+  pt: { now: 'agora', index: 'Índice', category: 'Categoria', lastMeasurement: 'Última medição', cumulative: 'medições acumuladas', exporting: 'Exportando…', exportError: 'Não foi possível exportar as medições.', noCommunity: 'Ainda não há dados comunitários', noLive: 'Sem medições recentes (<24 h)', noHistory: 'Ainda não há medições no histórico', live: 'Ao vivo (24 h)', history: 'Histórico (90 dias)', zones: 'áreas', measurements: 'medições', updated: 'Última atualização', loadError: 'Não foi possível carregar os dados', low: 'baixo', moderate: 'moderado', high: 'alto' }
+};
+
+function communityText(key) {
+  const language = localStorage.getItem('acoustimap-language') || document.documentElement.lang;
+  return (communityCopy[language] || communityCopy.es)[key];
+}
+
 
 // ============================================
 // DIBUJAR UN PUNTO COMUNITARIO
 // ============================================
 function addCommunityPoint(lat, lng, db, category, createdAt, sampleCount = 1) {
   const color = COLOR_BY_CAT[category] || COLOR_BY_CAT[classifyDb(db)];
-  const when  = createdAt ? timeAgo(createdAt) : 'ahora';
+  const when  = createdAt ? timeAgo(createdAt) : communityText('now');
+
+  const categoryLabel = communityText(category === 'bajo' ? 'low' : category === 'moderado' ? 'moderate' : 'high');
 
   const popupHtml = [
-    `<b>Índice ${db}</b>`,
-    `Categoría: <b>${category}</b>`,
-    `<small>Última medición: ${when}</small>`,
-    sampleCount > 1 ? `<small>${sampleCount} mediciones acumuladas</small>` : ''
+    `<b>${communityText('index')} ${db}</b>`,
+    `${communityText('category')}: <b>${categoryLabel}</b>`,
+    `<small>${communityText('lastMeasurement')}: ${when}</small>`,
+    sampleCount > 1 ? `<small>${sampleCount} ${communityText('cumulative')}</small>` : ''
   ].filter(Boolean).join('<br>');
 
   // Halo exterior tenue
@@ -148,7 +161,7 @@ async function exportMeasurementsCsv() {
 
   const originalText = button.innerText;
   button.disabled = true;
-  button.innerText = 'Exportando…';
+  button.innerText = communityText('exporting');
 
   try {
     const pageSize = 1000;
@@ -185,7 +198,7 @@ async function exportMeasurementsCsv() {
     URL.revokeObjectURL(url);
   } catch (err) {
     console.error('Error exportando mediciones:', err);
-    alert('No se pudieron exportar las mediciones.');
+    alert(communityText('exportError'));
   } finally {
     button.disabled = false;
     button.innerText = originalText;
@@ -198,7 +211,7 @@ async function exportMeasurementsGeoJson() {
 
   const originalText = button.innerText;
   button.disabled = true;
-  button.innerText = 'Exportando…';
+  button.innerText = communityText('exporting');
 
   try {
     const pageSize = 1000;
@@ -242,7 +255,7 @@ async function exportMeasurementsGeoJson() {
     URL.revokeObjectURL(url);
   } catch (err) {
     console.error('Error exportando GeoJSON:', err);
-    alert('No se pudieron exportar las mediciones.');
+    alert(communityText('exportError'));
   } finally {
     button.disabled = false;
     button.innerText = originalText;
@@ -258,7 +271,7 @@ async function loadCommunityPoints() {
   if (!counter) return;
 
   if (!supabaseClient) {
-    counter.innerText = 'Sin datos comunitarios aún';
+    counter.innerText = communityText('noCommunity');
     return;
   }
 
@@ -288,9 +301,7 @@ async function loadCommunityPoints() {
 
     if (rows.length === 0) {
       lastAggregatedPoints = [];
-      counter.innerText = mapMode === 'live'
-        ? 'Sin mediciones recientes (<24h)'
-        : 'Aún no hay mediciones en el historial';
+      counter.innerText = mapMode === 'live' ? communityText('noLive') : communityText('noHistory');
       return;
     }
 
@@ -303,16 +314,16 @@ async function loadCommunityPoints() {
     renderCommunityPoints(aggregated);
 
     const mostRecent = rows[0].created_at;
-    const modeLabel  = mapMode === 'live' ? 'En Vivo (24h)' : 'Historial (90 días)';
+    const modeLabel  = communityText(mapMode === 'live' ? 'live' : 'history');
     const measurementCount = aggregated.reduce((sum, point) => sum + point.sampleCount, 0);
     counter.innerText =
-      `${modeLabel} · ${aggregated.length} zonas · ${measurementCount} mediciones\n` +
-      `Última actualización: ${timeAgo(mostRecent)}`;
+      `${modeLabel} · ${aggregated.length} ${communityText('zones')} · ${measurementCount} ${communityText('measurements')}\n` +
+      `${communityText('updated')}: ${timeAgo(mostRecent)}`;
 
   } catch (err) {
     if (requestToken !== communityLoadToken) return;
     console.error('Error cargando mediciones:', err);
-    counter.innerText = 'Error al cargar datos';
+    counter.innerText = communityText('loadError');
   }
 }
 

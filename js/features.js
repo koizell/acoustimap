@@ -67,7 +67,7 @@ function isOfflineError(error) {
 const featureText = {
   es: {
     tools: 'Herramientas', compare: 'Comparar mes', draw: 'Dibujar zona', report: 'Reportar ruido', stats: 'Estadísticas', challenges: 'Retos', theme: 'Tema oscuro', language: 'English', close: 'Cerrar',
-    comparison: 'Antes y después', comparisonHelp: 'La capa azul muestra el mes anterior. La capa actual conserva sus colores de intensidad.', loading: 'Cargando datos…', noData: 'No hay datos suficientes.', current: 'Ahora', previous: 'Hace un mes', average: 'Promedio', difference: 'Cambio',
+    comparison: 'Antes y después', comparisonHelp: 'Compara los últimos 30 días con los 30 anteriores. Elige un periodo para verlo en el mapa.', loading: 'Cargando datos…', noData: 'No hay datos suficientes.', current: 'Últimos 30 días', previous: '30 días anteriores', average: 'Promedio del índice', difference: 'Cambio', index: 'índice', sector: 'sector', viewMap: 'Ver en mapa', viewCurrent: 'Ver periodo actual', viewPrevious: 'Ver periodo anterior', indexPoints: 'puntos del índice', summaryTitle: 'Resumen de 30 días',
     zone: 'Análisis de zona', zoneHelp: 'Dibuja un polígono sobre el mapa para calcular el promedio del área.', drawAction: 'Activar dibujo', clear: 'Limpiar zona', noZone: 'Aún no hay una zona seleccionada.', measurements: 'mediciones',
     reportTitle: 'Reportar contexto', reportHelp: 'Añade una nota breve sobre el origen del ruido. No se guarda audio ni ubicación exacta.', notePlaceholder: 'Ej.: obra en la calle', send: 'Enviar reporte', sent: 'Reporte enviado.',
     ranking: 'Ranking de zonas', loudest: 'Más ruidosas', quietest: 'Más tranquilas', alerts: 'Alertas persistentes', noAlerts: 'No se detectan zonas persistentes.', confirm: 'Confirmar ruido aquí', confirmed: 'Ruido confirmado.', confirmHelp: 'Pulsa el mapa para elegir una zona y confirma si también escuchas el ruido.',
@@ -75,7 +75,7 @@ const featureText = {
   },
   en: {
     tools: 'Tools', compare: 'Compare month', draw: 'Draw zone', report: 'Report noise', stats: 'Statistics', challenges: 'Challenges', theme: 'Dark theme', language: 'Português', close: 'Close',
-    comparison: 'Before and after', comparisonHelp: 'The blue layer shows the previous month. The current layer keeps its intensity colors.', loading: 'Loading data…', noData: 'Not enough data.', current: 'Now', previous: 'One month ago', average: 'Average', difference: 'Change',
+    comparison: 'Before and after', comparisonHelp: 'Compare the last 30 days with the 30 days before. Choose a period to see it on the map.', loading: 'Loading data…', noData: 'Not enough data.', current: 'Last 30 days', previous: 'Previous 30 days', average: 'Average index', difference: 'Change', index: 'index', sector: 'area', viewMap: 'View on map', viewCurrent: 'View current period', viewPrevious: 'View previous period', indexPoints: 'index points', summaryTitle: '30-day summary',
     zone: 'Zone analysis', zoneHelp: 'Draw a polygon on the map to calculate the area average.', drawAction: 'Enable drawing', clear: 'Clear zone', noZone: 'No zone selected yet.', measurements: 'measurements',
     reportTitle: 'Context report', reportHelp: 'Add a short note about the noise source. No audio or exact location is stored.', notePlaceholder: 'E.g. road works', send: 'Send report', sent: 'Report sent.',
     ranking: 'Zone ranking', loudest: 'Loudest', quietest: 'Quietest', alerts: 'Persistent alerts', noAlerts: 'No persistent zones detected.', confirm: 'Confirm noise here', confirmed: 'Noise confirmed.', confirmHelp: 'Click the map to choose an area and confirm if you also hear the noise.',
@@ -83,7 +83,7 @@ const featureText = {
   },
   pt: {
     tools: 'Ferramentas', compare: 'Comparar mês', draw: 'Desenhar zona', report: 'Relatar ruído', stats: 'Estatísticas', challenges: 'Desafios', theme: 'Tema escuro', language: 'Español', close: 'Fechar',
-    comparison: 'Antes e depois', comparisonHelp: 'A camada azul mostra o mês anterior. A camada atual mantém suas cores de intensidade.', loading: 'Carregando dados…', noData: 'Dados insuficientes.', current: 'Agora', previous: 'Há um mês', average: 'Média', difference: 'Mudança',
+    comparison: 'Antes e depois', comparisonHelp: 'Compare os últimos 30 dias com os 30 dias anteriores. Escolha um período para ver no mapa.', loading: 'Carregando dados…', noData: 'Dados insuficientes.', current: 'Últimos 30 dias', previous: '30 dias anteriores', average: 'Média do índice', difference: 'Mudança', index: 'índice', sector: 'setor', viewMap: 'Ver no mapa', viewCurrent: 'Ver período atual', viewPrevious: 'Ver período anterior', indexPoints: 'pontos do índice', summaryTitle: 'Resumo de 30 dias',
     zone: 'Análise da zona', zoneHelp: 'Desenhe um polígono no mapa para calcular a média da área.', drawAction: 'Ativar desenho', clear: 'Limpar zona', noZone: 'Nenhuma zona selecionada.', measurements: 'medições',
     reportTitle: 'Relato de contexto', reportHelp: 'Adicione uma nota breve sobre a origem do ruído. Áudio e localização exata não são armazenados.', notePlaceholder: 'Ex.: obra na rua', send: 'Enviar relato', sent: 'Relato enviado.',
     ranking: 'Ranking de zonas', loudest: 'Mais barulhentas', quietest: 'Mais silenciosas', alerts: 'Alertas persistentes', noAlerts: 'Nenhuma zona persistente detectada.', confirm: 'Confirmar ruído aqui', confirmed: 'Ruído confirmado.', confirmHelp: 'Clique no mapa para escolher uma zona e confirme se também ouve o ruído.',
@@ -96,12 +96,24 @@ function t(key) {
 }
 
 const interfaceCopy = {
-  es: { noteLabel: 'Nota', photoLabel: 'Foto opcional (JPG, PNG o WebP; máximo 5 MB)', chooseLocation: 'Elegir ubicación en el mapa', sendReport: 'Enviar reporte', selectedLocation: 'Ubicación seleccionada para el reporte.', reportNeed: 'Escribe una nota y selecciona una ubicación.', photoError: 'La foto debe ser JPG, PNG o WebP y pesar menos de 5 MB.', sending: 'Enviando reporte…', queuedReport: 'Reporte guardado y pendiente de conexión.', queueError: 'No se pudo guardar el reporte sin conexión.', chooseArea: 'Elegir zona en el mapa', chooseConfirm: 'Elegir zona para confirmar', trendTitle: 'Evolución de una zona', trendHelp: 'Elige un punto del mapa para ver su tendencia de 7 días.', emptyTrend: 'No hay mediciones en esta zona durante el periodo.', last30: 'últimos 30 días', noZone: 'Sin zona seleccionada.', rushTitle: 'Hora punta', rushDetail: 'Mide la misma zona entre 07:00 y 09:00 durante 3 días.', quietTitle: 'Ruta tranquila', quietDetail: 'Registra 5 mediciones tranquilas en ubicaciones distintas.', nightTitle: 'Cobertura nocturna', nightDetail: 'Comparte 3 mediciones entre las 18:00 y las 06:00.', completed: 'Completado', chooseMapPoint: 'Toca el mapa para elegir una ubicación.' },
-  en: { noteLabel: 'Note', photoLabel: 'Optional photo (JPG, PNG, or WebP; 5 MB max)', chooseLocation: 'Choose a location on the map', sendReport: 'Send report', selectedLocation: 'Location selected for the report.', reportNeed: 'Add a note and choose a location.', photoError: 'Photo must be JPG, PNG, or WebP and under 5 MB.', sending: 'Sending report…', queuedReport: 'Report saved and waiting for a connection.', queueError: 'Could not save the report offline.', chooseArea: 'Choose an area on the map', chooseConfirm: 'Choose an area to confirm', trendTitle: 'Area trend', trendHelp: 'Choose a map point to view its 7-day trend.', emptyTrend: 'No measurements in this area for this period.', last30: 'last 30 days', noZone: 'No area selected.', rushTitle: 'Rush hour', rushDetail: 'Measure the same area between 07:00 and 09:00 on 3 days.', quietTitle: 'Quiet route', quietDetail: 'Record 5 quiet measurements in different locations.', nightTitle: 'Night coverage', nightDetail: 'Share 3 measurements between 18:00 and 06:00.', completed: 'Completed', chooseMapPoint: 'Tap the map to choose a location.' },
-  pt: { noteLabel: 'Nota', photoLabel: 'Foto opcional (JPG, PNG ou WebP; máximo 5 MB)', chooseLocation: 'Escolher local no mapa', sendReport: 'Enviar relato', selectedLocation: 'Local selecionado para o relato.', reportNeed: 'Escreva uma nota e escolha um local.', photoError: 'A foto deve ser JPG, PNG ou WebP e ter menos de 5 MB.', sending: 'Enviando relato…', queuedReport: 'Relato salvo e aguardando conexão.', queueError: 'Não foi possível salvar o relato offline.', chooseArea: 'Escolher área no mapa', chooseConfirm: 'Escolher área para confirmar', trendTitle: 'Tendência da área', trendHelp: 'Escolha um ponto no mapa para ver a tendência de 7 dias.', emptyTrend: 'Não há medições nesta área para o período.', last30: 'últimos 30 dias', noZone: 'Nenhuma área selecionada.', rushTitle: 'Hora de pico', rushDetail: 'Meça a mesma área entre 07:00 e 09:00 durante 3 dias.', quietTitle: 'Rota tranquila', quietDetail: 'Registre 5 medições tranquilas em locais diferentes.', nightTitle: 'Cobertura noturna', nightDetail: 'Compartilhe 3 medições entre 18:00 e 06:00.', completed: 'Concluído', chooseMapPoint: 'Toque no mapa para escolher um local.' }
+  es: { noteLabel: 'Nota', photoLabel: 'Foto opcional (JPG, PNG o WebP; máximo 5 MB)', selectPhoto: 'Seleccionar foto', chooseLocation: 'Elegir ubicación en el mapa', sendReport: 'Enviar reporte', selectedLocation: 'Ubicación seleccionada para el reporte.', reportNeed: 'Escribe una nota y selecciona una ubicación.', photoError: 'La foto debe ser JPG, PNG o WebP y pesar menos de 5 MB.', sending: 'Enviando reporte…', queuedReport: 'Reporte guardado y pendiente de conexión.', queueError: 'No se pudo guardar el reporte sin conexión.', chooseArea: 'Elegir zona en el mapa', chooseConfirm: 'Elegir zona para confirmar', trendTitle: 'Evolución de una zona', trendHelp: 'Elige un punto del mapa para ver su tendencia de 7 días.', emptyTrend: 'No hay mediciones en esta zona durante el periodo.', last30: 'últimos 30 días', noZone: 'Sin zona seleccionada.', rushTitle: 'Hora punta', rushDetail: 'Mide la misma zona entre 07:00 y 09:00 durante 3 días.', quietTitle: 'Ruta tranquila', quietDetail: 'Registra 5 mediciones tranquilas en ubicaciones distintas.', nightTitle: 'Cobertura nocturna', nightDetail: 'Comparte 3 mediciones entre las 18:00 y las 06:00.', completed: 'Completado', chooseMapPoint: 'Toca el mapa para elegir una ubicación.' },
+  en: { noteLabel: 'Note', photoLabel: 'Optional photo (JPG, PNG, or WebP; 5 MB max)', selectPhoto: 'Choose photo', chooseLocation: 'Choose a location on the map', sendReport: 'Send report', selectedLocation: 'Location selected for the report.', reportNeed: 'Add a note and choose a location.', photoError: 'Photo must be JPG, PNG, or WebP and under 5 MB.', sending: 'Sending report…', queuedReport: 'Report saved and waiting for a connection.', queueError: 'Could not save the report offline.', chooseArea: 'Choose an area on the map', chooseConfirm: 'Choose an area to confirm', trendTitle: 'Area trend', trendHelp: 'Choose a map point to view its 7-day trend.', emptyTrend: 'No measurements in this area for this period.', last30: 'last 30 days', noZone: 'No area selected.', rushTitle: 'Rush hour', rushDetail: 'Measure the same area between 07:00 and 09:00 on 3 days.', quietTitle: 'Quiet route', quietDetail: 'Record 5 quiet measurements in different locations.', nightTitle: 'Night coverage', nightDetail: 'Share 3 measurements between 18:00 and 06:00.', completed: 'Completed', chooseMapPoint: 'Tap the map to choose a location.' },
+  pt: { noteLabel: 'Nota', photoLabel: 'Foto opcional (JPG, PNG ou WebP; máximo 5 MB)', selectPhoto: 'Escolher foto', chooseLocation: 'Escolher local no mapa', sendReport: 'Enviar relato', selectedLocation: 'Local selecionado para o relato.', reportNeed: 'Escreva uma nota e escolha um local.', photoError: 'A foto deve ser JPG, PNG ou WebP e ter menos de 5 MB.', sending: 'Enviando relato…', queuedReport: 'Relato salvo e aguardando conexão.', queueError: 'Não foi possível salvar o relato offline.', chooseArea: 'Escolher área no mapa', chooseConfirm: 'Escolher área para confirmar', trendTitle: 'Tendência da área', trendHelp: 'Escolha um ponto no mapa para ver a tendência de 7 dias.', emptyTrend: 'Não há medições nesta área para o período.', last30: 'últimos 30 dias', noZone: 'Nenhuma área selecionada.', rushTitle: 'Hora de pico', rushDetail: 'Meça a mesma área entre 07:00 e 09:00 durante 3 dias.', quietTitle: 'Rota tranquila', quietDetail: 'Registre 5 medições tranquilas em locais diferentes.', nightTitle: 'Cobertura noturna', nightDetail: 'Compartilhe 3 medições entre 18:00 e 06:00.', completed: 'Concluído', chooseMapPoint: 'Toque no mapa para escolher um local.' }
 };
 
 function u(key) { return interfaceCopy[currentLanguage][key] || interfaceCopy.es[key] || key; }
+
+function noPhotoLabel() {
+  return { es: 'Ninguna foto seleccionada', en: 'No photo selected', pt: 'Nenhuma foto selecionada' }[currentLanguage];
+}
+
+const featureMessages = {
+  es: { noData: 'No hay mediciones suficientes para este análisis.', connect: 'Conecta Supabase para cargar las mediciones reales.', reportHeading: 'Reportes ciudadanos', noReports: 'Aún no hay reportes ciudadanos.', reportsError: 'No se pudieron cargar los reportes.', zonesAnalyzed: 'zonas analizadas', noMeasurement: 'Sin medición', alertDays: '3 días consecutivos', alreadyConfirmed: 'Ya confirmaste el ruido en esta zona durante esta hora.', queuedConfirmation: 'Confirmación guardada y pendiente de conexión.', confirmations: 'confirmaciones en esta zona durante las últimas 24 horas.', statsTabLabel: 'Secciones de estadísticas', periods: 'mediciones entre ambos periodos.', supabaseMissing: 'Supabase no está configurado.', attachedPhoto: 'Foto adjunta al reporte', selectConfirmHint: 'Toca una zona del mapa para seleccionarla y vuelve a Datos para confirmar.', loadingTrend: 'Cargando tendencia…', trendError: 'No se pudo cargar la tendencia.', analyzingError: 'No se pudo analizar la zona.', comparisonError: 'No se pudo cargar la comparación.' },
+  en: { noData: 'There are not enough measurements for this analysis.', connect: 'Connect Supabase to load real measurements.', reportHeading: 'Citizen reports', noReports: 'No citizen reports yet.', reportsError: 'Reports could not be loaded.', zonesAnalyzed: 'areas analyzed', noMeasurement: 'No measurement', alertDays: '3 consecutive days', alreadyConfirmed: 'You already confirmed noise in this area this hour.', queuedConfirmation: 'Confirmation saved until you are online.', confirmations: 'confirmations in this area during the last 24 hours.', statsTabLabel: 'Statistics sections', periods: 'measurements across both periods.', supabaseMissing: 'Supabase is not configured.', attachedPhoto: 'Photo attached to report', selectConfirmHint: 'Tap an area on the map, then return to Data to confirm it.', loadingTrend: 'Loading trend…', trendError: 'Could not load the trend.', analyzingError: 'Could not analyze this area.', comparisonError: 'Could not load the comparison.' },
+  pt: { noData: 'Não há medições suficientes para esta análise.', connect: 'Conecte o Supabase para carregar medições reais.', reportHeading: 'Relatos cidadãos', noReports: 'Ainda não há relatos cidadãos.', reportsError: 'Não foi possível carregar os relatos.', zonesAnalyzed: 'áreas analisadas', noMeasurement: 'Sem medição', alertDays: '3 dias consecutivos', alreadyConfirmed: 'Você já confirmou o ruído nesta área nesta hora.', queuedConfirmation: 'Confirmação salva até a conexão voltar.', confirmations: 'confirmações nesta área nas últimas 24 horas.', statsTabLabel: 'Seções de estatísticas', periods: 'medições nos dois períodos.', supabaseMissing: 'O Supabase não está configurado.', attachedPhoto: 'Foto anexada ao relato', selectConfirmHint: 'Toque em uma área do mapa e volte a Dados para confirmar.', loadingTrend: 'Carregando tendência…', trendError: 'Não foi possível carregar a tendência.', analyzingError: 'Não foi possível analisar a área.', comparisonError: 'Não foi possível carregar a comparação.' }
+};
+
+function m(key) { return featureMessages[currentLanguage][key] || featureMessages.es[key] || key; }
 
 function createFeatureUi() {
   const toolbar = document.createElement('div');
@@ -110,7 +122,7 @@ function createFeatureUi() {
     <button type="button" class="feature-menu-toggle" aria-expanded="false" aria-controls="feature-menu-items" aria-label="${t('tools')}" title="${t('tools')}">⋯</button>
     <div class="feature-menu-items" id="feature-menu-items" hidden>
       <button type="button" data-feature="draw">⬡ ${t('draw')}</button>
-      <button type="button" data-feature="clear-zone">⌫ Quitar zona</button>
+      <button type="button" data-feature="clear-zone">⌫ ${t('clear')}</button>
       <button type="button" data-feature="theme">◐ ${t('theme')}</button>
       <button type="button" data-feature="language">🌐 ${t('language')}</button>
     </div>`;
@@ -149,23 +161,27 @@ function createFeatureUi() {
     if (status) status.textContent = `${event.latlng.lat.toFixed(5)}, ${event.latlng.lng.toFixed(5)}`;
     if (pendingMapSelection) {
       pendingMapSelection = false;
+      switchTab('stats-view', document.querySelectorAll('.tab-btn')[2]);
+      openStatsTab('stats');
       const confirmStatus = document.getElementById('confirm-status');
       if (confirmStatus) confirmStatus.textContent = u('selectedLocation');
       loadZoneConfirmations(event.latlng);
+      return;
     }
     if (pendingTrendSelection) {
       pendingTrendSelection = false;
       switchTab('stats-view', document.querySelectorAll('.tab-btn')[2]);
       openStatsTab('stats');
       loadZoneTrend(event.latlng);
+      return;
     }
     if (pendingReportSelection) {
       pendingReportSelection = false;
       switchTab('stats-view', document.querySelectorAll('.tab-btn')[2]);
       const reportStatus = document.getElementById('stats-feature-content')?.querySelector('#feature-status');
       if (reportStatus) reportStatus.textContent = u('selectedLocation');
+      return;
     }
-    if (document.getElementById('stats-view')?.classList.contains('active')) loadZoneTrend(event.latlng);
   });
 
   return panel;
@@ -179,7 +195,7 @@ function openFeaturePanel(view) {
   (renderers[view] || renderStatsPanel)(panel);
 }
 
-function openStatsTab(view) {
+function openStatsTab(view, render = true) {
   const content = document.getElementById('stats-feature-content');
   if (!content) return;
   document.querySelectorAll('.stats-section-btn').forEach((button) => {
@@ -189,8 +205,10 @@ function openStatsTab(view) {
   });
   content.dataset.view = view;
   content.setAttribute('aria-labelledby', `stats-tab-${view}`);
+  const page = document.getElementById('stats-view');
+  if (page) page.scrollTop = 0;
   const renderers = { compare: renderComparisonPanel, report: renderReportPanel, stats: renderStatsPanel, challenges: renderChallengesPanel };
-  (renderers[view] || renderStatsPanel)(content);
+  if (render) (renderers[view] || renderStatsPanel)(content);
 }
 
 function closeFeaturePanel() {
@@ -215,7 +233,7 @@ function panelFrame(title, content, panel) {
 }
 
 async function fetchFeatureMeasurements(start, end) {
-  if (!supabaseClient) throw new Error('Supabase no está configurado.');
+  if (!supabaseClient) throw new Error(m('connect'));
   const rows = [];
   const pageSize = 1000;
   let from = 0;
@@ -242,12 +260,12 @@ function averageDb(rows) {
 
 function noDataMessage() {
   return supabaseClient
-    ? 'No hay mediciones suficientes para este análisis.'
-    : 'Conecta Supabase para cargar las mediciones reales.';
+    ? m('noData')
+    : m('connect');
 }
 
 function renderComparisonPanel(panel) {
-  panel.innerHTML = panelFrame(t('comparison'), `<p>${t('comparisonHelp')}</p><div class="feature-status" role="status" aria-live="polite">${t('loading')}</div><div class="panel-actions comparison-actions" hidden><button type="button" data-comparison="current">Ver últimas 4 semanas</button><button type="button" data-comparison="previous">Ver 4 semanas anteriores</button></div>`, panel);
+  panel.innerHTML = panelFrame(t('comparison'), `<p>${t('comparisonHelp')}</p><div class="feature-status" role="status" aria-live="polite">${t('loading')}</div><div class="comparison-summary" hidden><div><span>${t('previous')}</span><strong id="comparison-previous">--</strong><small>${t('average')}</small></div><div><span>${t('current')}</span><strong id="comparison-current">--</strong><small>${t('average')}</small></div><div><span>${t('difference')}</span><strong id="comparison-difference">--</strong><small>${t('indexPoints')}</small></div></div><div class="panel-actions comparison-actions" hidden><button type="button" data-comparison="previous">${t('viewPrevious')}</button><button type="button" data-comparison="current">${t('viewCurrent')}</button></div>`, panel);
   panel.querySelector('[data-close]')?.addEventListener('click', closeFeaturePanel);
   panel.querySelectorAll('[data-comparison]').forEach((button) => button.addEventListener('click', () => showComparison(button.dataset.comparison)));
   comparePeriods(panel);
@@ -271,11 +289,22 @@ async function comparePeriods(panel) {
     if (!panelIsCurrent(panel, 'compare')) return;
     comparisonRows = { current, previous };
     const status = panel.querySelector('.feature-status');
-    status.textContent = difference == null ? noDataMessage() : `${t('current')}: ${currentAvg} · ${t('previous')}: ${previousAvg} · ${t('difference')}: ${difference > 0 ? '+' : ''}${difference} puntos del índice`;
-    panel.querySelector('.comparison-actions')?.removeAttribute('hidden');
+    status.textContent = difference == null
+      ? `${noDataMessage()} ${t('previous')}: ${previous.length} · ${t('current')}: ${current.length}.`
+      : `${previous.length + current.length} ${m('periods')}`;
+    const summary = panel.querySelector('.comparison-summary');
+    if (summary) summary.hidden = difference == null;
+    if (difference != null) {
+      panel.querySelector('#comparison-previous').textContent = previousAvg;
+      panel.querySelector('#comparison-current').textContent = currentAvg;
+      panel.querySelector('#comparison-difference').textContent = `${difference > 0 ? '+' : ''}${difference}`;
+    }
+    const actions = panel.querySelector('.comparison-actions');
+    if (actions) actions.hidden = difference == null;
+    if (difference == null) comparisonMode = null;
   } catch (error) {
-    console.error('Error comparando periodos:', error);
-    if (panelIsCurrent(panel, 'compare')) panel.querySelector('.feature-status').textContent = error.message || 'No se pudo cargar la comparación.';
+    if (supabaseClient) console.error('Error comparando periodos:', error);
+    if (panelIsCurrent(panel, 'compare')) panel.querySelector('.feature-status').textContent = error.message || m('comparisonError');
   }
 }
 
@@ -290,11 +319,11 @@ function activateComparisonLayer() {
   const rows = comparisonRows[comparisonMode] || [];
   const points = rows.map((row) => [row.latitude, row.longitude, normalizeDbForHeatmap(row.db_level)]);
   if (!comparisonLayer) comparisonLayer = L.heatLayer([], {
-    radius: 28, blur: 20, maxZoom: 17, max: 1, minOpacity: 0.3,
+    radius: 42, blur: 30, maxZoom: 17, max: 1, minOpacity: 0.3,
     gradient: { 0.2: '#2563eb', 0.55: '#38bdf8', 1: '#1d4ed8' }
   });
   if (!currentComparisonLayer) currentComparisonLayer = L.heatLayer([], {
-    radius: 28, blur: 20, maxZoom: 17, max: 1, minOpacity: 0.3,
+    radius: 42, blur: 30, maxZoom: 17, max: 1, minOpacity: 0.3,
     gradient: { 0.2: '#10b981', 0.55: '#f59e0b', 1: '#dc2626' }
   });
   communityLayer.clearLayers();
@@ -345,9 +374,11 @@ function pointInPolygon(point, polygon) {
 
 async function analyzeDrawnZone(polygon) {
   switchTab('stats-view', document.querySelectorAll('.tab-btn')[2]);
-  openStatsTab('stats');
+  openStatsTab('stats', false);
   const panel = document.getElementById('stats-feature-content');
-  panel.innerHTML = panelFrame(t('zone'), `<p>${t('zoneHelp')} (últimos 30 días)</p><div class="feature-status">${t('loading')}</div><div id="zone-trend" class="feature-status"></div>`, panel);
+  panel.dataset.subview = 'zone';
+  panel.innerHTML = panelFrame(t('zone'), `<p>${t('zoneHelp')} (${u('last30')})</p><div class="feature-status">${t('loading')}</div><div id="zone-trend" class="feature-status"></div>`, panel);
+  const zoneTrend = panel.querySelector('#zone-trend');
   panel.querySelector('[data-close]')?.addEventListener('click', closeFeaturePanel);
   try {
     const end = new Date();
@@ -355,18 +386,34 @@ async function analyzeDrawnZone(polygon) {
     start.setDate(start.getDate() - 30);
     const rows = await fetchFeatureMeasurements(start, end);
     const selected = rows.filter((row) => pointInPolygon({ lat: row.latitude, lng: row.longitude }, polygon));
-    if (!panelIsCurrent(panel, 'stats')) return;
-    panel.querySelector('.feature-status').textContent = selected.length ? `${t('average')} del índice: ${averageDb(selected)} · ${selected.length} ${t('measurements')} (30 días)` : noDataMessage();
+    if (!panelIsCurrent(panel, 'stats') || panel.dataset.subview !== 'zone' || panel.querySelector('#zone-trend') !== zoneTrend) return;
+    panel.querySelector('.feature-status').textContent = selected.length ? `${t('average')}: ${averageDb(selected)} · ${selected.length} ${t('measurements')} (${u('last30')})` : noDataMessage();
     renderTrendChart(panel, selected);
   } catch (error) {
-    console.error('Error analizando zona:', error);
-    if (panelIsCurrent(panel, 'stats')) panel.querySelector('.feature-status').textContent = error.message || 'No se pudo analizar la zona.';
+    if (supabaseClient) console.error('Error analizando zona:', error);
+    if (panelIsCurrent(panel, 'stats') && panel.dataset.subview === 'zone' && panel.querySelector('#zone-trend') === zoneTrend) {
+      panel.querySelector('.feature-status').textContent = error.message || m('analyzingError');
+    }
   }
 }
 
 function renderReportPanel(panel) {
-  panel.innerHTML = panelFrame(t('reportTitle'), `<p>${t('reportHelp')}</p><label for="report-note">${u('noteLabel')}</label><textarea id="report-note" maxlength="280" placeholder="${t('notePlaceholder')}" required></textarea><label for="report-photo">${u('photoLabel')}</label><input id="report-photo" type="file" accept="image/jpeg,image/png,image/webp" /><div class="panel-actions"><button type="button" id="select-report-location">${u('chooseLocation')}</button></div><div class="feature-status" id="feature-status" role="status" aria-live="polite"></div><div class="panel-actions"><button type="button" class="primary-action" id="send-report">${u('sendReport')}</button></div>`, panel);
+  panel.innerHTML = panelFrame(t('reportTitle'), `
+    <p>${t('reportHelp')}</p>
+    <label for="report-note">${u('noteLabel')}</label>
+    <textarea id="report-note" maxlength="280" placeholder="${t('notePlaceholder')}" required></textarea>
+    <label for="report-photo">${u('photoLabel')}</label>
+    <input id="report-photo" type="file" accept="image/jpeg,image/png,image/webp" hidden />
+    <button type="button" id="choose-report-photo">${u('selectPhoto')}</button>
+    <div id="report-photo-name" class="photo-selection" role="status" aria-live="polite">${noPhotoLabel()}</div>
+    <div class="panel-actions"><button type="button" id="select-report-location">${u('chooseLocation')}</button></div>
+    <div class="feature-status" id="feature-status" role="status" aria-live="polite"></div>
+    <div class="panel-actions"><button type="button" class="primary-action" id="send-report">${u('sendReport')}</button></div>`, panel);
   panel.querySelector('[data-close]')?.addEventListener('click', closeFeaturePanel);
+  panel.querySelector('#choose-report-photo').addEventListener('click', () => panel.querySelector('#report-photo').click());
+  panel.querySelector('#report-photo').addEventListener('change', (event) => {
+    panel.querySelector('#report-photo-name').textContent = event.target.files?.[0]?.name || noPhotoLabel();
+  });
   panel.querySelector('#select-report-location').addEventListener('click', () => {
     pendingReportSelection = true;
     switchTab('map-view', document.querySelector('.tab-btn'));
@@ -388,24 +435,24 @@ async function loadCitizenReports(panel) {
     .order('created_at', { ascending: false })
     .limit(20);
   if (error) {
-    list.innerHTML = '<li>No se pudieron cargar los reportes.</li>';
+    list.innerHTML = `<li>${m('reportsError')}</li>`;
     return;
   }
   if (!data?.length) {
-    list.innerHTML = '<li>Aún no hay reportes ciudadanos.</li>';
+    list.innerHTML = `<li>${m('noReports')}</li>`;
     return;
   }
   list.innerHTML = '';
   data.forEach((report) => {
     const item = document.createElement('li');
     const detail = document.createElement('span');
-    detail.textContent = `${report.db_level == null ? 'Sin medición' : `Índice ${report.db_level}`} · ${report.note} · ${timeAgo(report.created_at)}`;
+    detail.textContent = `${report.db_level == null ? m('noMeasurement') : `${t('index')} ${report.db_level}`} · ${report.note} · ${timeAgo(report.created_at)}`;
     item.appendChild(detail);
     if (report.photo_path) {
       const { data: photo } = supabaseClient.storage.from('noise-report-photos').getPublicUrl(report.photo_path);
       const image = document.createElement('img');
       image.src = photo.publicUrl;
-      image.alt = 'Foto adjunta al reporte';
+      image.alt = m('attachedPhoto');
       image.loading = 'lazy';
       item.appendChild(image);
     }
@@ -432,7 +479,7 @@ async function submitReport() {
   const status = panel?.querySelector('#feature-status');
   if (!status) return;
   if (!note || !position) { status.textContent = u('reportNeed'); return; }
-  if (!supabaseClient && navigator.onLine) { status.textContent = 'Supabase no está configurado.'; return; }
+  if (!supabaseClient && navigator.onLine) { status.textContent = m('supabaseMissing'); return; }
   const photo = photoInput?.files?.[0] || null;
   if (photo && (!['image/jpeg', 'image/png', 'image/webp'].includes(photo.type) || photo.size > 5 * 1024 * 1024)) {
     status.textContent = u('photoError');
@@ -457,6 +504,8 @@ async function submitReport() {
     status.textContent = t('sent');
     noteInput.value = '';
     if (photoInput) photoInput.value = '';
+    const photoName = panel.querySelector('#report-photo-name');
+    if (photoName) photoName.textContent = noPhotoLabel();
     loadCitizenReports(document.getElementById('stats-feature-content'));
   } catch (error) {
     if (isOfflineError(error) && typeof enqueueOfflineRecord === 'function') {
@@ -465,6 +514,8 @@ async function submitReport() {
         status.textContent = u('queuedReport');
         noteInput.value = '';
         if (photoInput) photoInput.value = '';
+        const photoName = panel.querySelector('#report-photo-name');
+        if (photoName) photoName.textContent = noPhotoLabel();
       } catch (_) {
         status.textContent = u('queueError');
       }
@@ -479,14 +530,15 @@ async function submitReport() {
 }
 
 function renderStatsPanel(panel) {
-  panel.innerHTML = panelFrame(t('stats'), `<div class="feature-status" role="status" aria-live="polite">${t('loading')}</div><div class="stats-metrics"><div><strong id="metric-total">--</strong><span>${t('measurements')} · ${u('last30')}</span></div><div><strong id="metric-average">--</strong><span>${t('average')} del índice</span></div><div><strong id="metric-high">--</strong><span>Índice &gt; 70</span></div></div><div class="stats-columns"><section><h2>${t('loudest')}</h2><ul class="feature-list" id="loudest-list"></ul></section><section><h2>${t('quietest')}</h2><ul class="feature-list" id="quietest-list"></ul></section></div><h2>${t('alerts')}</h2><ul class="feature-list" id="alerts-list"></ul><h2>${u('trendTitle')}</h2><p>${u('trendHelp')}</p><div class="panel-actions"><button type="button" id="select-trend-location">${u('chooseArea')}</button></div><div id="zone-trend" class="feature-status">${u('noZone')}</div><h2>Reportes ciudadanos</h2><ul class="feature-list" id="citizen-reports-list"><li>${t('loading')}</li></ul><div class="panel-actions"><button type="button" id="select-confirm-location">${u('chooseConfirm')}</button><button type="button" id="confirm-noise">🔊 ${t('confirm')}</button></div><p id="confirm-status" role="status" aria-live="polite">${t('confirmHelp')}</p>`, panel);
+  panel.dataset.subview = 'overview';
+  panel.innerHTML = panelFrame(t('summaryTitle'), `<div class="feature-status" role="status" aria-live="polite">${t('loading')}</div><div class="stats-metrics"><div><strong id="metric-total">--</strong><span>${t('measurements')} · ${u('last30')}</span></div><div><strong id="metric-average">--</strong><span>${t('average')}</span></div><div><strong id="metric-high">--</strong><span>${t('index')} &gt; 70</span></div></div><div class="stats-columns"><section><h2>${t('loudest')}</h2><ul class="feature-list" id="loudest-list"></ul></section><section><h2>${t('quietest')}</h2><ul class="feature-list" id="quietest-list"></ul></section></div><h2>${t('alerts')}</h2><ul class="feature-list" id="alerts-list"></ul><h2>${u('trendTitle')}</h2><p>${u('trendHelp')}</p><div class="panel-actions"><button type="button" id="select-trend-location">${u('chooseArea')}</button></div><div id="zone-trend" class="feature-status">${u('noZone')}</div><h2>${m('reportHeading')}</h2><ul class="feature-list" id="citizen-reports-list"><li>${t('loading')}</li></ul><div class="panel-actions"><button type="button" id="select-confirm-location">${u('chooseConfirm')}</button><button type="button" id="confirm-noise">🔊 ${t('confirm')}</button></div><p id="confirm-status" role="status" aria-live="polite">${t('confirmHelp')}</p>`, panel);
   panel.querySelector('[data-close]')?.addEventListener('click', closeFeaturePanel);
   panel.querySelector('#confirm-noise').addEventListener('click', confirmNoise);
   panel.querySelector('#select-confirm-location').addEventListener('click', () => {
     pendingMapSelection = true;
     switchTab('map-view', document.querySelector('.tab-btn'));
     const status = document.getElementById('confirm-status');
-    if (status) status.textContent = 'Toca una zona del mapa para seleccionarla y vuelve a Estadísticas para confirmar.';
+    if (status) status.textContent = m('selectConfirmHint');
   });
   panel.querySelector('#select-trend-location').addEventListener('click', () => {
     pendingTrendSelection = true;
@@ -501,9 +553,28 @@ function appendRanking(list, rows) {
     list.innerHTML = `<li>${noDataMessage()}</li>`;
     return;
   }
-  rows.forEach((row) => {
+  rows.forEach((row, index) => {
     const item = document.createElement('li');
-    item.textContent = `Índice ${row.db} · ${row.count} ${t('measurements')} · ${row.lat.toFixed(4)}, ${row.lng.toFixed(4)}`;
+    item.className = 'ranked-zone';
+    const order = document.createElement('span');
+    order.className = 'ranking-order';
+    order.textContent = String(index + 1).padStart(2, '0');
+    const detail = document.createElement('span');
+    detail.className = 'ranking-detail';
+    detail.textContent = `${row.count} ${t('measurements')}`;
+    const level = document.createElement('strong');
+    level.className = 'ranking-level';
+    level.textContent = `${row.db} ${t('index')}`;
+    const viewButton = document.createElement('button');
+    viewButton.type = 'button';
+    viewButton.className = 'ranking-map-button';
+    viewButton.textContent = t('viewMap');
+    viewButton.setAttribute('aria-label', `${t('viewMap')}, ${t('sector')} ${index + 1}`);
+    viewButton.addEventListener('click', () => {
+      switchTab('map-view', document.querySelector('.tab-btn'));
+      map.setView([row.lat, row.lng], Math.max(map.getZoom(), 16));
+    });
+    item.append(order, detail, level, viewButton);
     list.appendChild(item);
   });
 }
@@ -514,7 +585,7 @@ async function loadStats(panel) {
     const start = new Date(end);
     start.setDate(start.getDate() - 30);
     const rows = await fetchFeatureMeasurements(start, end);
-    if (!panelIsCurrent(panel, 'stats')) return;
+    if (!panelIsCurrent(panel, 'stats') || panel.dataset.subview !== 'overview' || !panel.querySelector('#metric-total')) return;
     featureRows = rows;
     const zones = aggregatePoints(featureRows).map((point) => ({ ...point, count: point.sampleCount }));
     panel.querySelector('#metric-total').textContent = featureRows.length;
@@ -542,11 +613,11 @@ async function loadStats(panel) {
     }).slice(0, 3);
     const alertList = panel.querySelector('#alerts-list');
     if (!alerts.length) alertList.innerHTML = `<li>${t('noAlerts')}</li>`;
-    alerts.forEach((zone) => { const item = document.createElement('li'); item.textContent = `⚠️ Índice ${averageDb(zone.dailyLevels.get([...zone.days].sort().at(-1)).map((db_level) => ({ db_level })))} · 3 días consecutivos`; alertList.appendChild(item); });
-    panel.querySelector('.feature-status').textContent = featureRows.length ? `${zones.length} zonas analizadas` : noDataMessage();
+    alerts.forEach((zone) => { const item = document.createElement('li'); item.textContent = `⚠️ ${t('index')} ${averageDb(zone.dailyLevels.get([...zone.days].sort().at(-1)).map((db_level) => ({ db_level })))} · ${m('alertDays')}`; alertList.appendChild(item); });
+    panel.querySelector('.feature-status').textContent = featureRows.length ? `${zones.length} ${m('zonesAnalyzed')}` : noDataMessage();
   } catch (error) {
-    console.error('Error cargando estadísticas:', error);
-    if (!panelIsCurrent(panel, 'stats')) return;
+    if (supabaseClient) console.error('Error cargando estadísticas:', error);
+    if (!panelIsCurrent(panel, 'stats') || panel.dataset.subview !== 'overview' || !panel.querySelector('#metric-total')) return;
     panel.querySelector('.feature-status').textContent = error.message || noDataMessage();
     panel.querySelector('#loudest-list').innerHTML = `<li>${error.message || noDataMessage()}</li>`;
     panel.querySelector('#quietest-list').innerHTML = `<li>${error.message || noDataMessage()}</li>`;
@@ -557,7 +628,7 @@ async function loadStats(panel) {
 async function confirmNoise() {
   const position = selectedMapPoint || currentPosition;
   const status = document.getElementById('confirm-status');
-  if (!position || (!supabaseClient && navigator.onLine)) { if (status) status.textContent = !position ? u('chooseMapPoint') : 'Supabase no está configurado.'; return; }
+  if (!position || (!supabaseClient && navigator.onLine)) { if (status) status.textContent = !position ? u('chooseMapPoint') : m('supabaseMissing'); return; }
   const keyTime = new Date();
   keyTime.setMinutes(0, 0, 0);
   const measurementTime = keyTime.toISOString();
@@ -566,7 +637,7 @@ async function confirmNoise() {
     confirmation = await buildConfirmation(position, measurementTime);
     const { error } = await supabaseClient.from('noise_confirmations').insert(confirmation);
     if (error && error.code === '23505') {
-      if (status) status.textContent = 'Ya confirmaste el ruido en esta zona durante esta hora.';
+      if (status) status.textContent = m('alreadyConfirmed');
       return;
     }
     if (error) throw error;
@@ -575,7 +646,7 @@ async function confirmNoise() {
   } catch (error) {
     if (confirmation && isOfflineError(error) && typeof enqueueOfflineRecord === 'function') {
       await enqueueOfflineRecord('noise_confirmations', confirmation);
-      if (status) status.textContent = 'Confirmación guardada y pendiente de conexión.';
+      if (status) status.textContent = m('queuedConfirmation');
     } else if (status) status.textContent = error.message || 'No se pudo confirmar el ruido.';
   }
 }
@@ -598,7 +669,7 @@ async function loadZoneConfirmations(position) {
   const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
   const { count, error } = await supabaseClient.from('noise_confirmations').select('id', { count: 'exact', head: true })
     .eq('latitude', snapped.lat).eq('longitude', snapped.lng).gte('created_at', since);
-  if (!error) status.textContent = `${count || 0} confirmaciones en esta zona durante las últimas 24 horas.`;
+  if (!error) status.textContent = `${count || 0} ${m('confirmations')}`;
 }
 
 function renderTrendChart(container, rows) {
@@ -630,14 +701,14 @@ async function loadZoneTrend(position) {
   if (!target || !supabaseClient) return;
   const center = snapToGrid(position.lat, position.lng);
   const start = new Date(); start.setDate(start.getDate() - 7);
-  target.textContent = 'Cargando tendencia…';
+  target.textContent = m('loadingTrend');
   try {
     const rows = await fetchFeatureMeasurements(start, new Date());
     if (!target.isConnected || document.getElementById('zone-trend') !== target) return;
     const selected = rows.filter((row) => haversineDistance(center.lat, center.lng, row.latitude, row.longitude) <= 90);
     renderTrendChart(target.parentElement, selected);
   } catch (error) {
-    if (target.isConnected) target.textContent = error.message || 'No se pudo cargar la tendencia.';
+    if (target.isConnected) target.textContent = error.message || m('trendError');
   }
 }
 
@@ -718,6 +789,7 @@ function rotateLanguage() {
   updateStaticLanguage();
   if (activeStatsView) openStatsTab(activeStatsView);
   if (activeMapView) openFeaturePanel(activeMapView);
+  if (document.getElementById('map-view')?.classList.contains('active')) loadCommunityPoints();
 }
 
 function updateStaticLanguage() {
@@ -727,14 +799,25 @@ function updateStaticLanguage() {
     pt: { intro: 'Explore padrões de ruído e como os dados cidadãos podem melhorar a cidade.', cardDescriptions: ['A exposição prolongada ao ruído pode afetar o sono, a concentração e a saúde cardiovascular.', 'O AcoustiMap mostra padrões relativos de ruído; o índice não avalia exposição nem risco clínico.', 'Medições anônimas fornecem informações para um planejamento urbano mais sustentável.'], badges: ['Saúde', 'ODS 3', 'ODS 11'], cardLabels: ['Bem-estar', 'Saúde', 'Cidade'], legend: 'Informações do mapa' }
   }[currentLanguage];
   const copy = {
-    es: { map: 'Mapa', health: 'Salud + ODS', healthShort: 'Salud', stats: 'Estadísticas', statsShort: 'Stats', title: 'Salud y ODS', intro: 'Entiende el impacto del ruido y cómo los datos ciudadanos ayudan a mejorar la ciudad.', detail: 'Mostrar detalles', hide: 'Ocultar detalles', all: 'Todo', morning: 'Mañana', afternoon: 'Tarde', night: 'Noche', exportCsv: 'Exportar CSV', exportGeo: 'Exportar GeoJSON', statsTitle: 'Estadísticas del ruido', statsIntro: 'Explora tendencias, reportes y zonas persistentes sin salir de la aplicación.', back: 'Volver al mapa', tabs: ['Resumen', 'Reportar ruido', 'Comparar meses', 'Retos'], privacy: 'Privacidad por diseño', privacyCopy: 'AcoustiMap no graba audio, no requiere login y guarda las coordenadas ancladas a una cuadrícula aproximada de 70 m.', mapHelp: 'Cómo interpretar el mapa', mapHelpCopy: 'Verde indica valores bajos, amarillo moderados y rojo altos del índice relativo. No equivale a decibelios calibrados ni evalúa exposición.', cardTitles: ['Menos ruido, más descanso', 'Ciudades más saludables', 'Participación local'] },
-    en: { map: 'Map', health: 'Health + SDGs', healthShort: 'Health', stats: 'Statistics', statsShort: 'Stats', title: 'Health and SDGs', intro: 'Understand how noise affects health and how citizen data can improve the city.', detail: 'Show details', hide: 'Hide details', all: 'All', morning: 'Morning', afternoon: 'Afternoon', night: 'Night', exportCsv: 'Export CSV', exportGeo: 'Export GeoJSON', statsTitle: 'Noise statistics', statsIntro: 'Explore trends, reports, and persistent areas without leaving the app.', back: 'Back to map', tabs: ['Summary', 'Report noise', 'Compare months', 'Challenges'], privacy: 'Privacy by design', privacyCopy: 'AcoustiMap does not record audio, requires no login, and stores coordinates snapped to an approximate 70 m grid.', mapHelp: 'How to read the map', mapHelpCopy: 'Green shows low, yellow moderate, and red high relative index values. This is not calibrated decibel data and cannot assess exposure.', cardTitles: ['Less noise, better rest', 'Healthier cities', 'Local participation'] },
-    pt: { map: 'Mapa', health: 'Saúde + ODS', healthShort: 'Saúde', stats: 'Estatísticas', statsShort: 'Stats', title: 'Saúde e ODS', intro: 'Entenda o impacto do ruído e como os dados cidadãos podem melhorar a cidade.', detail: 'Mostrar detalhes', hide: 'Ocultar detalhes', all: 'Tudo', morning: 'Manhã', afternoon: 'Tarde', night: 'Noite', exportCsv: 'Exportar CSV', exportGeo: 'Exportar GeoJSON', statsTitle: 'Estatísticas de ruído', statsIntro: 'Explore tendências, relatos e áreas persistentes sem sair do aplicativo.', back: 'Voltar ao mapa', tabs: ['Resumo', 'Relatar ruído', 'Comparar meses', 'Desafios'], privacy: 'Privacidade desde o início', privacyCopy: 'O AcoustiMap não grava áudio, não exige login e salva coordenadas em uma grade aproximada de 70 m.', mapHelp: 'Como interpretar o mapa', mapHelpCopy: 'Verde indica valores baixos, amarelo moderados e vermelho altos do índice relativo. Não equivale a decibéis calibrados nem avalia exposição.', cardTitles: ['Menos ruído, mais descanso', 'Cidades mais saudáveis', 'Participação local'] }
+    es: { map: 'Mapa', health: 'Salud y ODS', healthShort: 'Salud', stats: 'Estadísticas', statsShort: 'Datos', title: 'Salud y ODS', detail: 'Mostrar detalles', hide: 'Ocultar detalles', all: 'Todo', morning: 'Mañana', afternoon: 'Tarde', night: 'Noche', exportCsv: 'Exportar CSV', exportGeo: 'Exportar GeoJSON', statsTitle: 'Datos del ruido', statsIntro: 'Mediciones ciudadanas, tendencias y reportes de tu zona.', tabs: ['Resumen', 'Reportar', 'Comparar', 'Retos'], visualHeat: 'Mapa de calor', visualZones: 'Puntos', privacy: 'Privacidad por diseño', privacyCopy: 'AcoustiMap no graba audio, no requiere login y guarda las coordenadas ancladas a una cuadrícula aproximada de 70 m.', mapHelp: 'Cómo interpretar el mapa', mapHelpCopy: 'Verde indica valores bajos, amarillo moderados y rojo altos del índice relativo. No equivale a decibelios calibrados ni evalúa exposición.', cardTitles: ['Menos ruido, más descanso', 'Ciudades más saludables', 'Participación local'] },
+    en: { map: 'Map', health: 'Health and SDGs', healthShort: 'Health', stats: 'Statistics', statsShort: 'Data', title: 'Health and SDGs', detail: 'Show details', hide: 'Hide details', all: 'All', morning: 'Morning', afternoon: 'Afternoon', night: 'Night', exportCsv: 'Export CSV', exportGeo: 'Export GeoJSON', statsTitle: 'Noise data', statsIntro: 'Citizen measurements, trends, and reports for your area.', tabs: ['Summary', 'Report', 'Compare', 'Challenges'], visualHeat: 'Heatmap', visualZones: 'Points', privacy: 'Privacy by design', privacyCopy: 'AcoustiMap does not record audio, requires no login, and stores coordinates snapped to an approximate 70 m grid.', mapHelp: 'How to read the map', mapHelpCopy: 'Green shows low, yellow moderate, and red high relative index values. This is not calibrated decibel data and cannot assess exposure.', cardTitles: ['Less noise, better rest', 'Healthier cities', 'Local participation'] },
+    pt: { map: 'Mapa', health: 'Saúde e ODS', healthShort: 'Saúde', stats: 'Estatísticas', statsShort: 'Dados', title: 'Saúde e ODS', detail: 'Mostrar detalhes', hide: 'Ocultar detalhes', all: 'Tudo', morning: 'Manhã', afternoon: 'Tarde', night: 'Noite', exportCsv: 'Exportar CSV', exportGeo: 'Exportar GeoJSON', statsTitle: 'Dados do ruído', statsIntro: 'Medições cidadãs, tendências e relatos da sua região.', tabs: ['Resumo', 'Relatar', 'Comparar', 'Desafios'], visualHeat: 'Mapa de calor', visualZones: 'Pontos', privacy: 'Privacidade desde o início', privacyCopy: 'O AcoustiMap não grava áudio, não exige login e salva coordenadas em uma grade aproximada de 70 m.', mapHelp: 'Como interpretar o mapa', mapHelpCopy: 'Verde indica valores baixos, amarelo moderados e vermelho altos do índice relativo. Não equivale a decibéis calibrados nem avalia exposição.', cardTitles: ['Menos ruído, mais descanso', 'Cidades mais saudáveis', 'Participação local'] }
+  }[currentLanguage];
+  const extra = {
+    es: { timeLabel: 'Hora CO', timeGroup: 'Filtrar por franja horaria de Colombia', visualGroup: 'Forma de visualizar el mapa', low: 'Índice < 55 · Bajo', medium: 'Índice 55–70 · Moderado', high: 'Índice > 70 · Alto', legendNote: 'Escala relativa orientativa; no equivale a dB físicos ni sirve para evaluar exposición.', yourLocation: 'Tu ubicación (solo tú)', shareTitle: 'Compartir ubicación', shareText: 'Tu ubicación se <strong>ancla a una cuadrícula de ~70 m</strong> antes de enviarse a la base de datos. Tú verás tu posición exacta en azul; los demás solo verán la zona.', shareNote: '🔒 <strong>Datos compartidos:</strong> Tu audio nunca se graba ni transmite. Se guarda el índice relativo y la celda aproximada.', micTitle: 'Activar micrófono', micText: 'La app usará tu micrófono para calcular un <strong>índice relativo de ruido</strong>. No es una medición calibrada en decibelios y no sirve para evaluar la exposición acústica.<br><br><strong>No se graba audio.</strong> Solo se analiza la intensidad del sonido en tiempo real.', micNote: '🔒 <strong>Privacidad garantizada:</strong> El audio nunca sale de tu dispositivo ni se transmite a ningún servidor.', cancel: 'Cancelar', acceptShare: 'Aceptar y compartir', acceptMic: 'Aceptar y activar', activate: 'Activar', stop: 'Detener', share: 'Compartir', measuring: 'Midiendo en vivo', idle: 'Inactivo', startHint: 'Presiona para empezar', average: 'Promedio', noSession: 'Sin datos' },
+    en: { timeLabel: 'CO time', timeGroup: 'Filter by Colombian time of day', visualGroup: 'Map display mode', low: 'Index < 55 · Low', medium: 'Index 55–70 · Moderate', high: 'Index > 70 · High', legendNote: 'Relative scale only; it is not calibrated dB and cannot assess noise exposure.', yourLocation: 'Your location (only you)', shareTitle: 'Share location', shareText: 'Your location is <strong>snapped to an approximately 70 m grid</strong> before it is sent to the database. You see your exact position in blue; others see only the area.', shareNote: '🔒 <strong>Shared data:</strong> Audio is never recorded or transmitted. Only the relative index and approximate cell are stored.', micTitle: 'Enable microphone', micText: 'The app uses your microphone to calculate a <strong>relative noise index</strong>. It is not calibrated in decibels and cannot assess noise exposure.<br><br><strong>Audio is not recorded.</strong> Sound intensity is analyzed on your device.', micNote: '🔒 <strong>Privacy:</strong> Audio never leaves your device or reaches a server.', cancel: 'Cancel', acceptShare: 'Accept and share', acceptMic: 'Accept and enable', activate: 'Enable', stop: 'Stop', share: 'Share', measuring: 'Measuring live', idle: 'Inactive', startHint: 'Press to start', average: 'Average', noSession: 'No data' },
+    pt: { timeLabel: 'Hora CO', timeGroup: 'Filtrar por horário da Colômbia', visualGroup: 'Modo de exibição do mapa', low: 'Índice < 55 · Baixo', medium: 'Índice 55–70 · Moderado', high: 'Índice > 70 · Alto', legendNote: 'Escala relativa; não equivale a dB calibrados nem avalia exposição.', yourLocation: 'Sua localização (só você)', shareTitle: 'Compartilhar localização', shareText: 'Sua localização é <strong>ajustada a uma grade de aproximadamente 70 m</strong> antes de ser enviada ao banco de dados. Você vê sua posição exata em azul; os demais veem apenas a área.', shareNote: '🔒 <strong>Dados compartilhados:</strong> O áudio nunca é gravado ou transmitido. Apenas o índice relativo e a célula aproximada são armazenados.', micTitle: 'Ativar microfone', micText: 'O aplicativo usa seu microfone para calcular um <strong>índice relativo de ruído</strong>. Não é calibrado em decibéis e não avalia exposição.<br><br><strong>O áudio não é gravado.</strong> A intensidade é analisada no dispositivo.', micNote: '🔒 <strong>Privacidade:</strong> O áudio nunca sai do dispositivo nem chega a um servidor.', cancel: 'Cancelar', acceptShare: 'Aceitar e compartilhar', acceptMic: 'Aceitar e ativar', activate: 'Ativar', stop: 'Parar', share: 'Compartilhar', measuring: 'Medindo ao vivo', idle: 'Inativo', startHint: 'Toque para começar', average: 'Média', noSession: 'Sem dados' }
+  }[currentLanguage];
+  const meterLabels = {
+    es: { index: 'índice', min: 'Mín', max: 'Máx', samples: 'Muestras', locate: 'Centrar en mi ubicación' },
+    en: { index: 'index', min: 'Min', max: 'Max', samples: 'Samples', locate: 'Center on my location' },
+    pt: { index: 'índice', min: 'Mín', max: 'Máx', samples: 'Amostras', locate: 'Centralizar na minha localização' }
   }[currentLanguage];
   const nav = document.querySelectorAll('.tab-btn');
-  if (nav[0]) nav[0].textContent = `🗺️ ${copy.map}`;
-  if (nav[1]) nav[1].innerHTML = `📚 <span class="tab-long">${copy.health}</span><span class="tab-short">${copy.healthShort}</span>`;
-  if (nav[2]) nav[2].innerHTML = `📊 <span class="tab-long">${copy.stats}</span><span class="tab-short">${copy.statsShort}</span>`;
+  if (nav[0]) nav[0].textContent = copy.map;
+  if (nav[1]) nav[1].innerHTML = `<span class="tab-long">${copy.health}</span><span class="tab-short">${copy.healthShort}</span>`;
+  if (nav[2]) nav[2].innerHTML = `<span class="tab-long">${copy.stats}</span><span class="tab-short">${copy.statsShort}</span>`;
+  if (nav[1]) nav[1].setAttribute('aria-label', copy.health);
   const title = document.querySelector('.info-header h1'); if (title) title.textContent = copy.title;
   const intro = document.querySelector('.info-header p'); if (intro) intro.textContent = details.intro;
   const cards = document.querySelectorAll('.info-card h3'); cards.forEach((element, index) => { if (copy.cardTitles[index]) element.textContent = copy.cardTitles[index]; });
@@ -749,15 +832,50 @@ function updateStaticLanguage() {
   if (infoCopy[1]) infoCopy[1].textContent = copy.mapHelpCopy;
   const statsTitle = document.querySelector('.stats-page-header h1'); if (statsTitle) statsTitle.textContent = copy.statsTitle;
   const statsIntro = document.querySelector('.stats-page-header p'); if (statsIntro) statsIntro.textContent = copy.statsIntro;
-  const back = document.querySelector('.stats-back-btn'); if (back) back.textContent = `🗺️ ${copy.back}`;
-  document.querySelectorAll('.stats-section-btn').forEach((button, index) => { if (copy.tabs[index]) button.textContent = `${['📈', '📝', '↔️', '🎯'][index]} ${copy.tabs[index]}`; });
+  document.querySelectorAll('.stats-section-btn').forEach((button, index) => { if (copy.tabs[index]) button.textContent = copy.tabs[index]; });
   const handle = document.getElementById('stats-handle-label');
   if (handle) handle.textContent = document.getElementById('stats-panel')?.classList.contains('collapsed') ? copy.detail : copy.hide;
   [['time-all', copy.all], ['time-morning', copy.morning], ['time-afternoon', copy.afternoon], ['time-night', copy.night]].forEach(([id, value]) => { const el = document.getElementById(id); if (el) el.textContent = value; });
+  const heat = document.getElementById('visual-heatmap'); if (heat) heat.textContent = copy.visualHeat;
+  const zones = document.getElementById('visual-zones'); if (zones) zones.textContent = copy.visualZones;
   const csv = document.getElementById('export-csv-btn'); if (csv) csv.textContent = copy.exportCsv;
   const geo = document.getElementById('export-geojson-btn'); if (geo) geo.textContent = copy.exportGeo;
   const legendTitle = document.querySelector('.legend-header span'); if (legendTitle) legendTitle.textContent = details.legend;
   const legendButton = document.getElementById('legend-toggle'); if (legendButton) legendButton.setAttribute('aria-label', details.legend);
+  const statsTabs = document.querySelector('.stats-section-nav'); if (statsTabs) statsTabs.setAttribute('aria-label', m('statsTabLabel'));
+  const timeGroup = document.querySelector('.time-filters'); if (timeGroup) timeGroup.setAttribute('aria-label', extra.timeGroup);
+  const timeLabel = document.querySelector('.time-filters-label'); if (timeLabel) timeLabel.textContent = extra.timeLabel;
+  const visualGroup = document.querySelector('.visual-filters'); if (visualGroup) visualGroup.setAttribute('aria-label', extra.visualGroup);
+  const legend = document.getElementById('map-legend'); if (legend) legend.setAttribute('aria-label', details.legend);
+  document.querySelectorAll('.legend-body > div').forEach((element, index) => {
+    if (index < 3 && element.lastChild) element.lastChild.textContent = [extra.low, extra.medium, extra.high][index];
+  });
+  const legendNote = document.querySelector('.legend-body p'); if (legendNote) legendNote.textContent = extra.legendNote;
+  const legendMe = document.querySelector('.legend-me'); if (legendMe?.lastChild) legendMe.lastChild.textContent = extra.yourLocation;
+  [['share-modal', extra.shareTitle, extra.shareText, extra.shareNote, extra.acceptShare], ['mic-modal', extra.micTitle, extra.micText, extra.micNote, extra.acceptMic]].forEach(([id, titleText, bodyText, noteText, actionText]) => {
+    const modal = document.getElementById(id);
+    if (!modal) return;
+    modal.querySelector('h2').textContent = titleText;
+    modal.querySelector('.modal-text').innerHTML = bodyText;
+    modal.querySelector('.modal-note').innerHTML = noteText;
+    modal.querySelector('.modal-btn.cancel').textContent = extra.cancel;
+    modal.querySelector('.modal-btn.confirm').textContent = actionText;
+  });
+  const monitoring = document.getElementById('stats-panel')?.classList.contains('monitoring');
+  const actionText = document.querySelector('#btn-toggle .action-text'); if (actionText) actionText.textContent = monitoring ? extra.stop : extra.activate;
+  const shareText = document.querySelector('#btn-share .action-text'); if (shareText) shareText.textContent = extra.share;
+  const statusText = document.getElementById('status-text'); if (statusText) statusText.textContent = monitoring ? extra.measuring : extra.idle;
+  if (!monitoring) {
+    const startHint = document.getElementById('db-status-text'); if (startHint) startHint.textContent = extra.startHint;
+    const noSession = document.getElementById('avg-tag'); if (noSession && ['Sin datos', 'No data', 'Sem dados'].includes(noSession.textContent.trim())) noSession.textContent = extra.noSession;
+  }
+  const averageLabel = document.querySelector('.avg-head span'); if (averageLabel) averageLabel.textContent = extra.average;
+  document.querySelectorAll('.db-unit, .avg-unit').forEach((element) => { element.textContent = meterLabels.index; });
+  document.querySelectorAll('.avg-meta > span').forEach((element, index) => {
+    if (element.firstChild?.nodeType === Node.TEXT_NODE) element.firstChild.textContent = `${[meterLabels.min, meterLabels.max, meterLabels.samples][index]} `;
+  });
+  const locate = document.querySelector('.locate-btn'); if (locate) locate.title = meterLabels.locate;
+  if (typeof updateGpsChip === 'function') updateGpsChip(Boolean(sharingEnabled), currentPosition?.accuracy);
   document.title = `AcoustiMap — ${copy.title}`;
 }
 
@@ -883,7 +1001,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     tabs[next]?.click();
     event.preventDefault();
   });
-  if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch((error) => console.warn('PWA no disponible:', error));
+  if ('serviceWorker' in navigator) {
+    let reloadingForUpdate = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (reloadingForUpdate) return;
+      reloadingForUpdate = true;
+      window.location.reload();
+    });
+    navigator.serviceWorker.register('./sw.js').catch((error) => console.warn('PWA no disponible:', error));
+  }
   try {
     const legacy = JSON.parse(localStorage.getItem('acoustimap-pending-measurements') || '[]');
     const migration = await Promise.allSettled(legacy.map((measurement) => queueOfflineMeasurement({ ...measurement, id: measurement.id || crypto.randomUUID() })));

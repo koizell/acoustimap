@@ -1,4 +1,4 @@
-const CACHE_NAME = 'acoustimap-shell-v24';
+const CACHE_NAME = 'acoustimap-shell-v28';
 const APP_SHELL = [
   './',
   './index.html',
@@ -9,6 +9,7 @@ const APP_SHELL = [
   './css/info.css',
   './css/responsive.css',
   './css/features.css',
+  './css/experience.css',
   './js/config.js',
   './js/map.js',
   './js/audio.js',
@@ -63,6 +64,18 @@ self.addEventListener('fetch', (event) => {
 
   event.respondWith(
     (async () => {
+      if (event.request.mode === 'navigate') {
+        try {
+          const response = await fetch(event.request);
+          if (response.ok) {
+            const cache = await caches.open(CACHE_NAME);
+            await cache.put('./index.html', response.clone());
+          }
+          return response;
+        } catch (_) {
+          return (await caches.match('./index.html')) || Response.error();
+        }
+      }
       const cached = await caches.match(event.request);
       if (cached) return cached;
       try {
