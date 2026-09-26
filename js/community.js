@@ -265,6 +265,11 @@ async function exportMeasurementsGeoJson() {
 // ============================================
 // CARGAR PUNTOS DESDE SUPABASE
 // ============================================
+/**
+ * Consulta celdas agregadas del área visible, por periodo y franja horaria.
+ * El token descarta respuestas anteriores al último movimiento/filtro: una
+ * petición lenta no debe borrar ni reemplazar los datos de la vista actual.
+ */
 async function loadCommunityPoints() {
   const counter = document.getElementById('community-count');
   const requestToken = ++communityLoadToken;
@@ -339,6 +344,12 @@ map.on('moveend', () => {
 // ============================================
 // ENVIAR MEDICIÓN A SUPABASE
 // ============================================
+/**
+ * Envía el promedio de una ventana de muestras, como máximo una petición a la vez.
+ * Reserva las muestras antes del await para que las nuevas formen otra ventana.
+ * Si falla tanto el envío como su persistencia local, devuelve las muestras
+ * reservadas al acumulador; los datos solo llevan coordenadas aproximadas.
+ */
 async function sendMeasurementIfDue() {
   const now = Date.now();
   if (!sharingEnabled || !currentPosition) return;
@@ -366,47 +377,47 @@ async function sendMeasurementIfDue() {
 
   let success = false;
   try {
-  if (supabaseClient) {
-    let error;
-    try {
-      ({ error } = await supabaseClient.from('noise_measurements').insert(measurement));
-    } catch (requestError) {
-      error = requestError;
-    }
-    if (error) {
-      console.error('Supabase insert error:', error);
-      if (typeof isOfflineError === 'function' ? isOfflineError(error) : !navigator.onLine) {
-        await queueOfflineMeasurement(measurement);
+    if (supabaseClient) {
+      let error;
+      try {
+        ({ error } = await supabaseClient.from('noise_measurements').insert(measurement));
+      } catch (requestError) {
+        error = requestError;
+      }
+      if (error) {
+        console.error('Supabase insert error:', error);
+        if (typeof isOfflineError === 'function' ? isOfflineError(error) : !navigator.onLine) {
+          await queueOfflineMeasurement(measurement);
+          success = true;
+        }
+      } else {
         success = true;
       }
     } else {
-      success = true;
+      if (typeof queueOfflineMeasurement === 'function') {
+        await queueOfflineMeasurement(measurement);
+        success = true;
+      }
     }
-  } else {
-    if (typeof queueOfflineMeasurement === 'function') {
-      await queueOfflineMeasurement(measurement);
-      success = true;
-    }
-  }
 
-  if (success && typeof recordLocalChallengeMeasurement === 'function') {
-    recordLocalChallengeMeasurement({ ...measurement, created_at: nowIso });
-  }
-  if (success) {
-    if (mapMode === 'live') {
-      if (selectedVisualMode === 'heatmap') {
-        addCommunityHeatPoint(snapped.lat, snapped.lng, avg);
+    if (success && typeof recordLocalChallengeMeasurement === 'function') {
+      recordLocalChallengeMeasurement({ ...measurement, created_at: nowIso });
+    }
+    if (success) {
+      if (mapMode === 'live') {
+        if (selectedVisualMode === 'heatmap') {
+          addCommunityHeatPoint(snapped.lat, snapped.lng, avg);
+        } else {
+          addCommunityPoint(snapped.lat, snapped.lng, avg, category, nowIso, 1);
+        }
+        lastAggregatedPoints.push({
+          lat: snapped.lat, lng: snapped.lng, db: avg, category,
+          createdAt: nowIso, sampleCount: 1
+        });
       } else {
         addCommunityPoint(snapped.lat, snapped.lng, avg, category, nowIso, 1);
       }
-      lastAggregatedPoints.push({
-        lat: snapped.lat, lng: snapped.lng, db: avg, category,
-        createdAt: nowIso, sampleCount: 1
-      });
-    } else {
-      addCommunityPoint(snapped.lat, snapped.lng, avg, category, nowIso, 1);
     }
-  }
 
   } finally {
     if (!success) {

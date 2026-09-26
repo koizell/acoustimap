@@ -21,3 +21,13 @@ build/
 
 # Local Graphify knowledge graph and watcher output
 graphify-out/
+
+# Dependencias, resultados de pruebas y estado local de Supabase
+node_modules/
+coverage/
+test-results/
+playwright-report/
+supabase/.temp/
+.env
+.env.*
+!.env.example

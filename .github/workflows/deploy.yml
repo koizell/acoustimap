@@ -1,23 +1,45 @@
-name: Deploy to GitHub Pages
+name: Quality checks and GitHub Pages
 
 on:
   push:
-    branches: [main]
+    branches: [main, 'codex/**']
   pull_request:
     branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
+# Serializa también los builds de main para no publicar un artefacto antiguo
+# después de uno más reciente. Las comprobaciones de otras ramas son independientes.
 concurrency:
-  group: pages
+  group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
-  build:
+  quality:
     runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci --ignore-scripts
+      - name: Check syntax and run regression tests
+        run: npm run check
+
+  build:
+    # Las ramas de pruebas y los PR no consumen secretos ni publican el sitio.
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    needs: quality
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -25,16 +47,16 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24'
 
-      - name: Install dependencies
-        run: npm ci || echo "No package.json, skipping npm install"
-
-      - name: Build config (inject Supabase credentials)
+      - name: Build public Supabase config
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
         run: node build-config.js
+
+      - name: Package public files
+        run: npm run build:site
 
       - name: Setup Pages
         uses: actions/configure-pages@v4
@@ -42,9 +64,13 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: '.'
+          path: dist
 
   deploy:
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    permissions:
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}

@@ -39,3 +39,29 @@ test('photo cleanup retains report rows when Storage rejects deletion', async ()
   await assert.rejects(cleanupExpiredPhotos(client), /Storage unavailable/);
   assert.equal(deleted, false);
 });
+
+test('photo cleanup does nothing when the candidate query fails or returns no rows', async () => {
+  const cleanupExpiredPhotos = await cleanupFunction();
+  // No Storage/delete methods: any destructive call would fail this test.
+  await assert.rejects(cleanupExpiredPhotos({
+    rpc: async () => ({ data: null, error: new Error('Database unavailable') })
+  }), /Database unavailable/);
+  assert.deepEqual(await cleanupExpiredPhotos({
+    rpc: async () => ({ data: [], error: null })
+  }), { removedObjects: 0, deletedReports: 0 });
+});
+
+test('photo cleanup surfaces a database deletion failure after removing the object', async () => {
+  const cleanupExpiredPhotos = await cleanupFunction();
+  const operations = [];
+  const client = {
+    rpc: async () => ({ data: [{ path: 'one/one.jpg', report_id: 'report-one' }], error: null }),
+    storage: { from: () => ({ remove: async () => { operations.push('storage'); return { error: null }; } }) },
+    from: () => ({ delete: () => ({ in: async () => {
+      operations.push('database');
+      return { error: new Error('Database deletion failed') };
+    } }) })
+  };
+  await assert.rejects(cleanupExpiredPhotos(client), /Database deletion failed/);
+  assert.deepEqual(operations, ['storage', 'database']);
+});

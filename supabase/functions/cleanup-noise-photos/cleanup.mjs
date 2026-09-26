@@ -1,3 +1,10 @@
+/**
+ * Elimina archivos caducados antes de sus filas para no dejar objetos sin referencia.
+ * Si falla Storage, conserva las filas. Si falla el borrado SQL, propaga el error:
+ * la RPC también encuentra reportes caducados cuyo objeto ya no existe al reintentar.
+ * @param {object} client Cliente Supabase con permisos de servicio, solo en servidor.
+ * @returns {Promise<{removedObjects: number, deletedReports: number}>}
+ */
 export async function cleanupExpiredPhotos(client) {
   const { data: candidates, error: queryError } = await client.rpc('expired_noise_photo_candidates');
   if (queryError) throw queryError;

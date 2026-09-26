@@ -1,15 +1,13 @@
 /**
  * config.js
- * Credenciales, constantes, estado compartido y utilidades.
- * 
- * Las credenciales de Supabase se cargan desde:
- * 1. window.__ACOUSTIMAP_CONFIG__ (config.local.js para desarrollo local)
- * 2. Valores inyectados en build (GitHub Actions para producción)
- * 3. Fallback: placeholders que indican configuración pendiente
+ * Configuración pública, constantes, estado compartido y utilidades.
+ * config.local.js define window.__ACOUSTIMAP_CONFIG__: se copia de la plantilla
+ * en desarrollo o se genera con build-config.js en CI. Los placeholders permiten
+ * abrir la interfaz sin configurar Supabase. Orden de carga: docs/ARQUITECTURA.md.
  */
 
 // ============================================
-// SUPABASE - Cargar credenciales de forma segura
+// SUPABASE - Inicializar el cliente con la clave pública (RLS controla el acceso)
 // ============================================
 const _localConfig = window.__ACOUSTIMAP_CONFIG__ || {};
 const SUPABASE_URL = _localConfig.SUPABASE_URL || 'https://TU-PROYECTO.supabase.co';
@@ -54,7 +52,7 @@ let currentPosition = null;
 let geoWatchId      = null;
 let wakeLock        = null;
 
-// ✅ NUEVO: historial de lecturas GPS para detectar estabilidad
+// Historial de lecturas GPS para detectar estabilidad
 let positionHistory = [];
 
 let audioCtx, analyser, microphone, stream;
@@ -70,6 +68,11 @@ let lastSendTime    = 0;
 // ============================================
 // UTILIDADES
 // ============================================
+/** Clasifica el índice relativo. El nombre db se conserva por compatibilidad;
+ * no representa una medición calibrada de presión sonora en dB(A).
+ * @param {number} db Índice del micrófono, habitualmente entre 0 y 100.
+ * @returns {'bajo'|'moderado'|'alto'}
+ */
 function classifyDb(db) {
   if (db < 55) return 'bajo';
   if (db <= 70) return 'moderado';
@@ -90,6 +93,13 @@ function timeAgo(iso) {
   return relative.format(-Math.floor(diff / 2592000), 'month');
 }
 
+/**
+ * Aproxima la ubicación al centro de una celda de unos 70 m antes de compartirla.
+ * La celda de privacidad se expresa en metros; AGG_GRID agrupa visualmente en grados.
+ * @param {number} lat Latitud geográfica en grados.
+ * @param {number} lng Longitud geográfica en grados.
+ * @returns {{lat: number, lng: number}} Centro de celda; volver a anclarlo es idempotente.
+ */
 function snapToGrid(lat, lng) {
   const metersPerDegLat = 111000;
   const cellLat = CELL_SIZE_M / metersPerDegLat;

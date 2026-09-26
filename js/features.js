@@ -651,6 +651,13 @@ async function confirmNoise() {
   }
 }
 
+/**
+ * Crea una confirmación por navegador, celda y hora. El identificador local
+ * participa en el hash, pero no se envía como campo a Supabase.
+ * @param {{lat: number, lng: number}} position Coordenadas del mapa (grados).
+ * @param {string} measurementTime Hora redondeada en formato ISO 8601.
+ * @returns {Promise<object>} Registro con latitude/longitude para la base de datos.
+ */
 async function buildConfirmation(position, measurementTime) {
   const snapped = snapToGrid(position.lat, position.lng);
   const value = `${featureClientId}:${snapped.lat.toFixed(5)}:${snapped.lng.toFixed(5)}:${measurementTime}`;
@@ -957,6 +964,11 @@ async function removeOfflineRecord(id) {
   });
 }
 
+/**
+ * Vacía la cola en orden con un solo envío activo. Conserva cada UUID para
+ * reintentar sin duplicar registros; retira el elemento solo tras insertarlo
+ * o recibir 23505 (ya existe). Un error conserva el resto para el próximo intento.
+ */
 async function flushOfflineMeasurements() {
   if (!supabaseClient || !navigator.onLine || flushOfflineMeasurements.running) return;
   flushOfflineMeasurements.running = true;
@@ -972,7 +984,8 @@ async function flushOfflineMeasurements() {
           payload.longitude = snapped.lng;
         }
         if (record.table === 'noise_confirmations') {
-          const rebuilt = await buildConfirmation(payload, payload.measurement_time);
+          // El registro SQL usa latitude/longitude; el mapa usa lat/lng.
+          const rebuilt = await buildConfirmation({ lat: payload.latitude, lng: payload.longitude }, payload.measurement_time);
           payload.confirmation_key = rebuilt.confirmation_key;
         }
         if (record.table === 'noise_reports' && record.photo) {
