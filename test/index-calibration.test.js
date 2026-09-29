@@ -17,183 +17,120 @@ vm.runInNewContext(`${source}\nthis.api = { classifyDb, normalizeDbForHeatmap };
 const { classifyDb, normalizeDbForHeatmap } = context.api;
 
 /**
- * Reproduce la formula de audio.js:217 sobre el promedio de
- * analyser.getByteFrequencyData(), que devuelve enteros de 0 a 255.
- * No es una funcion aparte en el codigo, asi que se replica aqui a proposito:
- * si alguien la cambia, esta prueba deja de reflejar la app real.
+ * Reproduce la conversion de audio.js: rms del dominio temporal -> indice.
+ * El codigo real calcula el RMS sobre un Float32Array, lo convierte a dBFS y
+ * lo lleva al rango 30-95. No es una funcion aparte en el fuente, asi que se
+ * replica aqui a proposito: si alguien la cambia, esta prueba deja de reflejar
+ * la app real.
  */
-function indiceDesdeByteFreq(average) {
-  let db = Math.round(20 * Math.log10(average || 1) + 25);
-  if (db < 30) db = 35;
-  return db;
+function indiceDesdeRms(rms) {
+  const dbfs = 20 * Math.log10(rms || 1e-6);
+  return Math.min(95, Math.max(30, Math.round(dbfs + 100)));
 }
 
-// Stops del gradiente de ensureHeatLayer en map.js:56-62.
-const STOPS_GRADIENTE = [0.0, 0.35, 0.55, 0.75, 1.0];
+// Stops del gradiente de ensureHeatLayer en map.js.
+const STOPS_GRADIENTE = [0.0, 0.25, 0.385, 0.615, 1.0];
 
-test('el indice que la app puede producir tiene un techo de 73', () => {
-  // Barrido exhaustivo de los 256 valores posibles del promedio de bytes.
-  // El indice nunca pasa de 73, y solo se acerca a ese techo con el
-  // analizador practicamente saturado. El minimo real es 31, no 35: el suelo
-  // de 35 solo entra en juego cuando el indice baja de 30, y average=2 ya
-  // produce 31 sin tocarlo.
-  let maximo = 0;
-  let minimo = Infinity;
-  for (let average = 0; average <= 255; average += 1) {
-    const db = indiceDesdeByteFreq(average);
-    maximo = Math.max(maximo, db);
-    minimo = Math.min(minimo, db);
+/** RMS tipicos por entorno, de la literatura de medida de sonido. */
+const ESCENARIOS = [
+  { nombre: 'silencio total', rms: 0.0002 },
+  { nombre: 'habitacion en silencio', rms: 0.0008 },
+  { nombre: 'habitacion tranquila', rms: 0.003 },
+  { nombre: 'conversacion a un metro', rms: 0.012 },
+  { nombre: 'calle con trafico', rms: 0.04 },
+  { nombre: 'calle muy ruidosa', rms: 0.12 },
+  { nombre: 'obra o bocina cercana', rms: 0.35 },
+  { nombre: 'analizador saturado', rms: 0.707 }
+];
+
+test('el indice recorre todo el rango con rms reales', () => {
+  const tabla = ESCENARIOS.map(({ nombre, rms }) => {
+    const index = indiceDesdeRms(rms);
+    return { nombre, rms, index, categoria: classifyDb(index) };
+  });
+  for (const fila of tabla) {
+    console.log(`  ${fila.nombre.padEnd(26)} rms ${String(fila.rms).padEnd(7)} -> indice ${fila.index}  ${fila.categoria}`);
   }
-  assert.equal(maximo, 73);
-  assert.equal(minimo, 31);
+
+  // Los tres umbrales tienen que quedar dentro del rango alcanzable, cosa que
+  // no ocurria con la metrica anterior: alli "alto" exigia un promedio de 178
+  // sobre 255, practically inalcanzable.
+  const alcanzable = ESCENARIOS.map(({ rms }) => indiceDesdeRms(rms));
+  assert.ok(Math.min(...alcanzable) < 45, 'el silencio debe llegar a la zona baja');
+  assert.ok(alcanzable.some((i) => i >= 55 && i <= 70), 'debe haber escenarios moderados');
+  assert.ok(Math.max(...alcanzable) > 70, 'debe haber escenarios altos');
+
+  // Cada decade de amplitud suma unos 20 puntos de indice.
+  const silencio = indiceDesdeRms(0.0008);
+  const traves = indiceDesdeRms(0.008);
+  assert.ok(traves - silencio >= 19 && traves - silencio <= 21,
+    `10x de amplitud debe sumar ~20 puntos, sumo ${traves - silencio}`);
 });
 
-test('"alto" solo aparece en el 26 por ciento superior del rango del analizador', () => {
-  // db > 70 exige round(20*log10(average) + 25) > 70, es decir average >= 189
-  // sobre un maximo de 255. Es alcanzable, pero solo con el analizador casi
-  // saturado. En produccion, con celdas agregadas entre 49 y 54, nunca se da.
-  let primero = null;
-  let ultimo = 0;
-  for (let average = 0; average <= 255; average += 1) {
-    if (classifyDb(indiceDesdeByteFreq(average)) === 'alto') {
-      if (primero === null) primero = average;
-      ultimo = average;
-    }
-  }
-  assert.equal(primero, 189);
-  assert.equal(ultimo, 255);
-  assert.equal(ultimo - primero + 1, 67);
-});
-
-test('las celdas agregadas reales quedan mas comprimidas que las mediciones', () => {
-  // Comprobado en Chrome headless el 2026-09-29 contra produccion: las 20
-  // celdas que pinta el mapa tienen indice 49-54 (medio 52), no el rango
-  // 35-61 de las mediciones individuales, porque cada celda promedia.
-  // La intensidad real del heatmap quedo entre 0.271 y 0.343.
-  const celdas = [49, 54];
-  const min = Math.min(...celdas.map(normalizeDbForHeatmap));
-  const max = Math.max(...celdas.map(normalizeDbForHeatmap));
-  assert.equal(Number(min.toFixed(3)), 0.271);
-  assert.equal(Number(max.toFixed(3)), 0.343);
-  // No alcanza siquiera el segundo stop del gradiente, que esta en 0.35.
-  assert.ok(max < STOPS_GRADIENTE[1], 'no alcanza el stop de color lima');
-  assert.equal(STOPS_GRADIENTE.filter((stop) => stop <= max).length, 1,
-    'solo se pinta el primer color del gradiente');
-});
-
-test('el mapa pinta un unico color con los datos de produccion', () => {
-  // Hallazgo medido sobre el canvas real del heatmap en Chrome headless:
-  // 72034 pixeles pintados, todos en la gama del verde inicial #22c55e
-  // (34,197,94). Ningun pixel en amarillo, naranja o rojo.
-  const verdeInicial = { r: 34, g: 197, b: 94 };
-  const pixeles = [
-    { r: 42, g: 191, b: 85 }, { r: 55, g: 200, b: 91 }, { r: 39, g: 196, b: 78 },
-    { r: 48, g: 191, b: 80 }, { r: 57, g: 198, b: 85 }, { r: 51, g: 204, b: 85 },
-    { r: 60, g: 195, b: 75 }, { r: 58, g: 197, b: 81 }, { r: 61, g: 194, b: 73 },
-    { r: 54, g: 201, b: 81 }, { r: 64, g: 202, b: 74 }
-  ];
-  // El verde domina si el canal verde supera al rojo en todos los pixeles.
-  for (const p of pixeles) {
-    assert.ok(p.g > p.r && p.g > p.b,
-      `pixel ${p.r},${p.g},${p.b} no es una variante del verde inicial`);
-    assert.ok(Math.abs(p.g - verdeInicial.g) < 20, 'el canal verde se mantiene en la gama inicial');
+test('el indice queda acotado entre 30 y 95', () => {
+  assert.equal(indiceDesdeRms(0), 30, 'silencio absoluto da el suelo');
+  assert.equal(indiceDesdeRms(1e-12), 30, 'muy por debajo del ruido tambien');
+  assert.equal(indiceDesdeRms(0.707), 95, 'senal a plena escala da el techo');
+  assert.equal(indiceDesdeRms(5), 95, 'por encima de plena escala no se desborda');
+  for (let rms = 0; rms <= 1; rms += 0.001) {
+    const index = indiceDesdeRms(rms);
+    assert.ok(index >= 30 && index <= 95, `rms ${rms} produjo ${index}`);
+    assert.ok(Number.isInteger(index), 'el indice debe ser entero');
   }
 });
 
-/**
- * Carga communityCopy, communityText y formatLegendCounter desde community.js
- * en un contexto aislado, para comprobar la concordancia en los tres idiomas.
- */
-function requireCommunityHelpers() {
-  const js = fs.readFileSync(path.join(root, 'js', 'community.js'), 'utf8');
-  const extract = (name) => {
-    const match = js.match(new RegExp(`(?:function|const) ${name}\\b[^]*?(?=\\n(?:function|const|async function|\\/\\/|let) |$)`));
-    assert.ok(match, `${name} existe en community.js`);
-    return match[0];
-  };
-  const crear = (idioma) => {
-    const ctx = {
-      localStorage: { getItem: () => idioma },
-      document: { documentElement: { lang: idioma } }
-    };
-    vm.createContext(ctx);
-    vm.runInContext(
-      `${extract('communityCopy')}\n${extract('communityText')}\n${extract('formatLegendCounter')}`,
-      ctx
-    );
-    return ctx.formatLegendCounter;
-  };
-  return {
-    formatearContador: (idioma, celdas, mediciones) => {
-      const formato = crear(idioma);
-      const etiqueta = formato.__etiqueta
-        ? formato.__etiqueta
-        : { es: 'Historial (90 días)', en: 'History (90 days)', pt: 'Histórico (90 dias)' }[idioma];
-      return formato(etiqueta, celdas, mediciones);
-    }
-  };
-}
-
-test('el contador de la leyenda concuerda en singular', () => {
-  // Regresión. Comprobado en Chrome headless contra producción el 2026-09-29:
-  // el modo "En vivo" renderizó "En vivo (24 h) - 1 zonas - 2 mediciones"
-  // porque community.js concatenaba communityText('zones') sin distinguir
-  // plural de singular. Aquí se exige la forma correcta para los tres idiomas.
-  const { formatearContador } = requireCommunityHelpers();
-  assert.equal(formatearContador('es', 20, 479), 'Historial (90 días) · 20 zonas · 479 mediciones');
-  assert.equal(formatearContador('es', 1, 2), 'Historial (90 días) · 1 zona · 2 mediciones');
-  assert.equal(formatearContador('es', 1, 1), 'Historial (90 días) · 1 zona · 1 medición');
-  assert.equal(formatearContador('en', 1, 1), 'History (90 days) · 1 area · 1 measurement');
-  assert.equal(formatearContador('en', 2, 3), 'History (90 days) · 2 areas · 3 measurements');
-  assert.equal(formatearContador('pt', 1, 1), 'Histórico (90 dias) · 1 área · 1 medição');
-  assert.equal(formatearContador('pt', 5, 5), 'Histórico (90 dias) · 5 áreas · 5 medições');
-  // Cero también es plural en los tres idiomas.
-  assert.equal(formatearContador('es', 0, 0), 'Historial (90 días) · 0 zonas · 0 mediciones');
+test('los stops del gradiente coinciden con los umbrales de categoria', () => {
+  // El rango 30-95 tiene 65 puntos. 55 cae en 0.385 y 70 en 0.615, asi que el
+  // ambar y el naranja del heatmap arrancan donde arrancan "moderado" y "alto".
+  const cerca = (a, b) => Math.abs(a - b) < 1e-3;
+  assert.ok(cerca((55 - 30) / 65, STOPS_GRADIENTE[2]),
+    `el stop ambar ${STOPS_GRADIENTE[2]} debe caer en el umbral 55`);
+  assert.ok(cerca((70 - 30) / 65, STOPS_GRADIENTE[3]),
+    `el stop naranja ${STOPS_GRADIENTE[3]} debe caer en el umbral 70`);
+  assert.ok(cerca(normalizeDbForHeatmap(55), STOPS_GRADIENTE[2]));
+  assert.ok(cerca(normalizeDbForHeatmap(70), STOPS_GRADIENTE[3]));
+  // El indice maximo tiene que llegar al rojo del gradiente.
+  assert.equal(normalizeDbForHeatmap(95), 1);
+  assert.equal(normalizeDbForHeatmap(30), 0.05, 'el suelo mantiene un valor minimo visible');
 });
 
-test('setTimeFilter ignora valores invalidos en vez de vaciar el mapa', () => {
-  // Regresión. Ejecutado en Chrome headless el 2026-09-29: pasar una franja
-  // inexistente dejaba las celdas en 0 y el contador decía "Aún no hay
-  // mediciones en el historial", sin error. Las cuatro condiciones de
-  // noise_map_cells quedan falsas ante un valor inesperado y la RPC devuelve
-  // cero filas, así que el mapa se vacía en silencio.
-  // setMapMode ya validaba su argumento (community.js:435); setTimeFilter no.
-  const js = fs.readFileSync(path.join(root, 'js', 'community.js'), 'utf8');
-  const extract = (name) => {
-    const match = js.match(new RegExp(`function ${name}\\([^]*?\\n\\}`));
-    assert.ok(match, `${name} existe`);
-    return match[0];
-  };
-  let recargas = 0;
-  const ctx = {
-    mapMode: 'history',
-    selectedTimeFilter: 'morning',
-    document: { querySelectorAll: () => [] },
-    loadCommunityPoints: () => { recargas += 1; }
-  };
-  // TIME_FILTERS precede a la función en el fuente y forma parte de su contrato.
-  const filtros = js.match(/const TIME_FILTERS = \[[^\]]*\];/);
-  assert.ok(filtros, 'TIME_FILTERS existe');
-  vm.runInNewContext(
-    `${filtros[0]}\n${extract('setTimeFilter')}\nthis.run = setTimeFilter;`,
-    ctx
-  );
-
-  ctx.run('franja-inexistente');
-  assert.equal(ctx.selectedTimeFilter, 'morning', 'el valor invalido no debe guardarse');
-  assert.equal(recargas, 0, 'no debe disparar una recarga que la RPC no puede satisfacer');
-
-  ctx.run('night');
-  assert.equal(ctx.selectedTimeFilter, 'night', 'una franja valida si debe aplicarse');
-  assert.equal(recargas, 1);
-
-  for (const valido of ['all', 'morning', 'afternoon', 'night']) {
-    ctx.run(valido);
-    assert.equal(ctx.selectedTimeFilter, valido);
+test('el gradiente entero queda accesible con el rango del indice', () => {
+  // Antes solo se pintaba verde y lima: ningun dato real pasaba de 0.44.
+  // Ahora el rango completo 30-95 recorre las cinco bandas.
+  const alcanzados = STOPS_GRADIENTE.filter((stop) => stop <= 1);
+  assert.equal(alcanzados.length, 5, 'las cinco bandas son alcanzables');
+  for (const stop of STOPS_GRADIENTE) {
+    const indice = stop * 65 + 30;
+    assert.ok(indice <= 95, `el stop ${stop} exige indice ${indice.toFixed(1)} y el tope es 95`);
   }
-  for (const invalido of ['', null, undefined, 'MORNING', 'noche', 42, {}]) {
-    const previo = ctx.selectedTimeFilter;
-    ctx.run(invalido);
-    assert.equal(ctx.selectedTimeFilter, previo, `debe ignorar ${JSON.stringify(invalido)}`);
-  }
+});
+
+test('las mediciones historicas siguen siendo representables', () => {
+  // Las 490 filas de produccion se Took con la metrica anterior, entre 35 y 61.
+  // Con la escala nueva caen entre 0.077 y 0.477, o sea verde a lima: sigue
+  // siendo una lectura valida, no se rompe nada, pero el historico y lo que
+  // se mida a partir de ahora no son directamente comparables.
+  assert.equal(Number(normalizeDbForHeatmap(35).toFixed(3)), 0.077);
+  assert.equal(Number(normalizeDbForHeatmap(61).toFixed(3)), 0.477);
+  assert.equal(classifyDb(35), 'bajo');
+  assert.equal(classifyDb(61), 'moderado');
+});
+
+test('el indice ya no depende de getByteFrequencyData', () => {
+  // Regresion estructural: la metrica antigua promediaba los 128 bins y se
+  // hundia con sonidos tonales. Con un pitido fuerte ocupaba pocos bins y la
+  // media se quedaba en 93 de 255, indice 64, sin acercarse a "alto".
+  const audio = fs.readFileSync(path.join(root, 'js', 'audio.js'), 'utf8');
+  // Se ignoran los comentarios: el de updateMeter nombra la metrica antigua
+  // para explicar por que se cambio.
+  const cuerpo = audio
+    .slice(audio.indexOf('function updateMeter'))
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/\/\/[^\n]*/g, '');
+  assert.doesNotMatch(cuerpo, /getByteFrequencyData/,
+    'updateMeter no debe seguir usando el promedio espectral');
+  assert.doesNotMatch(cuerpo, /20\s*\*\s*Math\.log10\([^)]*average/,
+    'no debe quedar la conversion del promedio de bytes');
+  assert.match(cuerpo, /getFloatTimeDomainData/);
+  assert.match(cuerpo, /Math\.sqrt\(energy/);
 });

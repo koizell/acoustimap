@@ -58,6 +58,11 @@ let positionHistory = [];
 let audioCtx, analyser, microphone, stream;
 let rafId = null;
 
+// Búfer del dominio temporal y media móvil del RMS. Se asignan al activar el
+// micrófono para no crear un Float32Array por fotograma.
+let timeDomainBuffer = null;
+let smoothedRms = 0;
+
 let session = { sum: 0, count: 0, min: Infinity, max: -Infinity, startTime: 0, timerId: null };
 let lastStatTime = 0;
 
@@ -151,6 +156,15 @@ function releaseWakeLock() {
 }
 
 
+/**
+ * Lleva el índice relativo a la escala 0-1 del gradiente del heatmap.
+ * El rango útil es 30-95 (ver audio.js): 30 es silencio y 95 el tope del
+ * analizador. Los stops del gradiente están en 0.385 y 0.615, que son
+ * exactamente los umbrales 55 y 70 sobre ese rango, así que el ámbar empieza
+ * donde empieza "moderado" y el naranja donde empieza "alto".
+ * @param {number} db Índice relativo entre 30 y 95.
+ * @returns {number} Posición en el gradiente, de 0 a 1.
+ */
 function normalizeDbForHeatmap(db) {
-  return Math.min(Math.max((db - 30) / (100 - 30), 0.05), 1.0);
+  return Math.min(Math.max((db - 30) / 65, 0.05), 1.0);
 }

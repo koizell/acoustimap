@@ -4,7 +4,11 @@ Mapa colaborativo de patrones de ruido. [Abrir demo](https://koizell.github.io/a
 
 ## Qué mide
 
-La aplicación usa la Web Audio API para calcular un **índice relativo de ruido** en tiempo real. No graba audio. La escala conserva los umbrales históricos de la interfaz: bajo (<55), moderado (55–70) y alto (>70). **Los valores no son decibelios calibrados (dB SPL)** y no sirven para evaluar exposición, cumplimiento normativo ni riesgo para la salud. Los dispositivos y navegadores pueden producir valores distintos ante el mismo sonido.
+La aplicación usa la Web Audio API para calcular un **índice relativo de ruido** en tiempo real. No graba audio. **Los valores no son decibelios calibrados (dB SPL)** y no sirven para evaluar exposición, cumplimiento normativo ni riesgo para la salud. Los dispositivos y navegadores pueden producir valores distintos ante el mismo sonido.
+
+El índice se obtiene del **RMS del dominio temporal** (`getFloatTimeDomainData`), que mide la energía total de la señal, convertido a dBFS y llevado al rango 30-95: un punto de índice por decibelio. Hasta el 28 de septiembre de 2026 se usaba el promedio de los 128 bins del espectro, que se hundía con sonidos tonales: un pitido fuerte de prueba dejaba la media en 93 de 255 y el índice en 64, sin poder alcanzar la categoría «alto», y con datos reales el mapa salía siempre verde. Ese rango 30-95 está **calibrado por simulación, no medido en condiciones reales**: las 490 mediciones anteriores a este cambio se tomaron con la métrica vieja y no son comparables con las nuevas. Conviene recoger lecturas reales en varios entornos y ajustar si hace falta. `test/index-calibration.test.js` documenta la tabla de conversión.
+
+Los umbrales siguen siendo bajo (<55), moderado (55–70) y alto (>70). El gradiente del mapa de calor sitúa el ámbar en 0.385 y el naranja en 0.615, que son exactamente los índices 55 y 70 sobre ese rango, así que el color cambia donde cambia la categoría.
 
 Con consentimiento, se envía cada 10 segundos el promedio del índice, la categoría y una ubicación anclada a una cuadrícula aproximada de 70 m. El mapa consulta celdas agregadas del área visible: últimas 24 horas en «En vivo» o hasta 90 días en «Historial», y vuelve a consultar al moverlo. Las franjas usan la hora de Colombia (UTC−5) para todos los visitantes. También permite comparar meses, registrar reportes y exportar CSV o GeoJSON. Las exportaciones llaman `noise_index` al valor. La columna de base de datos `db_level` conserva su nombre anterior por compatibilidad, pero representa el mismo índice relativo.
 
@@ -38,9 +42,27 @@ Aplica la migración de privacidad y confirma que `noise_map_cells` responde **a
 
 Después despliega la Edge Function `cleanup-noise-photos` desde [`supabase/functions/cleanup-noise-photos`](supabase/functions/cleanup-noise-photos) con Supabase CLI y configura un secreto aleatorio `PHOTO_CLEANUP_TOKEN` en los secretos de la función. La función tiene `verify_jwt = false` en [`supabase/config.toml`](supabase/config.toml) y exige ese token en la cabecera `x-cleanup-token` de cada petición; no pongas el token en el frontend.
 
-Crea en Supabase Vault `acoustimap_project_url` (la URL de tu proyecto) y `acoustimap_photo_cleanup_token` (el mismo token de la función). Ejecuta luego [`migrations/20260925_schedule_photo_cleanup.sql`](migrations/20260925_schedule_photo_cleanup.sql). Esta migración configura una invocación por hora mediante `pg_cron` y `pg_net`. La tarea de limpieza de filas sin fotos de `setup.sql` permanece activa.
+Crea en Supabase Vault `acoustimap_project_url` (la URL de tu proyecto) y `acoustimap_photo_cleanup_token`. **El valor de este último debe ser una copia exacta del secreto `PHOTO_CLEANUP_TOKEN` de la función, no un token nuevo.** Son dos copias del mismo valor guardadas en dos sitios distintos, y nada en el sistema avisa si divergen: el trabajo programado sigue marcando `succeeded` porque `pg_net` no espera la respuesta. Si pierdes el valor, vuelve a generar uno y actualiza los dos lados. Ejecuta luego [`migrations/20260925_schedule_photo_cleanup.sql`](migrations/20260925_schedule_photo_cleanup.sql). Esta migración configura una invocación por hora mediante `pg_cron` y `pg_net`. La tarea de limpieza de filas sin fotos de `setup.sql` permanece activa.
 
 ### Comprobación posterior al despliegue
+
+Que el trabajo programado exista no significa que la Edge Function responda. `pg_net` encola la
+petición de forma asíncrona, así que `cron.job_run_details` marca `succeeded` aunque la función
+conteste con error. Hay que comprobar el código de respuesta por separado:
+
+```sql
+-- Debe devolver solo 200. Un 401 significa que acoustimap_photo_cleanup_token
+-- (Vault) no coincide con PHOTO_CLEANUP_TOKEN (secreto de la función) y que
+-- ninguna foto se está borrando. El 503 indica que falta el secreto en la función.
+select status_code, count(*) as llamadas, max(created) as ultima
+from net._http_response
+group by 1 order by 2 desc;
+```
+
+Mientras esa consulta devuelva algo distinto de 200, la limpieza de fotos está detenida. Como
+`cleanup_old_noise_data` solo borra reportes cuyo `photo_path` es nulo, los reportes con foto se
+retienen de forma indefinida y su archivo permanece accesible por URL. Espera a la siguiente
+ejecución del trabajo (cada hora en punto 15) antes de darlo por comprobado.
 
 En el SQL Editor, confirma que las funciones y los trabajos programados existen:
 

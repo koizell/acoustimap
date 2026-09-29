@@ -33,10 +33,11 @@ que el filtro Kalman está activo. Los estilos siguen el orden de `index.html`.
 | Registro SQL | `{latitude, longitude}` en grados, aproximados antes de compartir. |
 | `CELL_SIZE_M` | Cuadrícula de unos 70 metros. Volver a aplicar `snapToGrid` conserva la celda. |
 | `AGG_GRID` | Agrupación para análisis en grados; diferente de la celda de privacidad en metros. |
-| `db_level`, `avg_db` | Nombres históricos que contienen un índice relativo del micrófono. |
+| `db_level`, `avg_db` | Nombres históricos que contienen un índice relativo del micrófono. Rango 30-95, derivado del RMS del dominio temporal. |
 | Categoría | `bajo` <55, `moderado` entre 55 y 70, `alto` >70. |
 | Periodo del mapa | `history`: 90 días; `live`: 24 horas. |
 | Franja del mapa | `all`, `morning`, `afternoon`, `night`; la RPC aplica hora de Colombia. |
+| Escala del heatmap | `normalizeDbForHeatmap`: `(db - 30) / 65`. El índice 30 es silencio y 95 el tope del analizador. Los stops del gradiente están en 0.385 y 0.615 para caer sobre los umbrales 55 y 70. |
 
 El índice no es dB(A) calibrado ni demuestra cumplimiento de límites legales.
 Una capa vacía significa falta de datos para el área y filtros seleccionados;

@@ -31,6 +31,8 @@ async function toggleMonitoring() {
       microphone = audioCtx.createMediaStreamSource(stream);
       microphone.connect(analyser);
       analyser.fftSize = 256;
+      timeDomainBuffer = new Float32Array(analyser.fftSize);
+      smoothedRms = 0;
 
       isMonitoring = true;
       document.getElementById('stats-panel').classList.add('monitoring');
@@ -206,19 +208,35 @@ async function saveSessionSummary() {
 function updateMeter() {
   if (!isMonitoring) return;
 
-  const dataArray = new Uint8Array(analyser.frequencyBinCount);
-  analyser.getByteFrequencyData(dataArray);
+  // Amplitud real en el tiempo, no el promedio del espectro.
+  //
+  // La version anterior promediaba los 128 bins de getByteFrequencyData. Ese
+  // promedio se hunde con sonidos tonales: un pitido fuerte de prueba ocupaba
+  // unos pocos bins y dejaba la media en 93 de 255, indice 64, sin acercarse
+  // nunca a "alto". Para llegar a 70 hacia falta una media de 178, casi el tope
+  // absoluto, y con datos reales el mapa salia siempre verde. El RMS sube con
+  // la energia total, que es lo que oye la persona.
+  if (!timeDomainBuffer || timeDomainBuffer.length !== analyser.fftSize) {
+    timeDomainBuffer = new Float32Array(analyser.fftSize);
+  }
+  analyser.getFloatTimeDomainData(timeDomainBuffer);
+  let energy = 0;
+  for (let i = 0; i < timeDomainBuffer.length; i++) {
+    energy += timeDomainBuffer[i] * timeDomainBuffer[i];
+  }
+  const rms = Math.sqrt(energy / timeDomainBuffer.length);
+  // El suavizado del analizador no cubre el dominio temporal, asi que la media
+  // es propia: sin ella el digito de la pantalla parpadea.
+  smoothedRms = smoothedRms ? smoothedRms * 0.8 + rms * 0.2 : rms;
 
-  let sum = 0;
-  for (let i = 0; i < dataArray.length; i++) sum += dataArray[i];
-  const average = sum / dataArray.length;
-
-  // Indicador relativo sin calibración de presión sonora (no dB SPL).
-  let db = Math.round(20 * Math.log10(average || 1) + 25);
-  if (db < 30) db = 35;
+  // Indice relativo: 30 en silencio, 95 con el analizador casi saturado. Un
+  // punto de indice por cada dB. No es dB SPL calibrado y no sirve para
+  // evaluar exposicion; ver README y docs/CALIDAD.md.
+  const dbfs = 20 * Math.log10(smoothedRms || 1e-6);
+  const db = Math.min(95, Math.max(30, Math.round(dbfs + 100)));
 
   document.getElementById('db-number').innerText = db;
-  const percent = Math.min(100, Math.max(0, (db / 100) * 100));
+  const percent = Math.min(100, Math.max(0, ((db - 30) / 65) * 100));
   const dbBar = document.getElementById('db-bar');
   dbBar.style.width = `${percent}%`;
 

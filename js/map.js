@@ -53,11 +53,15 @@ function ensureHeatLayer() {
     blur: 36,
     maxZoom: 17,
     minOpacity: 0.22,
+    // Stops alineados con los umbrales de categoria sobre el rango 30-95 del
+    // indice: 0.385 es el indice 55 y 0.615 es el indice 70. Asi el ambar
+    // empieza con "moderado" y el naranja con "alto", en vez de que ambos
+    // quedaran fuera del alcance util.
     gradient: {
       0.0: '#22c55e',
-      0.35: '#84cc16',
-      0.55: '#facc15',
-      0.75: '#f97316',
+      0.25: '#84cc16',
+      0.385: '#facc15',
+      0.615: '#f97316',
       1.0: '#dc2626'
     }
   });
