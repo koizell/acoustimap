@@ -1,6 +1,7 @@
 /**
  * build-config.js
- * Script de build para inyectar credenciales de Supabase en producción.
+ * Genera la configuración pública que descargará el navegador.
+ * Usar solo la clave anon/publicable; nunca service_role ni una clave secreta.
  * 
  * Uso:
  *   SUPABASE_URL=xxx SUPABASE_ANON_KEY=yyy node build-config.js
@@ -22,13 +23,10 @@ if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
 const configContent = `/**
  * config.local.js - GENERADO AUTOMÁTICAMENTE EN BUILD
  * NO EDITAR MANUALMENTE - Se sobrescribe en cada deploy
- * Credenciales inyectadas desde variables de entorno (GitHub Secrets)
+ * Configuración pública generada desde variables de entorno (GitHub Secrets)
  */
 
-window.__ACOUSTIMAP_CONFIG__ = {
-  SUPABASE_URL: '${SUPABASE_URL.replace(/'/g, "\\'")}',
-  SUPABASE_ANON_KEY: '${SUPABASE_ANON_KEY.replace(/'/g, "\\'")}'
-};
+window.__ACOUSTIMAP_CONFIG__ = ${JSON.stringify({ SUPABASE_URL, SUPABASE_ANON_KEY }, null, 2)};
 `;
 
 const outputPath = path.join(__dirname, 'js', 'config.local.js');
@@ -36,8 +34,6 @@ const outputPath = path.join(__dirname, 'js', 'config.local.js');
 try {
   fs.writeFileSync(outputPath, configContent);
   console.log('✅ js/config.local.js generado correctamente');
-  console.log(`   URL: ${SUPABASE_URL}`);
-  console.log(`   Key: ${SUPABASE_ANON_KEY.substring(0, 20)}...`);
 } catch (err) {
   console.error('❌ Error escribiendo config.local.js:', err);
   process.exit(1);

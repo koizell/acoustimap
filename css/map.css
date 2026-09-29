@@ -154,7 +154,7 @@
   min-width: 220px;
   max-width: 260px;
   overflow: hidden;
-  transition: all 0.3s ease;
+  transition: opacity 0.3s ease, transform 0.3s ease;
   transform-origin: top right;
 }
 
@@ -208,6 +208,15 @@
   border-radius: 50%;
   margin-right: 6px;
   vertical-align: middle;
+}
+
+/* Explica que el rotulo lleva indice y mediciones, y que el borde codifica
+   cuantas mediciones sostienen el promedio. */
+.legend-hint {
+  margin: 3px 0 1px;
+  font-size: 0.68rem;
+  line-height: 1.4;
+  color: var(--text-muted);
 }
 
 .map-legend .dot-blue {

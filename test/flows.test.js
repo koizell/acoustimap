@@ -135,7 +135,20 @@ test('map requests aggregated cells for the visible area and selected time windo
     renderCommunityPoints: (points) => { rendered = points; },
     clearCommunityLayers() {},
     timeAgo: () => 'hace tiempo',
-    communityText: (key) => ({ history: 'Historial (90 días)', zones: 'zonas', measurements: 'mediciones', updated: 'Última actualización' })[key] || key,
+    // El doble de traduccion incluye las formas singulares: el contador real
+    // las pide para no escribir "1 zonas". La concordancia se verifica en
+    // test/index-calibration.test.js contra el código de producción.
+    communityText: (key) => ({
+      history: 'Historial (90 días)',
+      zones: 'zonas', zone: 'zona',
+      measurements: 'mediciones', measurement: 'medición',
+      updated: 'Última actualización'
+    })[key] || key,
+    formatLegendCounter: (modeLabel, cells, measurements) => {
+      const t = (key) => context.communityText(key);
+      const unit = (count, singularKey, pluralKey) => `${count} ${t(count === 1 ? singularKey : pluralKey)}`;
+      return `${modeLabel} · ${unit(cells, 'zone', 'zones')} · ${unit(measurements, 'measurement', 'measurements')}`;
+    },
     console
   };
   vm.runInNewContext(`${functionSource('community.js', 'loadCommunityPoints')}\nthis.run = loadCommunityPoints;`, context);

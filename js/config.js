@@ -1,15 +1,13 @@
 /**
  * config.js
- * Credenciales, constantes, estado compartido y utilidades.
- * 
- * Las credenciales de Supabase se cargan desde:
- * 1. window.__ACOUSTIMAP_CONFIG__ (config.local.js para desarrollo local)
- * 2. Valores inyectados en build (GitHub Actions para producción)
- * 3. Fallback: placeholders que indican configuración pendiente
+ * Configuración pública, constantes, estado compartido y utilidades.
+ * config.local.js define window.__ACOUSTIMAP_CONFIG__: se copia de la plantilla
+ * en desarrollo o se genera con build-config.js en CI. Los placeholders permiten
+ * abrir la interfaz sin configurar Supabase. Orden de carga: docs/ARQUITECTURA.md.
  */
 
 // ============================================
-// SUPABASE - Cargar credenciales de forma segura
+// SUPABASE - Inicializar el cliente con la clave pública (RLS controla el acceso)
 // ============================================
 const _localConfig = window.__ACOUSTIMAP_CONFIG__ || {};
 const SUPABASE_URL = _localConfig.SUPABASE_URL || 'https://TU-PROYECTO.supabase.co';
@@ -54,11 +52,16 @@ let currentPosition = null;
 let geoWatchId      = null;
 let wakeLock        = null;
 
-// ✅ NUEVO: historial de lecturas GPS para detectar estabilidad
+// Historial de lecturas GPS para detectar estabilidad
 let positionHistory = [];
 
 let audioCtx, analyser, microphone, stream;
 let rafId = null;
+
+// Búfer del dominio temporal y media móvil del RMS. Se asignan al activar el
+// micrófono para no crear un Float32Array por fotograma.
+let timeDomainBuffer = null;
+let smoothedRms = 0;
 
 let session = { sum: 0, count: 0, min: Infinity, max: -Infinity, startTime: 0, timerId: null };
 let lastStatTime = 0;
@@ -70,6 +73,14 @@ let lastSendTime    = 0;
 // ============================================
 // UTILIDADES
 // ============================================
+/**
+ * Clasifica el índice relativo en las tres categorías de la interfaz.
+ * El nombre del parámetro se conserva por compatibilidad: no representa una
+ * medición calibrada de presión sonora en dB(A).
+ * @param {number} db Índice relativo, entre 30 y 95 (ver audio.js).
+ * @returns {'bajo'|'moderado'|'alto'} 'bajo' por debajo de 55, 'moderado' hasta
+ *   70 inclusive, 'alto' por encima.
+ */
 function classifyDb(db) {
   if (db < 55) return 'bajo';
   if (db <= 70) return 'moderado';
@@ -90,6 +101,13 @@ function timeAgo(iso) {
   return relative.format(-Math.floor(diff / 2592000), 'month');
 }
 
+/**
+ * Aproxima la ubicación al centro de una celda de unos 70 m antes de compartirla.
+ * La celda de privacidad se expresa en metros; AGG_GRID agrupa visualmente en grados.
+ * @param {number} lat Latitud geográfica en grados.
+ * @param {number} lng Longitud geográfica en grados.
+ * @returns {{lat: number, lng: number}} Centro de celda; volver a anclarlo es idempotente.
+ */
 function snapToGrid(lat, lng) {
   const metersPerDegLat = 111000;
   const cellLat = CELL_SIZE_M / metersPerDegLat;
@@ -141,6 +159,42 @@ function releaseWakeLock() {
 }
 
 
+/**
+ * Lleva el índice relativo a la escala 0-1 del gradiente del heatmap.
+ * El rango útil es 30-95 (ver audio.js): 30 es silencio y 95 el tope del
+ * analizador. Los stops del gradiente están en 0.385 y 0.615, que son
+ * exactamente los umbrales 55 y 70 sobre ese rango, así que el ámbar empieza
+ * donde empieza "moderado" y el naranja donde empieza "alto".
+ * @param {number} db Índice relativo entre 30 y 95.
+ * @returns {number} Posición en el gradiente, de 0 a 1.
+ */
 function normalizeDbForHeatmap(db) {
-  return Math.min(Math.max((db - 30) / (100 - 30), 0.05), 1.0);
+  return Math.min(Math.max((db - 30) / 65, 0.05), 1.0);
+}
+
+// Mediciones a partir de las cuales la confianza de una celda satura.
+const DENSITY_REFERENCE = 30;
+
+/**
+ * Confianza de una celda, por cuántas mediciones sostienen su promedio.
+ *
+ * IMPORTANTE: solo modula el borde del círculo, nunca la intensidad del
+ * heatmap ni el color. Un único ciudadano que reporta ruido extremo en su
+ * calle aporta el dato más valioso de la app; atenuarlo por tener una sola
+ * lectura escondería justo lo que la gente busca. La densidad se comunica en
+ * el rótulo y en un borde más marcado, no apagando la celda.
+ *
+ * Se usa raíz y no logaritmo porque es lineal en el grosor: duplicar el borde
+ * es duplicar la densidad, y eso se entiende sin explicación.
+ * @param {number} sampleCount Mediciones de la celda.
+ * @returns {number} Peso entre 0 y 1.
+ */
+function densityConfidence(sampleCount) {
+  const n = Math.max(0, Number(sampleCount) || 0);
+  return Math.min(1, Math.sqrt(n / DENSITY_REFERENCE));
+}
+
+/** Opacidad del borde de una celda: tenue si es una lectura suelta, marcada si está bien medida. */
+function cellBorderOpacity(sampleCount) {
+  return 0.3 + 0.5 * densityConfidence(sampleCount);
 }

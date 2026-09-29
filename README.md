@@ -6,6 +6,12 @@ AcoustiMap convierte tu dispositivo en un sensor de ruido ciudadano. Mide el niv
 
 🌐 **Abrir la aplicación:** [https://koizell.github.io/acoustimap/](https://koizell.github.io/acoustimap/)
 
+La aplicación usa la Web Audio API para calcular un **índice relativo de ruido** en tiempo real. No graba audio. **Los valores no son decibelios calibrados (dB SPL)** y no sirven para evaluar exposición, cumplimiento normativo ni riesgo para la salud. Los dispositivos y navegadores pueden producir valores distintos ante el mismo sonido.
+
+El índice se obtiene del **RMS del dominio temporal** (`getFloatTimeDomainData`), que mide la energía total de la señal, convertido a dBFS y llevado al rango 30-95: un punto de índice por decibelio. Hasta el 28 de septiembre de 2026 se usaba el promedio de los 128 bins del espectro, que se hundía con sonidos tonales: un pitido fuerte de prueba dejaba la media en 93 de 255 y el índice en 64, sin poder alcanzar la categoría «alto», y con datos reales el mapa salía siempre verde. Ese rango 30-95 está **calibrado por simulación, no medido en condiciones reales**: las mediciones anteriores al 29 de septiembre de 2026 se tomaron con la métrica vieja y no son comparables con las nuevas. Conviene recoger lecturas reales en varios entornos y ajustar si hace falta. `test/index-calibration.test.js` documenta la tabla de conversión.
+
+Los umbrales siguen siendo bajo (<55), moderado (55–70) y alto (>70). El gradiente del mapa de calor sitúa el ámbar en 0.385 y el naranja en 0.615, que son exactamente los índices 55 y 70 sobre ese rango, así que el color cambia donde cambia la categoría.
+
 ---
 
 ## 📖 ¿Qué es AcoustiMap?
@@ -29,7 +35,7 @@ La aplicación tiene 3 pestañas principales en la parte superior:
 |---|---|
 | **🗺️ Mapa** | Medir ruido y explorar zonas comunitarias |
 | **📚 Salud + ODS** | Información sobre ruido, salud y ODS |
-| **📊 Stats** | Estadísticas, reportes y comparativas |
+| **📊 Estadísticas** | Estadísticas, reportes y comparativas |
 
 ---
 
@@ -45,12 +51,14 @@ Pulsa el botón **🎤 Activar** y acepta el permiso que te pedirá el navegador
 
 Verás en pantalla:
 
-- **Nivel instantáneo** en tiempo real (grande y destacado).
+- **Índice instantáneo** en tiempo real (grande y destacado).
 - **Promedio** de tu sesión, con mínimo, máximo y número de muestras.
 - Una **clasificación por color**:
-  - 🟢 **Bajo** (< 55 dB) · Entorno confortable
-  - 🟡 **Moderado** (55 – 70 dB) · Ligeramente molesto
-  - 🔴 **Alto** (> 70 dB) · Ruido dañino
+  - 🟢 **Bajo** (< 55) · Entrazable
+  - 🟡 **Moderado** (55 – 70) · Molesto
+  - 🔴 **Alto** (> 70) · Molesto de forma sostenida
+
+> Estos valores son un **índice relativo**, no dB. No miden exposición ni cumplen límites.
 
 ### 3. Compartir en el mapa (opcional)
 
@@ -67,7 +75,7 @@ Si quieres aportar tu medición al mapa, pulsa **📡 Compartir**. Aparecerá un
 
 ---
 
-## 📊 Cómo usar la pestaña Stats
+## 📊 Cómo usar la pestaña Estadísticas
 
 Esta es la sección más completa. Tiene 4 subsecciones:
 
@@ -76,7 +84,7 @@ Esta es la sección más completa. Tiene 4 subsecciones:
 Vista general con:
 
 - **Total de mediciones** registradas en la ciudad.
-- **Promedio general** de dB.
+- **Promedio general** del índice.
 - **Niveles altos** detectados.
 - **Zonas más ruidosas** (Top 3 con sus coordenadas y número de mediciones).
 - **Zonas más silenciosas** (Top 3).
@@ -90,7 +98,7 @@ Puedes dejar un **reporte ciudadano** sobre un problema específico:
 - Añade la ubicación (se difumina igual que las mediciones).
 - El reporte queda visible para toda la comunidad.
 
-> Los reportes ciudadanos **humanizan los datos**: no solo dicen "72 dB" sino también *"obra en la calle desde las 7 AM"*.
+> Los reportes ciudadanos **humanizan los datos**: no solo dicen "índice 72" sino también *"obra en la calle desde las 7 AM"*.
 
 ### ↔️ Comparar meses
 
@@ -198,10 +206,12 @@ Sí, funciona en navegadores modernos (Chrome, Firefox, Edge, Safari). Requiere 
 No son decibelios calibrados. Son un índice relativo útil para comparar zonas, no para mediciones profesionales.
 
 **¿Cuánto tiempo se guardan mis datos?**
-- Mediciones: máximo 24 horas si no hay actividad cercana.
+- Mediciones: 90 días.
+- Sesiones: 90 días.
 - Confirmaciones: 24 horas.
 - Reportes: 30 días.
-- Sesiones: 7 días.
+
+El detalle está en [SECURITY.md](SECURITY.md).
 
 **¿Puedo usar los datos para un trabajo académico?**
 Sí. Puedes exportar los datos en CSV o GeoJSON y citar el proyecto. El código es open source bajo licencia MIT.
@@ -211,9 +221,105 @@ Puedes contribuir en [GitHub](https://github.com/koizell/acoustimap) con mejoras
 
 ---
 
+## 🛠️ Desarrollo local
+
+Sirve el repositorio desde localhost para probar la interfaz; el micrófono y la geolocalización exigen un contexto seguro, así que no abras `index.html` por `file://`.
+
+```sh
+npm ci --ignore-scripts   # instalación fijada, la misma que usa CI
+npm run check             # puerta obligatoria: sintaxis + pruebas
+npm run dev               # npx serve . -> http://localhost:3000
+```
+
+`js/config.local.js` está en `.gitignore`: créalo copiando `js/config.local.js.template` para poder abrir la interfaz sin backend. Con los placeholders de la plantilla el cliente Supabase no se crea y el mapa queda vacío, así que es normal que no aparezcan datos. `npm run build:config` lo genera a partir de `SUPABASE_URL` y `SUPABASE_ANON_KEY` y falla con código 1 si falta alguno.
+
+---
+
+## 🚀 Publicación en GitHub Pages
+
+El flujo [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) publica la rama `main` en [koizell.github.io/acoustimap](https://koizell.github.io/acoustimap/). Necesita los secretos de Actions `SUPABASE_URL` y `SUPABASE_ANON_KEY` para generar `js/config.local.js` durante el build. Publicar **no** aplica migraciones ni despliega Edge Functions: son pasos manuales y en el orden de la sección siguiente. Aplica y verifica primero las migraciones; después publica el frontend.
+
+El service worker cambia de versión para renovar los recursos guardados. Si había una pestaña abierta antes del despliegue, recárgala: seguía usando los recursos anteriores.
+
+---
+
+## 🗄️ Despliegue de Supabase
+
+Para un proyecto nuevo, ejecuta en el SQL Editor de Supabase, en este orden:
+
+1. [`setup.sql`](setup.sql)
+2. [`migrations/20260923_complete_features.sql`](migrations/20260923_complete_features.sql)
+3. [`migrations/20260925_privacy_and_retention.sql`](migrations/20260925_privacy_and_retention.sql)
+
+En un proyecto que ya tenga las dos primeras migraciones, ejecuta solo la tercera. Revisa cualquier política RLS adicional creada manualmente: **las políticas permisivas de `INSERT` se combinan con OR** y pueden eludir las restricciones nuevas. La migración retira las políticas conocidas del repositorio, no las que se crearon a mano fuera de él.
+
+Aplica la migración de privacidad y confirma que `noise_map_cells` responde **antes** de publicar este frontend: el mapa nuevo depende de esa función.
+
+Después despliega la Edge Function `cleanup-noise-photos` desde [`supabase/functions/cleanup-noise-photos`](supabase/functions/cleanup-noise-photos) con Supabase CLI y configura un secreto aleatorio `PHOTO_CLEANUP_TOKEN` en los secretos de la función. La función tiene `verify_jwt = false` en [`supabase/config.toml`](supabase/config.toml) y exige ese token en la cabecera `x-cleanup-token` de cada petición; no pongas el token en el frontend.
+
+Crea en Supabase Vault `acoustimap_project_url` (la URL de tu proyecto) y `acoustimap_photo_cleanup_token`. **El valor de este último debe ser una copia exacta del secreto `PHOTO_CLEANUP_TOKEN` de la función, no un token nuevo.** Son dos copias del mismo valor guardadas en dos sitios distintos, y nada en el sistema avisa si divergen. Si pierdes el valor, vuelve a generar uno y actualiza los dos lados. Ejecuta luego [`migrations/20260925_schedule_photo_cleanup.sql`](migrations/20260925_schedule_photo_cleanup.sql), que configura una invocación por hora mediante `pg_cron` y `pg_net`. La tarea de limpieza de filas sin fotos de `setup.sql` permanece activa.
+
+### Comprobación posterior al despliegue
+
+Que el trabajo programado exista no significa que la Edge Function responda. `pg_net` encola la petición de forma asíncrona, así que `cron.job_run_details` marca `succeeded` aunque la función conteste con error. Hay que comprobar el código de respuesta por separado:
+
+```sql
+-- Debe devolver solo 200. Un 401 significa que acoustimap_photo_cleanup_token
+-- (Vault) no coincide con PHOTO_CLEANUP_TOKEN (secreto de la función) y que
+-- ninguna foto se está borrando. El 503 indica que falta el secreto en la función.
+select status_code, count(*) as llamadas, max(created) as ultima
+from net._http_response
+group by 1 order by 2 desc;
+```
+
+Mientras esa consulta devuelva algo distinto de 200, la limpieza de fotos está detenida. Como `cleanup_old_noise_data` solo borra reportes cuyo `photo_path` es nulo, los reportes con foto se retienen de forma indefinida y su archivo permanece accesible por URL. Espera a la siguiente ejecución del trabajo (cada hora en punto 15) antes de darlo por comprobado.
+
+En el SQL Editor, confirma que las funciones y los trabajos programados existen:
+
+```sql
+select jobname, schedule from cron.job
+where jobname in ('cleanup-old-noise', 'cleanup-noise-photos');
+
+select conname, convalidated from pg_constraint
+where conname like 'noise_%_grid_check' or conname like 'noise_%_no_client_check'
+order by conname;
+
+with latitude_cell as (
+  select (floor(4.6 / (70.0 / 111000.0)) + 0.5) * (70.0 / 111000.0) as lat
+), snapped as (
+  select lat,
+    (floor(-74.1 / (70.0 / (111000.0 * cos(radians(lat))))) + 0.5)
+    * (70.0 / (111000.0 * cos(radians(lat)))) as lng
+  from latitude_cell
+)
+select public.is_noise_grid_cell(lat, lng) as snapped_cell_is_valid,
+  public.is_noise_grid_cell(4.6, -74.1) as exact_point_is_valid
+from snapped;
+```
+
+Los trabajos deben aparecer, las restricciones de cuadrícula e identificador deben tener `convalidated = true`, `snapped_cell_is_valid` debe ser `true` y `exact_point_is_valid`, `false`. Comprueba además que `select * from public.noise_map_cells(now() - interval '1 day', now(), 8.7, 8.8, -75.9, -75.8, 'all') limit 1;` se ejecuta sin error.
+
+Las migraciones de higiene aplicadas en producción el 28 y el 29 de septiembre de 2026, [`migrations/20260928_schema_hygiene.sql`](migrations/20260928_schema_hygiene.sql) y [`migrations/20260929_drop_unused_measurement_link.sql`](migrations/20260929_drop_unused_measurement_link.sql), corrigen las restricciones, índices y funciones que quedaron sin uso. Se ejecutaron a mano en producción y no son necesarias en un proyecto nuevo, pero sí en uno que ya tenga `setup.sql`.
+
+Desde el navegador, comprueba que el mapa carga, vuelve a consultar al moverlo, una medición se comparte una sola vez por intervalo, las franjas de historial incluyen días anteriores según la hora de Colombia, la comparación mensual abre sin errores, y un reporte con foto se ve. Para comprobar la limpieza sin esperar 30 días, se puede invocar la función con el token y verificar sus contadores; no alteres las fechas de reportes de producción para probarla.
+
+---
+
+## 🧰 Stack
+
+HTML, CSS y JavaScript sin framework ni bundler; Leaflet y OpenStreetMap; Supabase PostgreSQL, Storage y Edge Functions; GitHub Pages.
+
+---
+
+## 🔒 Privacidad
+
+Qué datos guarda la app, quién puede verlos y qué limitaciones tiene, y cuánto tiempo se retiene cada cosa, en [SECURITY.md](SECURITY.md).
+
+---
+
 ## 📄 Licencia
 
-MIT © [Koizell](https://github.com/koizell)
+MIT © [Koizell](https://github.com/koizell) · texto completo en [LICENSE](LICENSE)
 
 ---
 

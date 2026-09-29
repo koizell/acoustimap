@@ -4,8 +4,11 @@
   "description": "Mapeo colaborativo de contaminación acústica urbana",
   "scripts": {
     "build:config": "node build-config.js",
+    "build:site": "node scripts/build-site.js",
     "dev": "npx serve .",
-    "test": "node --test"
+    "test": "node scripts/run-tests.js",
+    "check:syntax": "node scripts/check-syntax.js",
+    "check": "npm run check:syntax && npm test"
   },
   "keywords": [
     "noise",

@@ -1,166 +1,125 @@
-# 🔒 Seguridad y Privacidad de AcoustiMap
+# Seguridad y Privacidad de AcoustiMap
 
-Este documento explica cómo AcoustiMap protege tu privacidad y tus datos cuando usas la aplicación.
+Este documento explica qué datos maneja AcoustiMap, cómo los protege y qué
+limitaciones tiene. Se aplica al sitio publicado en
+[koizell.github.io/acoustimap](https://koizell.github.io/acoustimap/).
 
----
+> **El índice no son decibelios.** AcoustiMap calcula un *índice relativo* a
+> partir de la amplitud del micrófono. No es dB SPL calibrado, no sirve para
+> evaluar exposición ni para acreditar cumplimiento de límites legales. Compara
+> zonas entre sí, nada más.
 
-## 🛡️ Tu privacidad
+## Qué se guarda
 
-AcoustiMap fue diseñado con la **privacidad como prioridad**. Esto es lo que ocurre con tu información:
-
-| Dato | ¿Se guarda? | ¿Dónde? |
+| Dato | ¿Se guarda? | Dónde |
 |---|---|---|
-| 🎵 **Audio** | ❌ **Nunca** | Se analiza en tu dispositivo y se descarta |
-| 📍 **Ubicación exacta** | ❌ **Nunca** | Solo visible en tu pantalla |
-| 📍 **Ubicación difuminada** | ✅ Sí | Anclada a una cuadrícula de ~70 m |
-| 📊 **Nivel de ruido** | ✅ Sí | Asociado a la ubicación difuminada |
-| 🆔 **Tu identidad** | ❌ **Nunca** | Sin cuentas, emails ni nombres |
-| 🍪 **Cookies de rastreo** | ❌ **Nunca** | No se usan |
-| 🌐 **Dirección IP** | ❌ **Nunca** | No se almacena |
+| Audio | **Nunca** | Se analiza en el dispositivo y se descarta |
+| Ubicación exacta | **Nunca** | Solo se ve en tu pantalla |
+| Ubicación aproximada | Sí | Anclada a una cuadrícula de ~70 m |
+| Índice de ruido | Sí | Junto a la ubicación aproximada |
+| Tu identidad | **Nunca** | Sin cuentas, correos ni nombres |
+| Identificador estable del navegador | **Nunca** | Tus retos se calculan en tu dispositivo |
+| Seguimiento | **Nunca** | Sin cookies de rastreo |
 
-### Difuminado de ubicación
+El proyecto **no tiene usuarios registrados**. No hay cuentas, ni correo, ni
+contraseñas, ni forma de vincular una medición con una persona.
 
-Tu ubicación real **nunca sale de tu dispositivo**. Antes de enviar cualquier dato, la app ancla la coordenada al centro de una celda de **~70 × 70 metros**.
+## Difuminado de ubicación
 
-- **Tú** ves tu posición exacta (punto azul en tu pantalla).
-- **Los demás** solo ven la zona aproximada.
-- **Nadie** puede saber exactamente dónde estabas.
+Antes de enviar nada, la app ancla la coordenada al centro de una celda de
+**~70 × 70 metros**. Tú ves tu punto exacto en azul; los demás solo ven la
+zona.
 
-### Consentimiento explícito
+Esto no es una cortesía del cliente: la base de datos lo impone. Cada tabla
+tiene la restricción `noise_*_grid_check`, que rechaza cualquier coordenada
+que no caiga exactamente en el centro de una celda. Los disparadores de
+inserción vuelven a anclar la coordenada aunque alguien llame a la API
+directamente saltándose la interfaz. La migración de privacidad además borró
+los identificadores estables históricos y reancló las coordenadas antiguas.
 
-Antes de enviar cualquier dato a la nube, la app muestra una **ventana de confirmación** explicando:
+## Consentimiento explícito
 
-- Qué se envía (nivel de dB + coordenada difuminada).
-- Qué **NO** se envía (audio, ubicación exacta, identidad).
-- Cómo se protege tu privacidad.
+Nada se envía hasta que pulsas **Compartir** y aceptas el aviso que explica
+qué se envía, qué no, y por qué. El audio se analiza en local y se descarta
+siempre, acepte o no.
 
-Solo si pulsas **"Aceptar"** se envía la información.
+## Quién puede hacer qué
 
----
+El acceso se controla con políticas de RLS por tabla:
 
-## 🗄️ Protección de los datos
+- Cualquiera puede **leer** mediciones, sesiones, reportes y confirmaciones.
+- Cualquiera puede **insertar** una medición nueva, sujeta a validación.
+- **Nadie** puede modificar ni borrar filas con la clave pública.
+- **Nadie** puede leer la columna de identificador ni la clave de
+  confirmación: no están entre las columnas concedidas al rol anónimo.
+- **Nadie** puede ejecutar los trabajos de limpieza ni las funciones internas.
 
-Los datos que se guardan están completamente **anonimizados**:
+La clave que viaja en el navegador es pública y solo sirve para hablar con la
+API. La seguridad no depende de ella: depende de las restricciones de tabla y
+de las políticas, que se aplican aunque alguien tenga una política más
+permisiva creada a mano.
 
-- 📊 Nivel de ruido (dB)
-- 📍 Coordenada difuminada (~70 m)
-- 🕒 Fecha y hora
-- 🏷️ Categoría (Bajo / Moderado / Alto)
+## Retención
 
-**NO se almacena:**
-- ❌ Audio
-- ❌ Ubicación exacta
-- ❌ Identidad del usuario
-- ❌ Direcciones IP
-- ❌ Cookies de seguimiento
-
-### Protección contra accesos no autorizados
-
-El servidor garantiza que:
-
-- ✅ Cualquier usuario puede **leer** las mediciones del mapa.
-- ✅ Cualquier usuario puede **contribuir** con una nueva medición.
-- 🚫 **Ningún usuario** puede modificar mediciones existentes.
-- 🚫 **Ningún usuario** puede borrar mediciones.
-- 🚫 **Ningún usuario** puede acceder a datos internos.
-- 🚫 **Ningún usuario** puede saber quién midió cada zona.
-
-Todo intento de modificación o borrado es bloqueado automáticamente por el servidor.
-
-### Limpieza automática
-
-El servidor elimina automáticamente:
-
-- **Mediciones:** máximo 24 h si no hay actividad cercana.
-- **Confirmaciones:** 24 h.
-- **Reportes:** 30 días.
-- **Sesiones:** 7 días.
-
-Así el mapa siempre muestra información reciente y relevante.
-
----
-
-## 🔍 Qué puedes y qué no puedes hacer
-
-### ✅ Permitido
-
-- Ver el mapa comunitario completo.
-- Medir el ruido de tu entorno.
-- Compartir tu ubicación difuminada (con consentimiento).
-- Ver tu ubicación exacta en tu propia pantalla.
-- Exportar los datos en CSV o GeoJSON.
-- Reportar problemas específicos de ruido.
-- Comparar periodos y consultar estadísticas.
-
-### 🚫 Bloqueado
-
-- Ver la ubicación exacta de otros usuarios.
-- Escuchar el audio de otros usuarios.
-- Modificar o borrar mediciones ajenas.
-- Saber quién midió cada zona.
-- Acceder a información personal de otros.
-
----
-
-## ⚠️ Riesgos conocidos
-
-Aunque AcoustiMap está diseñado con altos estándares de seguridad, existen algunas limitaciones que debes conocer:
-
-### 1. Mediciones falsas
-Alguien con conocimientos técnicos podría insertar mediciones inventadas dentro de los rangos válidos. La app valida coordenadas, niveles de dB y categorías, pero no puede verificar que la medición sea real. En la práctica es poco probable, pero posible.
-
-### 2. Errores de GPS
-El GPS de los dispositivos puede desviarse decenas de metros, especialmente en interiores o zonas urbanas densas. La app muestra el margen real (±X m) y aplica un filtro para suavizar lecturas, pero la precisión nunca es perfecta.
-
-### 3. Pausas automáticas del servidor
-El plan gratuito del servidor puede pausarse por inactividad prolongada. Al reactivarse, todo vuelve a la normalidad automáticamente.
-
-### 4. Precisión del sensor
-AcoustiMap calcula un índice relativo, no decibelios calibrados profesionalmente. Sirve para comparar zonas, no para certificaciones legales.
-
----
-
-## 📊 Nivel de seguridad
-
-| Aspecto | Nivel |
+| Dato | Se conserva |
 |---|---|
-| Protección contra robo de datos | 🟢 Alto |
-| Protección de la privacidad | 🟢 Alto |
-| Protección contra modificación | 🟢 Alto |
-| Protección contra spam | 🟡 Medio |
-| Transparencia | 🟢 Alto |
+| Mediciones | 90 días |
+| Sesiones | 90 días |
+| Reportes | 30 días |
+| Confirmaciones | 24 horas |
+| Fotografías de reportes | 30 días, o hasta que se borren junto a su reporte |
 
-**Nivel general: 7/10** — Seguro para uso público real.
+Lo aplica un trabajo programado cada hora. Las fotos se borran con un función
+de servidor que primero elimina el archivo del almacenamiento y luego la fila,
+para no dejar objetos huérfanos. Si el almacenamiento falla, la fila se
+conserva y se reintenta.
+
+Los datos del SQLite de tu navegador (retos, cola sin conexión) no salen del
+dispositivo y se pierden si borras los datos del sitio.
+
+## Limitaciones conocidas
+
+**1. El índice es relativo, no calibrado.** Sirve para comparar zonas en el
+momento de la medición. El resultado depende del micrófono del dispositivo y
+del navegador, así que dos equipos distintos pueden leer valores distintos
+ante el mismo sonido.
+
+**2. Cualquiera puede insertar mediciones dentro de los rangos válidos.** Las
+restricciones comprueban que las coordenadas caigan en la cuadrícula y que el
+índice esté entre 20 y 140, pero no que la medición sea real. Una persona con
+conocimientos técnicos podría enviar lecturas inventadas.
+
+**3. El GPS se desvía.** En interiores y zonas densas la precisión puede caer
+a decenas o cientos de metros. La app muestra el margen real y suaviza
+lecturas, pero la celda final depende de esa precisión. Con ±150 m de error,
+tu lectura puede caer en una celda distinta de la que estabas realmente.
+
+**4. Historial heterogéneo.** Hasta el 29 de septiembre de 2026 el índice se
+calculaba con el promedio del espectro de frecuencias; desde entonces usa la
+energía total de la señal en el tiempo. Las dos escalas no son comparables
+entre sí. Las mediciones antiguas aparecen más bajas de lo que indican.
+
+**5. Un plan gratuito puede pausarse.** Si el proyecto queda inactivo, el
+proveedor puede suspenderlo. Al reactivarse, el servicio vuelve por su cuenta.
+
+## Reportar un problema
+
+Si encuentras una vulnerabilidad, **no abras un issue público**. Escribe al
+autor en [GitHub](https://github.com/koizell) describiendo el problema, cómo
+reproducirlo y qué datos se ven afectados. Si prefieres, abre un issue
+privado de seguridad.
+
+El proyecto se compromete a responder, analizar y corregir, y a dar crédito
+público a quien lo solicite.
+
+## Compromiso
+
+- No vender ni compartir datos con terceros.
+- No grabar audio.
+- No rastrear la identidad de nadie.
+- Mantener el código abierto y auditable.
+- Actualizar este documento si cambian las condiciones.
 
 ---
 
-## 📢 Reportar una vulnerabilidad
-
-Si encuentras un problema de seguridad en la aplicación, **por favor no lo publiques en un issue abierto**. En su lugar:
-
-1. Contacta al autor del proyecto en [GitHub](https://github.com/koizell).
-2. Describe el problema con el mayor detalle posible.
-3. Si puedes, incluye pasos para reproducirlo.
-
-**Compromiso del autor:**
-- Responder en un plazo de **72 horas**.
-- Analizar y corregir el problema.
-- Dar crédito público al investigador, si lo desea.
-
----
-
-## 📌 Compromiso de AcoustiMap
-
-El proyecto se compromete a:
-
-- **Nunca** vender ni compartir datos con terceros.
-- **Nunca** grabar audio de los usuarios.
-- **Nunca** rastrear la identidad de los usuarios.
-- **Mantener** el código abierto y auditable.
-- **Actualizar** este documento si cambian las condiciones de seguridad.
-
----
-
-<p align="center">
-  <sub>Última actualización: 2026 · Ver <a href="README.md">README</a></sub>
-</p>
+<sub>Última revisión: 2026-09-29 · ver <a href="README.md">README</a> y <a href="CONTRIBUTING.md">CONTRIBUTING</a></sub>

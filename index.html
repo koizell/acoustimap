@@ -3,24 +3,25 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#0f172a" />
     <title>AcoustiMap - Mapeo de Contaminación Acústica</title>
-    <link rel="manifest" href="manifest.webmanifest?v=31" />
+    <link rel="manifest" href="manifest.webmanifest?v=35" />
 
-    <link rel="icon" href="assets/icon.svg?v=31" type="image/svg+xml" />
+    <link rel="icon" href="assets/icon.svg?v=35" type="image/svg+xml" />
 
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css" />
 
     <!-- Estilos modulares -->
-    <link rel="stylesheet" href="css/base.css?v=31" />
-    <link rel="stylesheet" href="css/layout.css?v=31" />
-    <link rel="stylesheet" href="css/map.css?v=31" />
-    <link rel="stylesheet" href="css/panel.css?v=31" />
-    <link rel="stylesheet" href="css/info.css?v=31" />
-    <link rel="stylesheet" href="css/responsive.css?v=31" />
-    <link rel="stylesheet" href="css/features.css?v=31" />
-    <link rel="stylesheet" href="css/experience.css?v=31" />
+    <link rel="stylesheet" href="css/base.css?v=35" />
+    <link rel="stylesheet" href="css/layout.css?v=35" />
+    <link rel="stylesheet" href="css/map.css?v=35" />
+    <link rel="stylesheet" href="css/panel.css?v=35" />
+    <link rel="stylesheet" href="css/info.css?v=35" />
+    <link rel="stylesheet" href="css/responsive.css?v=35" />
+    <link rel="stylesheet" href="css/features.css?v=35" />
+    <link rel="stylesheet" href="css/experience.css?v=35" />
   </head>
   <body>
     <header>
@@ -72,6 +73,7 @@
           <div><span class="dot" style="background: #f59e0b"></span>Índice 55–70 · Moderado</div>
           <div><span class="dot" style="background: #ef4444"></span>Índice &gt; 70 · Alto</div>
           <p>Escala relativa orientativa; no equivale a dB físicos ni sirve para evaluar exposición.</p>
+          <p class="legend-hint" id="legend-hint">Cada círculo rotula <b>índice · mediciones</b>. El borde se marca más cuanto más mediciones sostienen ese promedio; el color y el relleno dependen solo del índice.</p>
           <hr class="legend-divider">
           <div class="legend-count" id="community-count">Cargando datos…</div>
           <div class="legend-me">
@@ -247,13 +249,18 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
     <!-- Scripts internos -->
-    <script src="js/config.local.js?v=31"></script>
-    <script src="js/config.js?v=31"></script>
-    <script src="js/kalman.js"></script> 
-    <script src="js/map.js?v=31"></script>
-    <script src="js/audio.js?v=31"></script>
-    <script src="js/community.js?v=31"></script>
-    <script src="js/app.js?v=31"></script>
-    <script src="js/features.js?v=31"></script>
+    <!-- El orden es un contrato de dependencias: config.local.js define
+         window.__ACOUSTIMAP_CONFIG: antes de que config.js lo lea, y
+         community.js usa comparisonMode de features.js, que se carga al final.
+         Ver test/coupling.test.js y docs/ARQUITECTURA.md.
+         js/kalman.js no se carga: define la clase KalmanLatLong pero la app
+         suaviza el GPS con su propio filtro de estabilidad en map.js. -->
+    <script src="js/config.local.js?v=35"></script>
+    <script src="js/config.js?v=35"></script>
+    <script src="js/map.js?v=35"></script>
+    <script src="js/audio.js?v=35"></script>
+    <script src="js/community.js?v=35"></script>
+    <script src="js/app.js?v=35"></script>
+    <script src="js/features.js?v=35"></script>
   </body>
 </html>

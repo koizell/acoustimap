@@ -10,14 +10,28 @@ let lastAggregatedPoints = [];
 let communityLoadToken = 0;
 
 const communityCopy = {
-  es: { now: 'ahora', index: 'Índice', category: 'Categoría', lastMeasurement: 'Última medición', cumulative: 'mediciones acumuladas', exporting: 'Exportando…', exportError: 'No se pudieron exportar las mediciones.', noCommunity: 'Sin datos comunitarios aún', noLive: 'Sin mediciones recientes (<24 h)', noHistory: 'Aún no hay mediciones en el historial', live: 'En vivo (24 h)', history: 'Historial (90 días)', zones: 'zonas', measurements: 'mediciones', updated: 'Última actualización', loadError: 'Error al cargar datos', low: 'bajo', moderate: 'moderado', high: 'alto' },
-  en: { now: 'now', index: 'Index', category: 'Category', lastMeasurement: 'Last measurement', cumulative: 'measurements combined', exporting: 'Exporting…', exportError: 'Measurements could not be exported.', noCommunity: 'No community data yet', noLive: 'No recent measurements (<24 h)', noHistory: 'No measurements in history yet', live: 'Live (24 h)', history: 'History (90 days)', zones: 'areas', measurements: 'measurements', updated: 'Last updated', loadError: 'Could not load data', low: 'low', moderate: 'moderate', high: 'high' },
-  pt: { now: 'agora', index: 'Índice', category: 'Categoria', lastMeasurement: 'Última medição', cumulative: 'medições acumuladas', exporting: 'Exportando…', exportError: 'Não foi possível exportar as medições.', noCommunity: 'Ainda não há dados comunitários', noLive: 'Sem medições recentes (<24 h)', noHistory: 'Ainda não há medições no histórico', live: 'Ao vivo (24 h)', history: 'Histórico (90 dias)', zones: 'áreas', measurements: 'medições', updated: 'Última atualização', loadError: 'Não foi possível carregar os dados', low: 'baixo', moderate: 'moderado', high: 'alto' }
+  es: { now: 'ahora', index: 'Índice', category: 'Categoría', lastMeasurement: 'Última medición', cumulative: 'mediciones acumuladas', exporting: 'Exportando…', exportError: 'No se pudieron exportar las mediciones.', noCommunity: 'Sin datos comunitarios aún', noLive: 'Sin mediciones recientes (<24 h)', noHistory: 'Aún no hay mediciones en el historial', live: 'En vivo (24 h)', history: 'Historial (90 días)', zones: 'zonas', zone: 'zona', measurements: 'mediciones', measurement: 'medición', updated: 'Última actualización', loadError: 'Error al cargar datos', low: 'bajo', moderate: 'moderado', high: 'alto' },
+  en: { now: 'now', index: 'Index', category: 'Category', lastMeasurement: 'Last measurement', cumulative: 'measurements combined', exporting: 'Exporting…', exportError: 'Measurements could not be exported.', noCommunity: 'No community data yet', noLive: 'No recent measurements (<24 h)', noHistory: 'No measurements in history yet', live: 'Live (24 h)', history: 'History (90 days)', zones: 'areas', zone: 'area', measurements: 'measurements', measurement: 'measurement', updated: 'Last updated', loadError: 'Could not load data', low: 'low', moderate: 'moderate', high: 'high' },
+  pt: { now: 'agora', index: 'Índice', category: 'Categoria', lastMeasurement: 'Última medição', cumulative: 'medições acumuladas', exporting: 'Exportando…', exportError: 'Não foi possível exportar as medições.', noCommunity: 'Ainda não há dados comunitários', noLive: 'Sem medições recentes (<24 h)', noHistory: 'Ainda não há medições no histórico', live: 'Ao vivo (24 h)', history: 'Histórico (90 dias)', zones: 'áreas', zone: 'área', measurements: 'medições', measurement: 'medição', updated: 'Última atualização', loadError: 'Não foi possível carregar os dados', low: 'baixo', moderate: 'moderado', high: 'alto' }
 };
 
 function communityText(key) {
   const language = localStorage.getItem('acoustimap-language') || document.documentElement.lang;
   return (communityCopy[language] || communityCopy.es)[key];
+}
+
+/**
+ * Compone el contador de la leyenda distinguiendo singular de plural.
+ * Sin esto el modo "En vivo" mostraba "1 zonas" cuando solo había una celda.
+ * @param {string} modeLabel Etiqueta del periodo, ya traducida.
+ * @param {number} cells Número de celdas agregadas del área visible.
+ * @param {number} measurements Suma de mediciones de esas celdas.
+ * @returns {string} Texto del contador.
+ */
+function formatLegendCounter(modeLabel, cells, measurements) {
+  const unit = (count, singularKey, pluralKey) =>
+    `${count} ${communityText(count === 1 ? singularKey : pluralKey)}`;
+  return `${modeLabel} · ${unit(cells, 'zone', 'zones')} · ${unit(measurements, 'measurement', 'measurements')}`;
 }
 
 
@@ -47,13 +61,16 @@ function addCommunityPoint(lat, lng, db, category, createdAt, sampleCount = 1) {
     interactive: false
   }).addTo(communityLayer);
 
-  // Círculo principal
+  // Circulo principal. El relleno y el color dependen solo del indice: una
+  // celda con una lectura se ve igual de intensa que una muy medida, porque
+  // reportarla sigue siendo el objetivo de la app. Lo que si cambia es el
+  // grosor del borde, que sube con cuantas mediciones sostienen el promedio.
   L.circle([lat, lng], {
     color,
     fillColor: color,
     fillOpacity: 0.18,
-    weight: 1.2,
-    opacity: 0.6,
+    weight: 1.2 + 1.3 * densityConfidence(sampleCount),
+    opacity: cellBorderOpacity(sampleCount),
     radius: CIRCLE_VISUAL_RADIUS_M,
     interactive: false
   }).addTo(communityLayer);
@@ -77,7 +94,7 @@ function addCommunityPoint(lat, lng, db, category, createdAt, sampleCount = 1) {
     weight: 0
   })
     .addTo(communityLayer)
-    .bindTooltip(when, {
+    .bindTooltip(`${db} · ${sampleCount}`, {
       permanent: true,
       direction: 'top',
       offset: [0, -30],
@@ -123,8 +140,12 @@ function aggregatePoints(rows) {
 }
 
 function renderCommunityPoints(points) {
-  if (comparisonMode && document.getElementById('map-view')?.classList.contains('active')) {
-    activateComparisonLayer();
+  // comparisonMode vive en features.js, que se carga despues. La comprobacion
+  // lo mantiene segura: community.js llama a loadCommunityPoints() en tiempo de
+  // carga, antes de que exista ese binding.
+  if (typeof comparisonMode !== 'undefined' && comparisonMode
+      && document.getElementById('map-view')?.classList.contains('active')) {
+    if (typeof activateComparisonLayer === 'function') activateComparisonLayer();
     return;
   }
   clearCommunityLayers();
@@ -265,6 +286,11 @@ async function exportMeasurementsGeoJson() {
 // ============================================
 // CARGAR PUNTOS DESDE SUPABASE
 // ============================================
+/**
+ * Consulta celdas agregadas del área visible, por periodo y franja horaria.
+ * El token descarta respuestas anteriores al último movimiento/filtro: una
+ * petición lenta no debe borrar ni reemplazar los datos de la vista actual.
+ */
 async function loadCommunityPoints() {
   const counter = document.getElementById('community-count');
   const requestToken = ++communityLoadToken;
@@ -317,7 +343,7 @@ async function loadCommunityPoints() {
     const modeLabel  = communityText(mapMode === 'live' ? 'live' : 'history');
     const measurementCount = aggregated.reduce((sum, point) => sum + point.sampleCount, 0);
     counter.innerText =
-      `${modeLabel} · ${aggregated.length} ${communityText('zones')} · ${measurementCount} ${communityText('measurements')}\n` +
+      `${formatLegendCounter(modeLabel, aggregated.length, measurementCount)}\n` +
       `${communityText('updated')}: ${timeAgo(mostRecent)}`;
 
   } catch (err) {
@@ -339,6 +365,12 @@ map.on('moveend', () => {
 // ============================================
 // ENVIAR MEDICIÓN A SUPABASE
 // ============================================
+/**
+ * Envía el promedio de una ventana de muestras, como máximo una petición a la vez.
+ * Reserva las muestras antes del await para que las nuevas formen otra ventana.
+ * Si falla tanto el envío como su persistencia local, devuelve las muestras
+ * reservadas al acumulador; los datos solo llevan coordenadas aproximadas.
+ */
 async function sendMeasurementIfDue() {
   const now = Date.now();
   if (!sharingEnabled || !currentPosition) return;
@@ -366,47 +398,49 @@ async function sendMeasurementIfDue() {
 
   let success = false;
   try {
-  if (supabaseClient) {
-    let error;
-    try {
-      ({ error } = await supabaseClient.from('noise_measurements').insert(measurement));
-    } catch (requestError) {
-      error = requestError;
-    }
-    if (error) {
-      console.error('Supabase insert error:', error);
-      if (typeof isOfflineError === 'function' ? isOfflineError(error) : !navigator.onLine) {
-        await queueOfflineMeasurement(measurement);
+    if (supabaseClient) {
+      let error;
+      try {
+        ({ error } = await supabaseClient.from('noise_measurements').insert(measurement));
+      } catch (requestError) {
+        error = requestError;
+      }
+      if (error) {
+        console.error('Supabase insert error:', error);
+        if (typeof isOfflineError === 'function' ? isOfflineError(error) : !navigator.onLine) {
+          if (typeof queueOfflineMeasurement === 'function') {
+            await queueOfflineMeasurement(measurement);
+            success = true;
+          }
+        }
+      } else {
         success = true;
       }
     } else {
-      success = true;
+      if (typeof queueOfflineMeasurement === 'function') {
+        await queueOfflineMeasurement(measurement);
+        success = true;
+      }
     }
-  } else {
-    if (typeof queueOfflineMeasurement === 'function') {
-      await queueOfflineMeasurement(measurement);
-      success = true;
-    }
-  }
 
-  if (success && typeof recordLocalChallengeMeasurement === 'function') {
-    recordLocalChallengeMeasurement({ ...measurement, created_at: nowIso });
-  }
-  if (success) {
-    if (mapMode === 'live') {
-      if (selectedVisualMode === 'heatmap') {
-        addCommunityHeatPoint(snapped.lat, snapped.lng, avg);
+    if (success && typeof recordLocalChallengeMeasurement === 'function') {
+      recordLocalChallengeMeasurement({ ...measurement, created_at: nowIso });
+    }
+    if (success) {
+      if (mapMode === 'live') {
+        if (selectedVisualMode === 'heatmap') {
+          addCommunityHeatPoint(snapped.lat, snapped.lng, avg);
+        } else {
+          addCommunityPoint(snapped.lat, snapped.lng, avg, category, nowIso, 1);
+        }
+        lastAggregatedPoints.push({
+          lat: snapped.lat, lng: snapped.lng, db: avg, category,
+          createdAt: nowIso, sampleCount: 1
+        });
       } else {
         addCommunityPoint(snapped.lat, snapped.lng, avg, category, nowIso, 1);
       }
-      lastAggregatedPoints.push({
-        lat: snapped.lat, lng: snapped.lng, db: avg, category,
-        createdAt: nowIso, sampleCount: 1
-      });
-    } else {
-      addCommunityPoint(snapped.lat, snapped.lng, avg, category, nowIso, 1);
     }
-  }
 
   } finally {
     if (!success) {
@@ -431,7 +465,13 @@ function setMapMode(mode) {
   loadCommunityPoints();
 }
 
+// La RPC noise_map_cells acepta exactamente estas cuatro franjas. Un valor
+// inesperado deja sus cuatro condiciones en falso y devuelve cero filas, así
+// que hay que rechazarlo aquí en lugar de vaciar el mapa en silencio.
+const TIME_FILTERS = ['all', 'morning', 'afternoon', 'night'];
+
 function setTimeFilter(filter) {
+  if (!TIME_FILTERS.includes(filter)) return;
   selectedTimeFilter = filter;
   document.querySelectorAll('.time-filter-btn').forEach((button) => {
     const active = button.id === `time-${filter}`;
