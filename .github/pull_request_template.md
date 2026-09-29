@@ -9,7 +9,7 @@ Describe el problema, el resultado esperado y la solución.
 - [ ] Se revisaron privacidad, configuración pública y contratos de datos.
 - [ ] Se actualizaron documentación y versión de caché cuando correspondía.
 
-Casos manuales ejecutados, resultados y pendientes: consulta `docs/CALIDAD.md`.
+Describe aquí los casos manuales ejecutados, sus resultados y lo que queda pendiente.
 
 ## Riesgos y recuperación
 

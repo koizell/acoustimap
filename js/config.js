@@ -3,7 +3,7 @@
  * Configuración pública, constantes, estado compartido y utilidades.
  * config.local.js define window.__ACOUSTIMAP_CONFIG__: se copia de la plantilla
  * en desarrollo o se genera con build-config.js en CI. Los placeholders permiten
- * abrir la interfaz sin configurar Supabase. Orden de carga: docs/ARQUITECTURA.md.
+ * abrir la interfaz sin configurar Supabase.
  */
 
 // ============================================

@@ -5,10 +5,8 @@ Supabase. El índice del micrófono es relativo, no dB(A) calibrados.
 
 ## Fuentes de contexto
 
-- `README.md`: presentación del proyecto y configuración.
-- `CONTRIBUTING.md`: convenciones, comandos y proceso de cambios.
-- `docs/ARQUITECTURA.md`: responsabilidades, datos y contratos.
-- `docs/CALIDAD.md`: riesgos, pruebas y evidencia; no certificación ISO.
+- `README.md`: presentación del proyecto, configuración y despliegue.
+- `SECURITY.md`: qué datos se guardan, quién los ve y cuánto se retienen.
 - `setup.sql` y `migrations/`: esquema y cambios SQL.
 
 ## Reglas del proyecto

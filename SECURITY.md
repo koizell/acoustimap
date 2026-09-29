@@ -122,4 +122,4 @@ público a quien lo solicite.
 
 ---
 
-<sub>Última revisión: 2026-09-29 · ver <a href="README.md">README</a> y <a href="CONTRIBUTING.md">CONTRIBUTING</a></sub>
+<sub>Última revisión: 2026-09-29 · ver <a href="README.md">README</a></sub>

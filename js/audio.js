@@ -231,7 +231,7 @@ function updateMeter() {
 
   // Indice relativo: 30 en silencio, 95 con el analizador casi saturado. Un
   // punto de indice por cada dB. No es dB SPL calibrado y no sirve para
-  // evaluar exposicion; ver README y docs/CALIDAD.md.
+  // evaluar exposicion; ver README.
   const dbfs = 20 * Math.log10(smoothedRms || 1e-6);
   const db = Math.min(95, Math.max(30, Math.round(dbfs + 100)));
 

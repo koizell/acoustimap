@@ -252,7 +252,7 @@
     <!-- El orden es un contrato de dependencias: config.local.js define
          window.__ACOUSTIMAP_CONFIG: antes de que config.js lo lea, y
          community.js usa comparisonMode de features.js, que se carga al final.
-         Ver test/coupling.test.js y docs/ARQUITECTURA.md.
+         Ver test/coupling.test.js.
          js/kalman.js no se carga: define la clase KalmanLatLong pero la app
          suaviza el GPS con su propio filtro de estabilidad en map.js. -->
     <script src="js/config.local.js?v=35"></script>

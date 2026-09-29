@@ -1,6 +1,9 @@
 # Local configuration with secrets
 js/config.local.js
 
+# Configuracion local de agentes; describe el proyecto, no lo construye
+opencode.json
+
 # IDE
 .vscode/
 .idea/
