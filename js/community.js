@@ -140,8 +140,12 @@ function aggregatePoints(rows) {
 }
 
 function renderCommunityPoints(points) {
-  if (comparisonMode && document.getElementById('map-view')?.classList.contains('active')) {
-    activateComparisonLayer();
+  // comparisonMode vive en features.js, que se carga despues. La comprobacion
+  // lo mantiene segura: community.js llama a loadCommunityPoints() en tiempo de
+  // carga, antes de que exista ese binding.
+  if (typeof comparisonMode !== 'undefined' && comparisonMode
+      && document.getElementById('map-view')?.classList.contains('active')) {
+    if (typeof activateComparisonLayer === 'function') activateComparisonLayer();
     return;
   }
   clearCommunityLayers();
@@ -404,8 +408,10 @@ async function sendMeasurementIfDue() {
       if (error) {
         console.error('Supabase insert error:', error);
         if (typeof isOfflineError === 'function' ? isOfflineError(error) : !navigator.onLine) {
-          await queueOfflineMeasurement(measurement);
-          success = true;
+          if (typeof queueOfflineMeasurement === 'function') {
+            await queueOfflineMeasurement(measurement);
+            success = true;
+          }
         }
       } else {
         success = true;

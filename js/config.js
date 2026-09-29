@@ -73,10 +73,13 @@ let lastSendTime    = 0;
 // ============================================
 // UTILIDADES
 // ============================================
-/** Clasifica el índice relativo. El nombre db se conserva por compatibilidad;
- * no representa una medición calibrada de presión sonora en dB(A).
- * @param {number} db Índice del micrófono, habitualmente entre 0 y 100.
- * @returns {'bajo'|'moderado'|'alto'}
+/**
+ * Clasifica el índice relativo en las tres categorías de la interfaz.
+ * El nombre del parámetro se conserva por compatibilidad: no representa una
+ * medición calibrada de presión sonora en dB(A).
+ * @param {number} db Índice relativo, entre 30 y 95 (ver audio.js).
+ * @returns {'bajo'|'moderado'|'alto'} 'bajo' por debajo de 55, 'moderado' hasta
+ *   70 inclusive, 'alto' por encima.
  */
 function classifyDb(db) {
   if (db < 55) return 'bajo';
