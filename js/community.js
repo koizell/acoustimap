@@ -61,13 +61,16 @@ function addCommunityPoint(lat, lng, db, category, createdAt, sampleCount = 1) {
     interactive: false
   }).addTo(communityLayer);
 
-  // Círculo principal
+  // Circulo principal. El relleno y el color dependen solo del indice: una
+  // celda con una lectura se ve igual de intensa que una muy medida, porque
+  // reportarla sigue siendo el objetivo de la app. Lo que si cambia es el
+  // grosor del borde, que sube con cuantas mediciones sostienen el promedio.
   L.circle([lat, lng], {
     color,
     fillColor: color,
     fillOpacity: 0.18,
-    weight: 1.2,
-    opacity: 0.6,
+    weight: 1.2 + 1.3 * densityConfidence(sampleCount),
+    opacity: cellBorderOpacity(sampleCount),
     radius: CIRCLE_VISUAL_RADIUS_M,
     interactive: false
   }).addTo(communityLayer);
@@ -91,7 +94,7 @@ function addCommunityPoint(lat, lng, db, category, createdAt, sampleCount = 1) {
     weight: 0
   })
     .addTo(communityLayer)
-    .bindTooltip(when, {
+    .bindTooltip(`${db} · ${sampleCount}`, {
       permanent: true,
       direction: 'top',
       offset: [0, -30],

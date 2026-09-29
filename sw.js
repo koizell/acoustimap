@@ -1,5 +1,5 @@
-const CACHE_NAME = 'acoustimap-shell-v34';
-const ASSET_VERSION = '34';
+const CACHE_NAME = 'acoustimap-shell-v35';
+const ASSET_VERSION = '35';
 const APP_SHELL = [
   './',
   './index.html',

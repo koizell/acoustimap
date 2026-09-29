@@ -210,6 +210,15 @@
   vertical-align: middle;
 }
 
+/* Explica que el rotulo lleva indice y mediciones, y que el borde codifica
+   cuantas mediciones sostienen el promedio. */
+.legend-hint {
+  margin: 3px 0 1px;
+  font-size: 0.68rem;
+  line-height: 1.4;
+  color: var(--text-muted);
+}
+
 .map-legend .dot-blue {
   display: inline-block;
   width: 10px;

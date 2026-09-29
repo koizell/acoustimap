@@ -168,3 +168,30 @@ function releaseWakeLock() {
 function normalizeDbForHeatmap(db) {
   return Math.min(Math.max((db - 30) / 65, 0.05), 1.0);
 }
+
+// Mediciones a partir de las cuales la confianza de una celda satura.
+const DENSITY_REFERENCE = 30;
+
+/**
+ * Confianza de una celda, por cuántas mediciones sostienen su promedio.
+ *
+ * IMPORTANTE: solo modula el borde del círculo, nunca la intensidad del
+ * heatmap ni el color. Un único ciudadano que reporta ruido extremo en su
+ * calle aporta el dato más valioso de la app; atenuarlo por tener una sola
+ * lectura escondería justo lo que la gente busca. La densidad se comunica en
+ * el rótulo y en un borde más marcado, no apagando la celda.
+ *
+ * Se usa raíz y no logaritmo porque es lineal en el grosor: duplicar el borde
+ * es duplicar la densidad, y eso se entiende sin explicación.
+ * @param {number} sampleCount Mediciones de la celda.
+ * @returns {number} Peso entre 0 y 1.
+ */
+function densityConfidence(sampleCount) {
+  const n = Math.max(0, Number(sampleCount) || 0);
+  return Math.min(1, Math.sqrt(n / DENSITY_REFERENCE));
+}
+
+/** Opacidad del borde de una celda: tenue si es una lectura suelta, marcada si está bien medida. */
+function cellBorderOpacity(sampleCount) {
+  return 0.3 + 0.5 * densityConfidence(sampleCount);
+}

@@ -93,6 +93,11 @@ Los trabajos deben aparecer, las restricciones de cuadrícula e identificador de
 
 HTML, CSS y JavaScript sin framework; Leaflet y OpenStreetMap; Supabase PostgreSQL, Storage y Edge Functions; GitHub Pages.
 
+## Privacidad
+
+Qué datos guarda la app, quién puede verlos y qué limitaciones tiene, en
+[SECURITY.md](SECURITY.md).
+
 ## Licencia
 
-MIT © [Koizell](https://github.com/koizell)
+MIT © [Koizell](https://github.com/koizell) · texto en [LICENSE](LICENSE)
