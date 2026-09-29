@@ -154,7 +154,7 @@
   min-width: 220px;
   max-width: 260px;
   overflow: hidden;
-  transition: all 0.3s ease;
+  transition: opacity 0.3s ease, transform 0.3s ease;
   transform-origin: top right;
 }
 

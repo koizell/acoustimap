@@ -270,7 +270,7 @@
   cursor: pointer;
   font-weight: 700;
   font-size: 0.75rem;
-  transition: all 0.2s;
+  transition: background-color 0.2s, color 0.2s, box-shadow 0.2s;
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.12);
   white-space: nowrap;
   min-width: 0;
@@ -370,7 +370,7 @@
   font-weight: 700;
   font-size: 0.85rem;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: background-color 0.2s, color 0.2s;
 }
 
 .modal-btn.cancel { background: #f1f5f9; color: #475569; }

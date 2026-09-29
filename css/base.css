@@ -13,6 +13,14 @@
   --text-main: #1e293b;
   --text-muted: #64748b;
   --header-h: 60px;
+  color-scheme: light;
+}
+
+/* El tema oscuro se activa con una clase en body, no con la preferencia del
+   sistema, asi que hay que declarar color-scheme en el elemento raiz para que
+   las barras de desplazamiento y los controles nativos accompany al fondo. */
+html:has(body.dark-theme) {
+  color-scheme: dark;
 }
 
 * {
