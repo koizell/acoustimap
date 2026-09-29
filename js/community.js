@@ -10,14 +10,28 @@ let lastAggregatedPoints = [];
 let communityLoadToken = 0;
 
 const communityCopy = {
-  es: { now: 'ahora', index: 'Índice', category: 'Categoría', lastMeasurement: 'Última medición', cumulative: 'mediciones acumuladas', exporting: 'Exportando…', exportError: 'No se pudieron exportar las mediciones.', noCommunity: 'Sin datos comunitarios aún', noLive: 'Sin mediciones recientes (<24 h)', noHistory: 'Aún no hay mediciones en el historial', live: 'En vivo (24 h)', history: 'Historial (90 días)', zones: 'zonas', measurements: 'mediciones', updated: 'Última actualización', loadError: 'Error al cargar datos', low: 'bajo', moderate: 'moderado', high: 'alto' },
-  en: { now: 'now', index: 'Index', category: 'Category', lastMeasurement: 'Last measurement', cumulative: 'measurements combined', exporting: 'Exporting…', exportError: 'Measurements could not be exported.', noCommunity: 'No community data yet', noLive: 'No recent measurements (<24 h)', noHistory: 'No measurements in history yet', live: 'Live (24 h)', history: 'History (90 days)', zones: 'areas', measurements: 'measurements', updated: 'Last updated', loadError: 'Could not load data', low: 'low', moderate: 'moderate', high: 'high' },
-  pt: { now: 'agora', index: 'Índice', category: 'Categoria', lastMeasurement: 'Última medição', cumulative: 'medições acumuladas', exporting: 'Exportando…', exportError: 'Não foi possível exportar as medições.', noCommunity: 'Ainda não há dados comunitários', noLive: 'Sem medições recentes (<24 h)', noHistory: 'Ainda não há medições no histórico', live: 'Ao vivo (24 h)', history: 'Histórico (90 dias)', zones: 'áreas', measurements: 'medições', updated: 'Última atualização', loadError: 'Não foi possível carregar os dados', low: 'baixo', moderate: 'moderado', high: 'alto' }
+  es: { now: 'ahora', index: 'Índice', category: 'Categoría', lastMeasurement: 'Última medición', cumulative: 'mediciones acumuladas', exporting: 'Exportando…', exportError: 'No se pudieron exportar las mediciones.', noCommunity: 'Sin datos comunitarios aún', noLive: 'Sin mediciones recientes (<24 h)', noHistory: 'Aún no hay mediciones en el historial', live: 'En vivo (24 h)', history: 'Historial (90 días)', zones: 'zonas', zone: 'zona', measurements: 'mediciones', measurement: 'medición', updated: 'Última actualización', loadError: 'Error al cargar datos', low: 'bajo', moderate: 'moderado', high: 'alto' },
+  en: { now: 'now', index: 'Index', category: 'Category', lastMeasurement: 'Last measurement', cumulative: 'measurements combined', exporting: 'Exporting…', exportError: 'Measurements could not be exported.', noCommunity: 'No community data yet', noLive: 'No recent measurements (<24 h)', noHistory: 'No measurements in history yet', live: 'Live (24 h)', history: 'History (90 days)', zones: 'areas', zone: 'area', measurements: 'measurements', measurement: 'measurement', updated: 'Last updated', loadError: 'Could not load data', low: 'low', moderate: 'moderate', high: 'high' },
+  pt: { now: 'agora', index: 'Índice', category: 'Categoria', lastMeasurement: 'Última medição', cumulative: 'medições acumuladas', exporting: 'Exportando…', exportError: 'Não foi possível exportar as medições.', noCommunity: 'Ainda não há dados comunitários', noLive: 'Sem medições recentes (<24 h)', noHistory: 'Ainda não há medições no histórico', live: 'Ao vivo (24 h)', history: 'Histórico (90 dias)', zones: 'áreas', zone: 'área', measurements: 'medições', measurement: 'medição', updated: 'Última atualização', loadError: 'Não foi possível carregar os dados', low: 'baixo', moderate: 'moderado', high: 'alto' }
 };
 
 function communityText(key) {
   const language = localStorage.getItem('acoustimap-language') || document.documentElement.lang;
   return (communityCopy[language] || communityCopy.es)[key];
+}
+
+/**
+ * Compone el contador de la leyenda distinguiendo singular de plural.
+ * Sin esto el modo "En vivo" mostraba "1 zonas" cuando solo había una celda.
+ * @param {string} modeLabel Etiqueta del periodo, ya traducida.
+ * @param {number} cells Número de celdas agregadas del área visible.
+ * @param {number} measurements Suma de mediciones de esas celdas.
+ * @returns {string} Texto del contador.
+ */
+function formatLegendCounter(modeLabel, cells, measurements) {
+  const unit = (count, singularKey, pluralKey) =>
+    `${count} ${communityText(count === 1 ? singularKey : pluralKey)}`;
+  return `${modeLabel} · ${unit(cells, 'zone', 'zones')} · ${unit(measurements, 'measurement', 'measurements')}`;
 }
 
 
@@ -322,7 +336,7 @@ async function loadCommunityPoints() {
     const modeLabel  = communityText(mapMode === 'live' ? 'live' : 'history');
     const measurementCount = aggregated.reduce((sum, point) => sum + point.sampleCount, 0);
     counter.innerText =
-      `${modeLabel} · ${aggregated.length} ${communityText('zones')} · ${measurementCount} ${communityText('measurements')}\n` +
+      `${formatLegendCounter(modeLabel, aggregated.length, measurementCount)}\n` +
       `${communityText('updated')}: ${timeAgo(mostRecent)}`;
 
   } catch (err) {
@@ -442,7 +456,13 @@ function setMapMode(mode) {
   loadCommunityPoints();
 }
 
+// La RPC noise_map_cells acepta exactamente estas cuatro franjas. Un valor
+// inesperado deja sus cuatro condiciones en falso y devuelve cero filas, así
+// que hay que rechazarlo aquí en lugar de vaciar el mapa en silencio.
+const TIME_FILTERS = ['all', 'morning', 'afternoon', 'night'];
+
 function setTimeFilter(filter) {
+  if (!TIME_FILTERS.includes(filter)) return;
   selectedTimeFilter = filter;
   document.querySelectorAll('.time-filter-btn').forEach((button) => {
     const active = button.id === `time-${filter}`;
