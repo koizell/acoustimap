@@ -229,16 +229,38 @@ const featureMessages = {
 
 function m(key) { return featureMessages[currentLanguage][key] || featureMessages.es[key] || key; }
 
+function toolUiText(key) {
+  const copy = {
+    es: { map: 'En el mapa', preferences: 'Preferencias' },
+    en: { map: 'On the map', preferences: 'Preferences' },
+    pt: { map: 'No mapa', preferences: 'Preferências' }
+  };
+  return (copy[currentLanguage] || copy.es)[key];
+}
+
+function closeFeatureMenu(restoreFocus = false) {
+  const toolbar = document.querySelector('.feature-toolbar');
+  if (!toolbar) return;
+  const menu = toolbar.querySelector('.feature-menu-items');
+  const toggle = toolbar.querySelector('.feature-menu-toggle');
+  if (!menu || menu.hidden) return;
+  menu.hidden = true;
+  toggle.setAttribute('aria-expanded', 'false');
+  if (restoreFocus) toggle.focus();
+}
+
 function createFeatureUi() {
   const toolbar = document.createElement('div');
   toolbar.className = 'feature-toolbar';
   toolbar.innerHTML = `
     <button type="button" class="feature-menu-toggle" aria-expanded="false" aria-controls="feature-menu-items" aria-label="${t('tools')}" title="${t('tools')}">⋯</button>
-    <div class="feature-menu-items" id="feature-menu-items" hidden>
-      <button type="button" data-feature="draw">⬡ ${t('draw')}</button>
-      <button type="button" data-feature="clear-zone">⌫ ${t('clear')}</button>
-      <button type="button" data-feature="theme">◐ ${t('theme')}</button>
-      <button type="button" data-feature="language">🌐 ${t('language')}</button>
+    <div class="feature-menu-items" id="feature-menu-items" role="region" aria-label="${t('tools')}" hidden>
+      <h3>${toolUiText('map')}</h3>
+      <button type="button" data-feature="draw"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5l14-2 3 15-14 3z"/><circle cx="4" cy="5" r="2"/><circle cx="18" cy="3" r="2"/><circle cx="21" cy="18" r="2"/><circle cx="7" cy="21" r="2"/></svg><span>${t('draw')}</span></button>
+      <button type="button" data-feature="clear-zone"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M9 6V3h6v3M6 6l1 15h10l1-15M10 10v7M14 10v7"/></svg><span>${t('clear')}</span></button>
+      <h3 class="tool-preferences-title">${toolUiText('preferences')}</h3>
+      <button type="button" data-feature="theme" aria-pressed="${Boolean(document.body?.classList?.contains('dark-theme'))}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 15.5A9 9 0 0 1 8.5 4 9 9 0 1 0 20 15.5z"/></svg><span>${t('theme')}</span></button>
+      <button type="button" data-feature="language"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c5 5 5 13 0 18-5-5-5-13 0-18z"/></svg><span>${t('language')}</span></button>
     </div>`;
   document.getElementById('map-view').appendChild(toolbar);
 
@@ -252,9 +274,16 @@ function createFeatureUi() {
   toolbar.querySelector('.feature-menu-toggle').addEventListener('click', () => {
     const menu = toolbar.querySelector('.feature-menu-items');
     const isOpen = !menu.hidden;
+    if (!isOpen) {
+      const filters = document.getElementById('map-filters');
+      if (filters) filters.open = false;
+      const legend = document.getElementById('map-legend');
+      if (legend && !legend.classList.contains('collapsed')) toggleLegend();
+    }
     menu.hidden = isOpen;
     toolbar.querySelector('.feature-menu-toggle').setAttribute('aria-expanded', String(!isOpen));
     if (!isOpen && typeof revealUi === 'function') revealUi(menu);
+    if (!isOpen) menu.querySelector('button')?.focus();
   });
 
   toolbar.addEventListener('click', (event) => {
@@ -268,7 +297,20 @@ function createFeatureUi() {
     else if (feature === 'draw') enableZoneDrawing();
     else if (feature === 'clear-zone') clearDrawnZone();
     else openFeaturePanel(feature);
+    document.querySelector('.feature-menu-toggle')?.focus();
   });
+
+  // Los listeners resuelven la barra actual: no se duplican al cambiar idioma.
+  if (!createFeatureUi.dismissBound) {
+    createFeatureUi.dismissBound = true;
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') closeFeatureMenu(true);
+    });
+    document.addEventListener('pointerdown', (event) => {
+      const current = document.querySelector('.feature-toolbar');
+      if (current && !current.contains(event.target)) closeFeatureMenu();
+    });
+  }
 
   // Cambiar idioma reconstruye los botones, no debe registrar otro listener.
   if (!createFeatureUi.mapClickBound) {
@@ -1156,6 +1198,8 @@ async function loadChallengeProgress(list, challenges) {
 
 function toggleTheme() {
   document.body.classList.toggle('dark-theme');
+  const toggle = document.querySelector('[data-feature="theme"]');
+  toggle?.setAttribute('aria-pressed', String(document.body.classList.contains('dark-theme')));
   localStorage.setItem('acoustimap-theme', document.body.classList.contains('dark-theme') ? 'dark' : 'light');
 }
 
@@ -1238,6 +1282,8 @@ function updateStaticLanguage() {
   const statsIntro = document.querySelector('.stats-page-header p'); if (statsIntro) statsIntro.textContent = copy.statsIntro;
   document.querySelectorAll('.stats-section-btn').forEach((button, index) => { if (copy.tabs[index]) button.textContent = copy.tabs[index]; });
   const handle = document.getElementById('stats-handle-label');
+  const filtersLabel = document.getElementById('map-filters-label');
+  if (filtersLabel) filtersLabel.textContent = { es: 'Filtros', en: 'Filters', pt: 'Filtros' }[currentLanguage];
   if (handle) handle.textContent = sharingText(document.getElementById('stats-panel')?.classList.contains('collapsed') ? 'showDetails' : 'hideDetails');
   [['time-all', copy.all], ['time-morning', copy.morning], ['time-afternoon', copy.afternoon], ['time-night', copy.night]].forEach(([id, value]) => { const el = document.getElementById(id); if (el) el.textContent = value; });
   [
@@ -1259,10 +1305,16 @@ function updateStaticLanguage() {
   const timeLabel = document.querySelector('.time-filters-label'); if (timeLabel) timeLabel.textContent = extra.timeLabel;
   const visualGroup = document.querySelector('.visual-filters'); if (visualGroup) visualGroup.setAttribute('aria-label', periodLabels.group);
   const legend = document.getElementById('map-legend'); if (legend) legend.setAttribute('aria-label', details.legend);
-  document.querySelectorAll('.legend-body > div').forEach((element, index) => {
-    if (index < 3 && element.lastChild) element.lastChild.textContent = [extra.low, extra.medium, extra.high][index];
+  const legendLabels = {
+    es: { scale: 'Escala del mapa', levels: ['Bajo', 'Moderado', 'Alto'], data: 'Datos en esta vista', technical: 'Método y conexión', downloads: 'Descargar datos' },
+    en: { scale: 'Map scale', levels: ['Low', 'Moderate', 'High'], data: 'Data in this view', technical: 'Method and connection', downloads: 'Download data' },
+    pt: { scale: 'Escala do mapa', levels: ['Baixo', 'Moderado', 'Alto'], data: 'Dados nesta vista', technical: 'Método e conexão', downloads: 'Baixar dados' }
+  }[currentLanguage];
+  [['legend-scale-title', legendLabels.scale], ['legend-data-title', legendLabels.data], ['legend-technical-title', legendLabels.technical], ['legend-download-title', legendLabels.downloads],
+    ['legend-low-label', legendLabels.levels[0]], ['legend-medium-label', legendLabels.levels[1]], ['legend-high-label', legendLabels.levels[2]]].forEach(([id, text]) => {
+    const element = document.getElementById(id); if (element) element.textContent = text;
   });
-  const legendNote = document.querySelector('.legend-body p'); if (legendNote) legendNote.textContent = extra.legendNote;
+  const legendNote = document.getElementById('legend-note'); if (legendNote) legendNote.textContent = extra.legendNote;
   const legendHint = document.getElementById('legend-hint');
   if (legendHint) legendHint.innerHTML = extra.legendHint;
   const legendMe = document.querySelector('.legend-me'); if (legendMe?.lastChild) legendMe.lastChild.textContent = extra.yourLocation;
@@ -1289,7 +1341,8 @@ function updateStaticLanguage() {
   document.querySelectorAll('.avg-meta > span').forEach((element, index) => {
     if (element.firstChild?.nodeType === Node.TEXT_NODE) element.firstChild.textContent = `${[meterLabels.min, meterLabels.max, meterLabels.samples][index]} `;
   });
-  const locate = document.querySelector('.locate-btn'); if (locate) locate.title = meterLabels.locate;
+  const locate = document.querySelector('.locate-btn');
+  if (locate) { locate.title = meterLabels.locate; locate.setAttribute('aria-label', meterLabels.locate); }
   if (typeof updateGpsChip === 'function') updateGpsChip(Boolean(sharingEnabled), currentPosition?.accuracy);
   if (typeof updateAudioDiagnostics === 'function') updateAudioDiagnostics();
   const mapStatus = document.getElementById('map-data-status');

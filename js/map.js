@@ -251,7 +251,8 @@ const LocateControl = L.Control.extend({
     const link = L.DomUtil.create('a', 'locate-btn', container);
     link.href = '#';
     link.title = 'Centrar en mi ubicación';
-    link.innerHTML = '📍';
+    link.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>';
+    link.setAttribute('aria-label', link.title);
     L.DomEvent.on(link, 'click', function (e) {
       L.DomEvent.stop(e);
       container.classList.add('locating');

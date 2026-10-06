@@ -37,6 +37,8 @@ function setMapDataStatus(state) {
   const count = state === 'ready'
     ? ` · ${lastAggregatedPoints.length} ${communityText(lastAggregatedPoints.length === 1 ? 'zone' : 'zones')}` : '';
   status.textContent = `${mapDataText(state)}${count} · v${APP_ASSET_VERSION}`;
+  const detail = document.getElementById('map-connection-detail');
+  if (detail) detail.textContent = status.textContent;
   status.hidden = false;
   status.setAttribute?.('aria-busy', String(state === 'loading'));
 }

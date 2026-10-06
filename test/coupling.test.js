@@ -10,7 +10,7 @@ const leer = (rel) => fs.readFileSync(path.join(root, rel), 'utf8');
 const DE_FEATURES = [
   'comparisonMode', 'comparisonLayer', 'currentComparisonLayer', 'comparisonRows',
   'drawnZone', 'selectedMapPoint', 'featureClientId',
-  'activateComparisonLayer', 'createFeatureUi', 'openFeaturePanel',
+  'activateComparisonLayer', 'createFeatureUi', 'openFeaturePanel', 'closeFeatureMenu',
   'flushOfflineMeasurements', 'queueOfflineMeasurement', 'enqueueOfflineRecord',
   'summaryText', 'summaryIcon', 'updateSummaryState', 'exitComparisonMode'
 ];

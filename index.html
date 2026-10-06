@@ -5,23 +5,23 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#0f172a" />
     <title>AcoustiMap - Mapeo de Contaminación Acústica</title>
-    <link rel="manifest" href="manifest.webmanifest?v=46" />
+    <link rel="manifest" href="manifest.webmanifest?v=48" />
 
-    <link rel="icon" href="assets/icon.svg?v=46" type="image/svg+xml" />
+    <link rel="icon" href="assets/icon.svg?v=48" type="image/svg+xml" />
 
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css" />
 
     <!-- Estilos modulares -->
-    <link rel="stylesheet" href="css/base.css?v=46" />
-    <link rel="stylesheet" href="css/layout.css?v=46" />
-    <link rel="stylesheet" href="css/map.css?v=46" />
-    <link rel="stylesheet" href="css/panel.css?v=46" />
-    <link rel="stylesheet" href="css/info.css?v=46" />
-    <link rel="stylesheet" href="css/responsive.css?v=46" />
-    <link rel="stylesheet" href="css/features.css?v=46" />
-    <link rel="stylesheet" href="css/experience.css?v=46" />
+    <link rel="stylesheet" href="css/base.css?v=48" />
+    <link rel="stylesheet" href="css/layout.css?v=48" />
+    <link rel="stylesheet" href="css/map.css?v=48" />
+    <link rel="stylesheet" href="css/panel.css?v=48" />
+    <link rel="stylesheet" href="css/info.css?v=48" />
+    <link rel="stylesheet" href="css/responsive.css?v=48" />
+    <link rel="stylesheet" href="css/features.css?v=48" />
+    <link rel="stylesheet" href="css/experience.css?v=48" />
   </head>
   <body>
     <header>
@@ -41,6 +41,10 @@
     <div id="map-view" class="tab-content active">
       <div id="map"></div>
 
+      <!-- Controles secundarios bajo demanda: el mapa queda libre al entrar. -->
+      <details class="map-filters" id="map-filters" ontoggle="onMapFiltersToggle()">
+        <summary id="map-filters-label">Filtros</summary>
+        <div class="map-filters-body">
       <!-- Filtros de franja horaria -->
       <div class="time-filters" role="group" aria-label="Filtrar por franja horaria de Colombia">
         <span class="time-filters-label" title="Hora de Colombia (UTC−5)">Hora CO</span>
@@ -58,10 +62,12 @@
         <button class="visual-filter-btn active" id="visual-heatmap" aria-pressed="true" onclick="setCommunityVisualMode('heatmap')"><span class="control-long">Mapa de calor</span><span class="control-short">Calor</span></button>
         <button class="visual-filter-btn" id="visual-zones" aria-pressed="false" onclick="setCommunityVisualMode('zones')"><span class="control-long">Puntos</span><span class="control-short">Puntos</span></button>
       </div>
+        </div>
+      </details>
 
       <!-- Botón de leyenda -->
       <div class="map-data-status" id="map-data-status" role="status" aria-live="polite">Comprobando conexión con Supabase…</div>
-      <button class="legend-toggle" id="legend-toggle" onclick="toggleLegend()" aria-label="Información del mapa" aria-controls="map-legend" aria-expanded="false">ℹ️</button>
+       <button class="legend-toggle" id="legend-toggle" onclick="toggleLegend()" aria-label="Información del mapa" aria-controls="map-legend" aria-expanded="false"><span aria-hidden="true">i</span></button>
 
       <!-- Leyenda colapsable -->
       <div class="map-legend collapsed" id="map-legend" role="region" aria-label="Información del mapa" inert>
@@ -70,24 +76,40 @@
           <button class="legend-close" onclick="toggleLegend()" aria-label="Cerrar información">✕</button>
         </div>
         <div class="legend-body">
-          <div><span class="dot" style="background: #10b981"></span>Índice &lt; 55 · Bajo</div>
-          <div><span class="dot" style="background: #f59e0b"></span>Índice 55–70 · Moderado</div>
-          <div><span class="dot" style="background: #ef4444"></span>Índice &gt; 70 · Alto</div>
-          <p>Escala relativa orientativa; no equivale a dB físicos ni sirve para evaluar exposición.</p>
+          <section class="legend-section" aria-labelledby="legend-scale-title">
+          <h3 id="legend-scale-title">Escala del mapa</h3>
+          <div class="legend-scale">
+            <div class="legend-level"><span class="dot" style="background: #119c70"></span><span id="legend-low-label">Bajo</span><strong>&lt; 55 dB</strong></div>
+            <div class="legend-level"><span class="dot" style="background: #db982d"></span><span id="legend-medium-label">Moderado</span><strong>55–70 dB</strong></div>
+            <div class="legend-level"><span class="dot" style="background: #c94842"></span><span id="legend-high-label">Alto</span><strong>&gt; 70 dB</strong></div>
+          </div>
+          <p class="legend-note" id="legend-note">Escala relativa orientativa; no equivale a dB físicos ni sirve para evaluar exposición.</p>
           <p class="legend-hint" id="legend-hint">Cada círculo rotula <b>índice · mediciones</b>. El borde se marca más cuanto más mediciones sostienen ese promedio; el color y el relleno dependen solo del índice.</p>
-          <p id="measurement-method-note">Mapa y estadísticas: solo método v5. El histórico anterior se conserva por separado.</p>
-          <hr class="legend-divider">
+          </section>
+          <section class="legend-section" aria-labelledby="legend-data-title">
+          <h3 id="legend-data-title">Datos en esta vista</h3>
           <div class="legend-count" id="community-count">Cargando datos…</div>
           <div class="legend-me">
             <span class="dot-blue"></span>
             Tu ubicación (solo tú)
           </div>
+          </section>
+          <details class="legend-technical">
+            <summary id="legend-technical-title">Método y conexión</summary>
+            <p id="measurement-method-note">Mapa y estadísticas: solo método v5. El histórico anterior se conserva por separado.</p>
+            <p class="map-connection-detail" id="map-connection-detail">Comprobando conexión con Supabase…</p>
+          </details>
+          <section class="legend-section legend-downloads" aria-labelledby="legend-download-title">
+          <h3 id="legend-download-title">Descargar datos</h3>
+          <div class="legend-export-actions">
           <button class="export-csv-btn" id="export-csv-btn" onclick="exportMeasurementsCsv()">
             Exportar CSV
           </button>
           <button class="export-csv-btn" id="export-geojson-btn" onclick="exportMeasurementsGeoJson()">
             Exportar GeoJSON
           </button>
+          </div>
+          </section>
         </div>
       </div>
 
@@ -281,12 +303,12 @@
          Ver test/coupling.test.js.
          js/kalman.js no se carga: define la clase KalmanLatLong pero la app
          suaviza el GPS con su propio filtro de estabilidad en map.js. -->
-    <script src="js/config.local.js?v=46"></script>
-    <script src="js/config.js?v=46"></script>
-    <script src="js/map.js?v=46"></script>
-    <script src="js/audio.js?v=46"></script>
-    <script src="js/community.js?v=46"></script>
-    <script src="js/app.js?v=46"></script>
-    <script src="js/features.js?v=46"></script>
+    <script src="js/config.local.js?v=48"></script>
+    <script src="js/config.js?v=48"></script>
+    <script src="js/map.js?v=48"></script>
+    <script src="js/audio.js?v=48"></script>
+    <script src="js/community.js?v=48"></script>
+    <script src="js/app.js?v=48"></script>
+    <script src="js/features.js?v=48"></script>
   </body>
 </html>

@@ -36,6 +36,18 @@ function toggleLegend() {
   toggle?.setAttribute('aria-expanded', String(!collapsed));
   if (collapsed && legend.contains(document.activeElement)) toggle?.focus();
   if (!collapsed) revealUi(legend);
+  if (!collapsed && typeof closeFeatureMenu === 'function') closeFeatureMenu();
+  const filters = document.getElementById('map-filters');
+  if (!collapsed && filters) filters.open = false;
+}
+
+function onMapFiltersToggle() {
+  const filters = document.getElementById('map-filters');
+  if (!filters?.open) return;
+  if (typeof closeFeatureMenu === 'function') closeFeatureMenu();
+  const legend = document.getElementById('map-legend');
+  if (legend && !legend.classList.contains('collapsed')) toggleLegend();
+  revealUi(filters.querySelector('.map-filters-body'));
 }
 
 // ============================================
@@ -118,6 +130,18 @@ function closePrivacyModal(id) {
 }
 
 function handlePrivacyModalKeydown(event) {
+  const filters = document.getElementById('map-filters');
+  if (!privacyModalState && event.key === 'Escape' && filters?.open) {
+    filters.open = false;
+    filters.querySelector('summary')?.focus();
+    return;
+  }
+  const legend = document.getElementById('map-legend');
+  if (!privacyModalState && event.key === 'Escape' && legend && !legend.classList.contains('collapsed')) {
+    toggleLegend();
+    document.getElementById('legend-toggle')?.focus();
+    return;
+  }
   if (!privacyModalState) return;
   const modal = privacyModalState.modal;
   if (event.key === 'Escape') {
@@ -138,6 +162,15 @@ function handlePrivacyModalKeydown(event) {
 }
 
 document.addEventListener('keydown', handlePrivacyModalKeydown);
+
+document.addEventListener('pointerdown', (event) => {
+  const legend = document.getElementById('map-legend');
+  const toggle = document.getElementById('legend-toggle');
+  if (legend && !legend.classList.contains('collapsed') && !legend.contains(event.target) && !toggle?.contains(event.target)) toggleLegend();
+  const filters = document.getElementById('map-filters');
+  if (filters?.open && !filters.contains(event.target)) filters.open = false;
+});
+
 
 function openShareModal() {
   if (sharingEnabled) { toggleSharing(); return; }
