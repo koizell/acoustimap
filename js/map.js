@@ -28,9 +28,12 @@ const myLocationLayer = L.layerGroup().addTo(map);
 // ============================================
 let communityHeatLayer = null;
 let heatmapReady = false;
+let communityHeatRenderToken = 0;
 
 /** Espera a que el mapa tenga dimensiones > 0 antes de dibujar el heatmap */
 function waitForMapSize(callback, attempts = 0) {
+  const view = document.getElementById('map-view');
+  if (view && !view.classList.contains('active')) return;
   const mapEl = document.getElementById('map');
   if (mapEl && mapEl.offsetWidth > 0 && mapEl.offsetHeight > 0) {
     heatmapReady = true;
@@ -45,13 +48,94 @@ function waitForMapSize(callback, attempts = 0) {
 }
 
 /** Crear la instancia del heatmap (una sola vez) */
+/**
+ * Raster de índice espacial suavizado. El color sale de la media ponderada
+ * de las celdas, no de sumar intensidades. La opacidad expresa el halo y no
+ * crece por repetir una celda. No es una interpolación acústica ni LAeq.
+ */
+function buildRelativeHeatRaster(width, height, points, radius, gradient, previous = null) {
+  const size = width * height;
+  const raster = previous?.width === width && previous?.height === height ? previous : {
+    width, height, values: new Float32Array(size), weights: new Float32Array(size),
+    coverage: new Float32Array(size), pixels: new Uint8ClampedArray(size * 4)
+  };
+  raster.values.fill(0);
+  raster.weights.fill(0);
+  raster.coverage.fill(0);
+  raster.pixels.fill(0);
+  const radiusSquared = radius * radius;
+  for (const [px, py, value] of points) {
+    if (![px, py, value].every(Number.isFinite) || value < 0 || value > 1) continue;
+    const left = Math.max(0, Math.floor(px - radius));
+    const right = Math.min(width - 1, Math.ceil(px + radius));
+    const top = Math.max(0, Math.floor(py - radius));
+    const bottom = Math.min(height - 1, Math.ceil(py + radius));
+    for (let y = top; y <= bottom; y++) for (let x = left; x <= right; x++) {
+      const distanceSquared = (x - px) ** 2 + (y - py) ** 2;
+      if (distanceSquared >= radiusSquared) continue;
+      const weight = (1 - distanceSquared / radiusSquared) ** 3;
+      const offset = y * width + x;
+      raster.values[offset] += value * weight;
+      raster.weights[offset] += weight;
+      raster.coverage[offset] = Math.max(raster.coverage[offset], weight);
+    }
+  }
+  for (let offset = 0; offset < size; offset++) {
+    if (!raster.weights[offset]) continue;
+    const color = Math.min(255, Math.max(0, Math.round(raster.values[offset] / raster.weights[offset] * 255))) * 4;
+    const pixel = offset * 4;
+    raster.pixels[pixel] = gradient[color];
+    raster.pixels[pixel + 1] = gradient[color + 1];
+    raster.pixels[pixel + 2] = gradient[color + 2];
+    raster.pixels[pixel + 3] = Math.round(180 * raster.coverage[offset]);
+  }
+  return raster;
+}
+
+/** Reutiliza el ciclo de vida de Leaflet.heat, pero no su suma de densidades. */
+function createRelativeHeatLayer(points, options) {
+  const layer = L.heatLayer(points, options);
+  layer._redraw = function () {
+    this._frame = null;
+    if (!this._map || !this._heat) return;
+    const size = this._map.getSize();
+    if (size.x < 1 || size.y < 1) return;
+    const projected = this._latlngs.map((point) => {
+      const pixel = this._map.latLngToContainerPoint(point);
+      return [pixel.x, pixel.y, point[2]];
+    });
+    // Conserva los valores de entrada para inspección, sin atenuación por zoom.
+    this._heat.data(projected);
+    // Media resolución: limita memoria y coste al mover un mapa con muchas celdas.
+    const step = 2;
+    const width = Math.ceil(size.x / step), height = Math.ceil(size.y / step);
+    this._relativeRaster = buildRelativeHeatRaster(width, height,
+      projected.map(([x, y, value]) => [x / step, y / step, value]),
+      ((this.options.radius || 48) + (this.options.blur || 36)) / step,
+      this._heat._grad, this._relativeRaster);
+    if (!this._relativeCanvas) this._relativeCanvas = document.createElement('canvas');
+    this._relativeCanvas.width = width;
+    this._relativeCanvas.height = height;
+    const context = this._relativeCanvas.getContext('2d');
+    const image = context.createImageData(width, height);
+    image.data.set(this._relativeRaster.pixels);
+    context.putImageData(image, 0, 0);
+    const output = this._canvas.getContext('2d');
+    output.clearRect(0, 0, size.x, size.y);
+    output.drawImage(this._relativeCanvas, 0, 0, size.x, size.y);
+  };
+  return layer;
+}
+
 function ensureHeatLayer() {
   if (communityHeatLayer) return communityHeatLayer;
 
-  communityHeatLayer = L.heatLayer([], {
+  communityHeatLayer = createRelativeHeatLayer([], {
     radius: 48,
     blur: 36,
-    maxZoom: 17,
+    // Leaflet.heat atenúa por 2^(maxZoom-zoom). Esa regla mide densidad,
+    // no nivel: con zoom 14 convertía un índice 95 (1) en 0.125.
+    maxZoom: 0,
     minOpacity: 0.22,
     // Stops alineados con los umbrales de categoria sobre el rango 30-95 del
     // indice: 0.385 es el indice 55 y 0.615 es el indice 70. Asi el ambar
@@ -71,6 +155,7 @@ function ensureHeatLayer() {
 
 /** Asigna los puntos al heatmap (nunca lo recrea) */
 function setCommunityHeatPoints(points) {
+  const renderToken = ++communityHeatRenderToken;
   // Limpiar capa de círculos
   if (communityLayer) communityLayer.clearLayers();
 
@@ -79,7 +164,8 @@ function setCommunityHeatPoints(points) {
 
   if (!points || points.length === 0) {
     // Sin datos: ocultar el heatmap si está en el mapa
-    if (map.hasLayer(layer)) map.removeLayer(layer);
+    detachHeatLayer(layer);
+    layer._latlngs = [];
     return;
   }
 
@@ -89,13 +175,16 @@ function setCommunityHeatPoints(points) {
     p.lng,
     typeof normalizeDbForHeatmap === 'function'
       ? normalizeDbForHeatmap(p.db)
-      : Math.min(Math.max((p.db - 30) / 70, 0.05), 1.0)
+      : Math.min(Math.max((p.db - 30) / 65, 0.05), 1.0)
   ]);
 
   // Esperar a que el mapa esté listo antes de añadir
   waitForMapSize(() => {
+    if (renderToken !== communityHeatRenderToken) return;
     try {
       if (!map.hasLayer(layer)) {
+        // onAdd dibuja inmediatamente: no debe recuperar el conjunto anterior.
+        layer._latlngs = heatData;
         layer.addTo(map);
       }
       layer.setLatLngs(heatData);
@@ -107,15 +196,17 @@ function setCommunityHeatPoints(points) {
 
 /** Añadir un punto individual al heatmap (sin recrear) */
 function addCommunityHeatPoint(lat, lng, db) {
+  const renderToken = communityHeatRenderToken;
   const layer = ensureHeatLayer();
   const intensity = typeof normalizeDbForHeatmap === 'function'
     ? normalizeDbForHeatmap(db)
-    : Math.min(Math.max((db - 30) / 70, 0.05), 1.0);
+    : Math.min(Math.max((db - 30) / 65, 0.05), 1.0);
 
   waitForMapSize(() => {
+    if (renderToken !== communityHeatRenderToken) return;
     try {
       if (!map.hasLayer(layer)) layer.addTo(map);
-      const current = layer._latlngs || [];
+      const current = [...(layer._latlngs || [])];
       current.push([lat, lng, intensity]);
       layer.setLatLngs(current);
     } catch (e) {
@@ -124,22 +215,30 @@ function addCommunityHeatPoint(lat, lng, db) {
   });
 }
 
-/** Limpiar capas comunitarias */
+/** Retira un canvas de Leaflet.heat sin dejar repintados pendientes. */
+function detachHeatLayer(layer) {
+  if (!layer) return;
+  // Leaflet.heat 0.2.0 no cancela su RAF al retirar la capa; el callback
+  // pendiente accede luego a _map=null y rompe cambios rápidos de modo/pestaña.
+  if (layer._frame) L.Util.cancelAnimFrame(layer._frame);
+  layer._frame = null;
+  if (map.hasLayer(layer)) map.removeLayer(layer);
+}
+
+/** Limpiar capas comunitarias e invalidar dibujos diferidos. */
 function clearCommunityLayers() {
+  communityHeatRenderToken++;
   if (communityLayer) communityLayer.clearLayers();
-  if (communityHeatLayer && map.hasLayer(communityHeatLayer)) {
-    map.removeLayer(communityHeatLayer);
-  }
+  detachHeatLayer(communityHeatLayer);
 }
 
 /** Leaflet.heat cannot redraw its canvas while the map is display:none. */
 function suspendMapHeatLayers() {
+  communityHeatRenderToken++;
   const layers = [communityHeatLayer];
   if (typeof comparisonLayer !== 'undefined') layers.push(comparisonLayer);
   if (typeof currentComparisonLayer !== 'undefined') layers.push(currentComparisonLayer);
-  layers.forEach((layer) => {
-    if (layer && map.hasLayer(layer)) map.removeLayer(layer);
-  });
+  layers.forEach(detachHeatLayer);
 }
 
 // ============================================

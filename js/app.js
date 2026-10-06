@@ -12,11 +12,12 @@ function switchTab(tabId, btn) {
   document.querySelectorAll('.tab-btn').forEach((b) => b.classList.remove('active'));
   const tab = document.getElementById(tabId);
   if (tab) tab.classList.add('active');
+  if (tabId !== 'map-view' && typeof revealUi === 'function') revealUi(tab?.querySelector?.('.info-wrapper, .stats-page'));
   if (btn) btn.classList.add('active');
   if (tabId === 'map-view') {
     setTimeout(() => {
       invalidateMapIfVisible();
-      if (typeof activateComparisonLayer === 'function') activateComparisonLayer();
+      if (typeof renderCommunityPoints === 'function') renderCommunityPoints(lastAggregatedPoints);
       if (typeof loadCommunityPoints === 'function') loadCommunityPoints();
     }, 200);
   }
@@ -29,7 +30,12 @@ function toggleLegend() {
   const legend = document.getElementById('map-legend');
   if (!legend) return;
   legend.classList.toggle('collapsed');
-  document.getElementById('legend-toggle')?.setAttribute('aria-expanded', String(!legend.classList.contains('collapsed')));
+  const collapsed = legend.classList.contains('collapsed');
+  legend.inert = collapsed;
+  const toggle = document.getElementById('legend-toggle');
+  toggle?.setAttribute('aria-expanded', String(!collapsed));
+  if (collapsed && legend.contains(document.activeElement)) toggle?.focus();
+  if (!collapsed) revealUi(legend);
 }
 
 // ============================================
@@ -43,9 +49,13 @@ function toggleStatsPanel() {
   const isCollapsed = panel.classList.contains('collapsed');
 
   const label = document.getElementById('stats-handle-label');
-  if (label) label.innerText = isCollapsed ? 'Mostrar detalles' : 'Ocultar detalles';
+  if (label) label.innerText = sharingText(isCollapsed ? 'showDetails' : 'hideDetails');
   const handle = panel.querySelector('.stats-handle');
   if (handle) handle.setAttribute('aria-expanded', String(!isCollapsed));
+  const content = document.getElementById('stats-content');
+  if (content) content.inert = isCollapsed;
+  if (isCollapsed && content?.contains(document.activeElement)) handle?.focus();
+  if (!isCollapsed) revealUi(content);
 }
 
 function updateMapAttributionClearance() {
@@ -70,29 +80,80 @@ document.getElementById('stats-panel')?.addEventListener('transitionend', (event
   }
 });
 requestAnimationFrame(updateMapAttributionClearance);
+// Los avisos GPS y el diagnóstico también cambian la altura sin transición CSS.
+const attributionPanel = document.getElementById('stats-panel');
+if (attributionPanel && typeof ResizeObserver === 'function') {
+  new ResizeObserver(updateMapAttributionClearance).observe(attributionPanel);
+}
 
 // ============================================
 // MODALES
 // ============================================
+let privacyModalState = null;
+
+function openPrivacyModal(id) {
+  const modal = document.getElementById(id);
+  if (!modal) return;
+  if (privacyModalState) closePrivacyModal(privacyModalState.modal.id);
+  const background = [...document.querySelectorAll('header, .tab-content')]
+    .map((element) => [element, element.inert]);
+  privacyModalState = { modal, trigger: document.activeElement, background };
+  background.forEach(([element]) => { element.inert = true; });
+  modal.inert = false;
+  modal.classList.add('visible');
+  revealUi(modal.querySelector('.modal-content'));
+  modal.querySelector('.cancel')?.focus();
+}
+
+function closePrivacyModal(id) {
+  const modal = document.getElementById(id);
+  if (!modal) return;
+  modal.classList.remove('visible');
+  modal.inert = true;
+  if (privacyModalState?.modal !== modal) return;
+  const { trigger, background } = privacyModalState;
+  privacyModalState = null;
+  background.forEach(([element, inert]) => { element.inert = inert; });
+  if (trigger?.isConnected) trigger.focus();
+}
+
+function handlePrivacyModalKeydown(event) {
+  if (!privacyModalState) return;
+  const modal = privacyModalState.modal;
+  if (event.key === 'Escape') {
+    event.preventDefault();
+    closePrivacyModal(modal.id);
+  } else if (event.key === 'Tab') {
+    const buttons = [...modal.querySelectorAll('button:not(:disabled)')];
+    const first = buttons[0];
+    const last = buttons.at(-1);
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last?.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first?.focus();
+    }
+  }
+}
+
+document.addEventListener('keydown', handlePrivacyModalKeydown);
+
 function openShareModal() {
   if (sharingEnabled) { toggleSharing(); return; }
-  const modal = document.getElementById('share-modal');
-  if (modal) modal.classList.add('visible');
+  openPrivacyModal('share-modal');
 }
 function closeShareModal() {
-  const modal = document.getElementById('share-modal');
-  if (modal) modal.classList.remove('visible');
+  closePrivacyModal('share-modal');
 }
 function confirmSharing() { closeShareModal(); toggleSharing(); }
 
 function openMicModal() {
   if (isMonitoring) { toggleMonitoring(); return; }
-  const modal = document.getElementById('mic-modal');
-  if (modal) modal.classList.add('visible');
+  openPrivacyModal('mic-modal');
 }
 function closeMicModal() {
-  const modal = document.getElementById('mic-modal');
-  if (modal) modal.classList.remove('visible');
+  closePrivacyModal('mic-modal');
 }
 function confirmMicActivation() { closeMicModal(); toggleMonitoring(); }
 
@@ -105,60 +166,101 @@ function updateActionButtons() {
 
   if (sharingEnabled) {
     btnShare.classList.add('active');
-    btnShare.innerHTML = '<span class="action-icon">✅</span><span class="action-text">Compartiendo</span>';
+    const state = sharingStatusKey === 'searching' ? 'locating'
+      : sharingDeliveryState !== 'idle' ? sharingDeliveryState : !isMonitoring ? 'gpsReady' : 'waiting';
+    btnShare.innerHTML = `<span class="action-icon">${actionIconMarkup(state === 'published' ? 'check' : 'location')}</span><span class="action-text">${sharingDeliveryText(state)}</span>`;
   } else {
     btnShare.classList.remove('active');
-    btnShare.innerHTML = '<span class="action-icon">📡</span><span class="action-text">Compartir</span>';
+    btnShare.innerHTML = `<span class="action-icon">${actionIconMarkup('location')}</span><span class="action-text">${sharingText('share')}</span>`;
   }
+  btnShare.setAttribute('aria-pressed', String(sharingEnabled));
 }
 
 // ============================================
 // COMPARTIR UBICACIÓN
 // ============================================
 const sharingCopy = {
-  es: { unsupported: '❌ Geolocalización no soportada.', searching: '⏳ Buscando señal GPS…', sharing: '✅ Compartiendo.', denied: '❌ No se obtuvo la ubicación. Revisa el permiso y la señal GPS.', disabled: '🔒 Compartir desactivado.', noPermission: 'sin permiso', locating: 'buscando…' },
-  en: { unsupported: '❌ Geolocation is unavailable.', searching: '⏳ Looking for a GPS signal…', sharing: '✅ Sharing.', denied: '❌ Location unavailable. Check your permission and GPS signal.', disabled: '🔒 Sharing turned off.', noPermission: 'no permission', locating: 'locating…' },
-  pt: { unsupported: '❌ Geolocalização indisponível.', searching: '⏳ Procurando sinal GPS…', sharing: '✅ Compartilhando.', denied: '❌ Localização indisponível. Verifique a permissão e o sinal GPS.', disabled: '🔒 Compartilhamento desativado.', noPermission: 'sem permissão', locating: 'procurando…' }
+  es: { unsupported: 'Geolocalización no soportada.', searching: 'Buscando señal GPS…', sharing: 'Compartiendo.', denied: 'No se obtuvo la ubicación. Revisa el permiso y la señal GPS.', schemaOutOfDate: 'La base no acepta esta versión del método. Falta aplicar la migración.', disabled: 'Compartir desactivado.', noPermission: 'sin permiso', locating: 'buscando…', share: 'Compartir', shareActive: 'Compartiendo', showDetails: 'Detalles y ayuda', hideDetails: 'Ocultar detalles' },
+  en: { unsupported: 'Geolocation is unavailable.', searching: 'Looking for a GPS signal…', sharing: 'Sharing.', denied: 'Location unavailable. Check your permission and GPS signal.', schemaOutOfDate: 'The database does not accept this method version yet. The migration is missing.', disabled: 'Sharing turned off.', noPermission: 'no permission', locating: 'locating…', share: 'Share', shareActive: 'Sharing', showDetails: 'Details and help', hideDetails: 'Hide details' },
+  pt: { unsupported: 'Geolocalização indisponível.', searching: 'Procurando sinal GPS…', sharing: 'Compartilhando.', denied: 'Localização indisponível. Verifique a permissão e o sinal GPS.', schemaOutOfDate: 'O banco ainda não aceita esta versão do método. Falta a migração.', disabled: 'Compartilhamento desativado.', noPermission: 'sem permissão', locating: 'procurando…', share: 'Compartilhar', shareActive: 'Compartilhando', showDetails: 'Detalhes e ajuda', hideDetails: 'Ocultar detalhes' }
 };
 
 function sharingText(key) {
   return (sharingCopy[document.documentElement.lang] || sharingCopy.es)[key];
 }
 
-function toggleSharing() {
+let sharingStatusKey = null;
+
+function sharingDeliveryText(key) {
+  const copy = {
+    es: { locating: 'Buscando GPS', gpsReady: 'GPS activo', waiting: 'Esperando lectura', sending: 'Enviando', queued: 'En cola local', published: 'Enviado', error: 'Error de envío', disconnected: 'Sin backend: se guarda en cola local, no en el mapa público.', queuedHelp: 'Pendiente de sincronizar; todavía no está publicado.', errorHelp: 'No se confirmó el envío. Revisa la conexión y Supabase.' },
+    en: { locating: 'Locating', gpsReady: 'GPS enabled', waiting: 'Awaiting reading', sending: 'Sending', queued: 'Queued locally', published: 'Sent', error: 'Send failed', disconnected: 'No backend: saved in the local queue, not on the public map.', queuedHelp: 'Awaiting sync; not published yet.', errorHelp: 'Delivery not confirmed. Check the connection and Supabase.' },
+    pt: { locating: 'Buscando GPS', gpsReady: 'GPS ativo', waiting: 'Aguardando leitura', sending: 'Enviando', queued: 'Na fila local', published: 'Enviado', error: 'Erro de envio', disconnected: 'Sem backend: salvo na fila local, não no mapa público.', queuedHelp: 'Aguardando sincronização; ainda não publicado.', errorHelp: 'Envio não confirmado. Verifique a conexão e o Supabase.' }
+  };
+  return (copy[document.documentElement.lang] || copy.es)[key];
+}
+
+function updateSharingDelivery(state, requestId = null) {
+  if (!sharingEnabled || (requestId !== null && requestId !== sharingRequestId)) return;
+  sharingDeliveryState = state;
+  updateActionButtons();
+  updateSharingStatus();
+}
+
+function updateSharingStatus(key = sharingStatusKey) {
+  sharingStatusKey = key;
   const status = document.getElementById('share-status');
+  if (status) status.innerText = sharingEnabled && key === 'sharing'
+    ? sharingDeliveryState === 'error' ? sharingDeliveryText('errorHelp')
+      : !supabaseClient ? sharingDeliveryText('disconnected')
+      : sharingDeliveryState === 'queued' ? sharingDeliveryText('queuedHelp')
+        : ''
+    : key && !['sharing', 'disabled'].includes(key) ? sharingText(key) : '';
+}
+
+let sharingRequestId = 0;
+
+function toggleSharing() {
+  const requestId = ++sharingRequestId;
   sharingEnabled = !sharingEnabled;
+  sharingDeliveryState = 'idle';
 
   if (sharingEnabled) {
     if (!navigator.geolocation) {
-      if (status) status.innerText = sharingText('unsupported');
+      updateSharingStatus('unsupported');
       sharingEnabled = false;
       updateActionButtons();
       return;
     }
-    if (status) status.innerText = sharingText('searching');
+    updateSharingStatus('searching');
+    updateActionButtons();
+    updateGpsChip(true);
     positionHistory = [];
 
     navigator.geolocation.getCurrentPosition(
       (pos) => {
+        if (!sharingEnabled || requestId !== sharingRequestId) return;
         processNewPosition(pos);
         map.setView([currentPosition.lat, currentPosition.lng], 17);
-        if (status) status.innerText = sharingText('sharing');
+        updateSharingStatus('sharing');
         updateActionButtons();
         lastSendTime = 0;
         loadCommunityPoints();
 
         if (geoWatchId === null) {
           geoWatchId = navigator.geolocation.watchPosition(
-            processNewPosition,
+            (nextPosition) => {
+              if (sharingEnabled && requestId === sharingRequestId) processNewPosition(nextPosition);
+            },
             (err) => console.warn('watchPosition:', err),
             { enableHighAccuracy: true, maximumAge: 0, timeout: 20000 }
           );
         }
       },
       (err) => {
+        if (!sharingEnabled || requestId !== sharingRequestId) return;
         console.warn(err);
-        if (status) status.innerText = sharingText('denied');
+        updateSharingStatus('denied');
         sharingEnabled = false;
         updateActionButtons();
         updateGpsChip(false);
@@ -166,7 +268,7 @@ function toggleSharing() {
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     );
   } else {
-    if (status) status.innerText = sharingText('disabled');
+    updateSharingStatus('disabled');
     updateGpsChip(false);
     hideMyLocation();
     currentPosition = null;
@@ -187,7 +289,7 @@ function updateGpsChip(active, accuracy) {
   if (!chip) return;
 
   if (!active) {
-    chip.innerText = `📡 GPS: ${sharingText('noPermission')}`;
+    chip.innerText = { es: 'GPS apagado', en: 'GPS off', pt: 'GPS desligado' }[document.documentElement.lang] || 'GPS apagado';
     chip.classList.remove('ok', 'medium', 'poor');
     return;
   }
@@ -196,13 +298,35 @@ function updateGpsChip(active, accuracy) {
   chip.classList.remove('ok', 'medium', 'poor');
 
   if (!accuracy || accuracy > 40) {
-    chip.innerText = `📡 GPS: ${accText || sharingText('locating')} ❌`;
+    chip.innerText = `GPS ${accText || sharingText('locating')}`;
     chip.classList.add('poor');
   } else if (accuracy > 15) {
-    chip.innerText = `📡 GPS: ${accText} ⚠️`;
+    chip.innerText = `GPS ${accText}`;
     chip.classList.add('medium');
   } else {
-    chip.innerText = `📡 GPS: ${accText}`;
+    chip.innerText = `GPS ${accText}`;
     chip.classList.add('ok');
   }
 }
+
+// Motion es opcional: si el CDN falla, la UI conserva su estado final usable.
+const uiMotionAnimations = new Map();
+function revealUi(element) {
+  if (!element || window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches
+    || typeof window.Motion?.animate !== 'function') return;
+  uiMotionAnimations.get(element)?.cancel();
+  const animation = window.Motion.animate(element, { opacity: [0, 1], y: [8, 0] }, {
+    duration: 0.22, ease: [0.22, 1, 0.36, 1]
+  });
+  uiMotionAnimations.set(element, animation);
+  animation.finished.then(() => {
+    if (uiMotionAnimations.get(element) === animation) uiMotionAnimations.delete(element);
+  }).catch(() => {});
+}
+
+window.matchMedia?.('(prefers-reduced-motion: reduce)')?.addEventListener('change', (event) => {
+  if (!event.matches) return;
+  uiMotionAnimations.forEach((animation) => animation.cancel());
+  uiMotionAnimations.clear();
+});
+requestAnimationFrame(() => revealUi(document.getElementById('stats-panel')));

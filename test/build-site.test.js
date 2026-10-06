@@ -17,7 +17,7 @@ test('publicación: incluye los recursos de la app y excluye código privado, pr
   for (const item of fs.readdirSync(path.join(project, 'js')).filter((name) => name !== 'config.local.js')) {
     fs.copyFileSync(path.join(project, 'js', item), path.join(root, 'js', item));
   }
-  fs.writeFileSync(path.join(root, 'js/config.local.js'), 'window.__ACOUSTIMAP_CONFIG__ = {};');
+  fs.writeFileSync(path.join(root, 'js/config.local.js'), 'window.__ACOUSTIMAP_CONFIG__ = { SUPABASE_URL: "https://fixture.supabase.co", SUPABASE_ANON_KEY: "public-fixture" };');
   for (const item of ['.git', 'graphify-out', 'supabase', 'test', 'node_modules', 'dist']) {
     fs.mkdirSync(path.join(root, item));
     fs.writeFileSync(path.join(root, item, 'private.txt'), 'not-for-publication');
@@ -31,6 +31,7 @@ test('publicación: incluye los recursos de la app y excluye código privado, pr
   assert.deepEqual(fs.readdirSync(dist).sort(), ['assets', 'css', 'index.html', 'js', 'manifest.webmanifest', 'sw.js']);
   assert.equal(fs.existsSync(path.join(dist, 'js/local-experiment.js')), false);
   assert.equal(fs.existsSync(path.join(dist, 'js/config.local.js.template')), false);
+  assert.equal(fs.readFileSync(path.join(dist, 'js/config.local.js'), 'utf8'), fs.readFileSync(path.join(root, 'js/config.local.js'), 'utf8'));
 
   // Comprueba el artefacto que consumen el HTML y la instalación offline reales.
   const html = fs.readFileSync(path.join(dist, 'index.html'), 'utf8');
@@ -42,6 +43,14 @@ test('publicación: incluye los recursos de la app y excluye código privado, pr
   vm.runInContext(fs.readFileSync(path.join(dist, 'sw.js'), 'utf8'), context);
   for (const reference of vm.runInContext('APP_SHELL', context)) {
     assert.ok(fs.existsSync(path.join(dist, reference.split('?')[0])), reference);
-    if (!['./', './index.html'].includes(reference)) assert.ok(html.includes(reference.slice(2)), reference);
+    if (reference.split('?')[0] === './js/audio-level-processor.js') {
+      // Es un módulo de AudioWorklet cargado por audio.js, no un script global.
+      assert.match(fs.readFileSync(path.join(dist, 'js/audio.js'), 'utf8'), /audio-level-processor\.js/);
+    } else if (!['./', './index.html'].includes(reference)) assert.ok(html.includes(reference.slice(2)), reference);
   }
+  fs.writeFileSync(path.join(root, 'js/config.local.js'), 'window.__ACOUSTIMAP_CONFIG__ = { SUPABASE_URL: "https://TU-PROYECTO.supabase.co", SUPABASE_ANON_KEY: "TU_ANON_KEY_AQUI" };');
+  const disconnectedBuild = spawnSync(process.execPath, ['scripts/build-site.js'], { cwd: root, encoding: 'utf8' });
+  assert.notEqual(disconnectedBuild.status, 0);
+  assert.match(disconnectedBuild.stderr, /Supabase sin configurar/);
+  assert.match(fs.readFileSync(path.join(dist, 'js/config.local.js'), 'utf8'), /public-fixture/);
 });

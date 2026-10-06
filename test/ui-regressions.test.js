@@ -51,6 +51,7 @@ test('leaving the map detaches heat canvases before the map is hidden', () => {
     },
     setTimeout: (fn) => fn(),
     invalidateMapIfVisible: () => assert.equal(mapVisible, true),
+    communityHeatRenderToken: 0,
     activateComparisonLayer: () => {},
     loadCommunityPoints: () => {}
   };
@@ -59,6 +60,7 @@ let comparisonLayer = { name: 'previous' };
 let currentComparisonLayer = { name: 'current' };
 this.layers = [communityHeatLayer, comparisonLayer, currentComparisonLayer];
 ${functionSource('map.js', 'suspendMapHeatLayers')}
+${functionSource('map.js', 'detachHeatLayer')}
 ${functionSource('app.js', 'switchTab')}
 this.run = switchTab;`, context);
   // Use the layers created in the VM, as those are the ones the functions see.
@@ -81,6 +83,7 @@ test('late statistics response cannot write into the replaced zone panel', async
     Date,
     panelIsCurrent: (node, view) => node.isConnected && node.dataset.view === view,
     fetchFeatureMeasurements: () => pending,
+    updateSummaryState: (_, state) => assert.equal(state, 'loading'),
     aggregatePoints: () => { throw new Error('stale response continued'); },
     console: { error: (error) => errors.push(error) }
   };
@@ -123,7 +126,8 @@ test('map period control selects history or live data and refreshes once', () =>
   const context = {
     mapMode: 'history',
     document: { querySelectorAll: () => buttons },
-    loadCommunityPoints: () => { refreshes++; }
+    loadCommunityPoints: () => { refreshes++; },
+    lastAggregatedPoints: [], clearCommunityLayers() {}
   };
   vm.runInNewContext(`${functionSource('community.js', 'setMapMode')}\nthis.run = setMapMode;`, context);
   context.run('live');

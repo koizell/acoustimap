@@ -17,6 +17,14 @@ const featureClientId = (() => {
 })();
 
 const CHALLENGE_STORE = 'acoustimap-local-challenge-measurements';
+/*
+ * Store aparte del de mediciones, a propósito.
+ *
+ * Mezclarlos haría que una funcióncontara para los dos y que un `filter` por
+ * `db_level` fuera la única forma de distinguirlos. Con dos almacenes, leer uno nunca
+ * puede contar lo del otro por accidente.
+ */
+const REPORT_CHALLENGE_STORE = 'acoustimap-local-challenge-reports';
 
 function getLocalChallengeMeasurements() {
   try {
@@ -43,6 +51,67 @@ function recordLocalChallengeMeasurement(measurement) {
   }
 }
 
+/**
+ * Anota un reporte para los retos, y decide si lo guarda en este dispositivo.
+ *
+ * ## Por qué el progreso no va a la base
+ *
+ * Porque es progreso **personal**, igual que las mediciones que ya contaban. El resto
+ * de retos se calculan en el navegador, así que este sigue la misma regla y no crea
+ * un precedente de "mis retos van al servidor".
+ *
+ * ## Por qué no se guarda la foto, y por qué la foto sigue siendo útil
+ *
+ * La foto **nunca sale del dispositivo** en esta ruta, ni en la base ni en el bucket.
+ * Eso no es una Carthage de los retos: la app promete «anónimo, sin audio, cuadrícula
+ * de 70 m», y una foto de una calle anula la cuadrícula, porque identifica el
+ * edificio y a veces a quien sale en la imagen.
+ *
+ * La foto sí cumple una función: **acreditar que el reporte es real**. Se guarda un
+ * `1` o un `0`, nunca el archivo. Con eso el reto se puede completar y la ciudad ve
+ * *dónde* se acumula basura, que es el dato que sirve, sin que exista ninguna imagen
+ * publicada.
+ *
+ * ## Lo que se guarda
+ *
+ * Categoría, día y celda. Nada que identifique a nadie ni por dónde pasó la persona.
+ */
+function recordLocalChallengeReport(report, photo, createdAt) {
+  try {
+    const rows = getLocalChallengeReports();
+    rows.push({
+      kind: report.kind,
+      latitude: report.latitude,
+      longitude: report.longitude,
+      // El flag se pasa explícitamente y no se deduce de `photo_path`, por un motivo
+      // concreto: en la cola offline el payload se guarda **sin** `photo_path` —la foto
+      // vive en el store de la cola y se sube al vaciarse—, así que deducirlo de ahí
+      // daba 0 siempre que hubiera red caída. El reto habría contado cero fotos
+      // justamente en el caso para el que la foto es obligatoria.
+      withPhoto: photo ? 1 : 0,
+      created_at: createdAt || report.created_at
+    });
+    localStorage.setItem(REPORT_CHALLENGE_STORE, JSON.stringify(rows.slice(-2000)));
+    return true;
+  } catch (error) {
+    // Un navegador con el almacenamiento lleno no debe impedir enviar el reporte:
+    // el reporte va a la base, que es lo importante. Solo se pierde el progreso del
+    // reto en este dispositivo.
+    console.warn('No se pudo guardar el progreso local del reporte:', error);
+    return false;
+  }
+}
+
+function getLocalChallengeReports() {
+  try {
+    const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000;
+    const rows = JSON.parse(localStorage.getItem(REPORT_CHALLENGE_STORE) || '[]');
+    return rows.filter((row) => Date.parse(row.created_at) >= cutoff);
+  } catch (_) {
+    return [];
+  }
+}
+
 let featureRows = [];
 let comparisonLayer = null;
 let currentComparisonLayer = null;
@@ -64,30 +133,75 @@ function isOfflineError(error) {
   return !navigator.onLine || /failed to fetch|network|offline|timeout/i.test(error?.message || '');
 }
 
+/**
+ * Un rechazo de Postgres por esquema, no un fallo de red.
+ *
+ * ## Por qué hace falta
+ *
+ * `isOfflineError()` reconoce fallos de red. Un `23514` —restricción violada— es
+ * otra cosa: la red funcionó y la base respondió que no. Lo que pasaba es que las dos
+ * se confundían, y el efecto era peor que un mal mensaje: la medición **no se
+ * guardaba en ninguna parte**. Con la app en la v4 y la migración sin aplicar, el
+ * CHECK rechazaba cada escritura y cada lectura del mundo se perdía en silencio.
+ *
+ * ## Los códigos que se consideran esquema
+ *
+ *   23514  check_violation       el CHECK no admite esta fila
+ *   42P01  undefined_table       falta la tabla
+ *   42703  undefined_column      falta la columna
+ *   42883  undefined_function    falta la RPC — es el PGRST202 que ve el mapa
+ *   42501  insufficient_privilege   el RLS o los permisos no dejan escribir
+ *   PGRST204                    PostgREST: la columna no está en la tabla
+ *
+ * `42501` se incluye a propósito: dice «no autorizado», y la reacción correcta es
+ * revisar la clave o las políticas, no esperar a que vuelva la red.
+ *
+ * ## Por qué PGRST204 está en la lista, y es el más importante
+ *
+ * Porque PostgREST envuelve los errores de Postgres en códigos propios, y el de
+ * columna ausente **no** es `42703`: es `PGRST204`. Sin él, escribir `kind` en un
+ * reporte antes de que la migración añada la columna daba un error que ninguna
+ * expresión de esta lista reconocía, así que caía por el camino de la red: el reporte
+ * se descartaba en silencio y el botón decía «revisa la conexión».
+ *
+ * Es el mismo modo de fallo que costó las mediciones de la v4, con un código distinto:
+ * desplegar el frontend antes que la migración, y perder datos sin que nadie lo note.
+ * Los dos casos están ahora en la lista y cubiertos por `test/schema-errors.test.js`.
+ *
+ * ## Lo que NO se hace con ellos
+ *
+ * No se ponen en la cola offline. Esa cola se sincroniza sola más tarde y volvería a
+ * fallar igual, acumulando filas que la base va a rechazar otra vez; y el mensaje de
+ * «guardado sin conexión» sería mentira.
+ */
+function isSchemaError(error) {
+  return /23514|42P01|42703|42883|42501|PGRST202|PGRST204/.test(String(error?.code || ''));
+}
+
 const featureText = {
   es: {
     tools: 'Herramientas', compare: 'Comparar mes', draw: 'Dibujar zona', report: 'Reportar ruido', stats: 'Estadísticas', challenges: 'Retos', theme: 'Tema oscuro', language: 'English', close: 'Cerrar',
-    comparison: 'Antes y después', comparisonHelp: 'Compara los últimos 30 días con los 30 anteriores. Elige un periodo para verlo en el mapa.', loading: 'Cargando datos…', noData: 'No hay datos suficientes.', current: 'Últimos 30 días', previous: '30 días anteriores', average: 'Promedio del índice', difference: 'Cambio', index: 'índice', sector: 'sector', viewMap: 'Ver en mapa', viewCurrent: 'Ver periodo actual', viewPrevious: 'Ver periodo anterior', indexPoints: 'puntos del índice', summaryTitle: 'Resumen de 30 días',
+    comparison: 'Antes y después', comparisonHelp: 'Compara los últimos 30 días con los 30 anteriores. Elige un periodo para verlo en el mapa.', loading: 'Cargando datos…', noData: 'No hay datos suficientes.', current: 'Últimos 30 días', previous: '30 días anteriores', average: 'Promedio en dB', difference: 'Cambio', index: 'dB', sector: 'sector', viewMap: 'Ver en mapa', viewCurrent: 'Ver periodo actual', viewPrevious: 'Ver periodo anterior', indexPoints: 'puntos de diferencia', summaryTitle: 'Resumen de 30 días',
     zone: 'Análisis de zona', zoneHelp: 'Dibuja un polígono sobre el mapa para calcular el promedio del área.', drawAction: 'Activar dibujo', clear: 'Limpiar zona', noZone: 'Aún no hay una zona seleccionada.', measurements: 'mediciones',
     reportTitle: 'Reportar contexto', reportHelp: 'Añade una nota breve sobre el origen del ruido. No se guarda audio ni ubicación exacta.', notePlaceholder: 'Ej.: obra en la calle', send: 'Enviar reporte', sent: 'Reporte enviado.',
     ranking: 'Ranking de zonas', loudest: 'Más ruidosas', quietest: 'Más tranquilas', alerts: 'Alertas persistentes', noAlerts: 'No se detectan zonas persistentes.', confirm: 'Confirmar ruido aquí', confirmed: 'Ruido confirmado.', confirmHelp: 'Pulsa el mapa para elegir una zona y confirma si también escuchas el ruido.',
-    challengeTitle: 'Retos de medición', challengeHelp: 'Completa mediciones consistentes para mejorar la cobertura ciudadana.', challengeProgress: 'progreso', offline: 'Medición guardada sin conexión.'
+    challengeTitle: 'Retos', challengeHelp: 'El progreso se guarda en este navegador con tus aportaciones de los últimos 30 días, incluidas las pendientes de conexión. Los retos de huella se completan con un reporte; los de ruido, midiendo. Activa Compartir para aportar.', challengeProgress: 'progreso', offline: 'Medición guardada sin conexión.'
   },
   en: {
     tools: 'Tools', compare: 'Compare month', draw: 'Draw zone', report: 'Report noise', stats: 'Statistics', challenges: 'Challenges', theme: 'Dark theme', language: 'Português', close: 'Close',
-    comparison: 'Before and after', comparisonHelp: 'Compare the last 30 days with the 30 days before. Choose a period to see it on the map.', loading: 'Loading data…', noData: 'Not enough data.', current: 'Last 30 days', previous: 'Previous 30 days', average: 'Average index', difference: 'Change', index: 'index', sector: 'area', viewMap: 'View on map', viewCurrent: 'View current period', viewPrevious: 'View previous period', indexPoints: 'index points', summaryTitle: '30-day summary',
+    comparison: 'Before and after', comparisonHelp: 'Compare the last 30 days with the 30 days before. Choose a period to see it on the map.', loading: 'Loading data…', noData: 'Not enough data.', current: 'Last 30 days', previous: 'Previous 30 days', average: 'Average in dB', difference: 'Change', index: 'dB', sector: 'area', viewMap: 'View on map', viewCurrent: 'View current period', viewPrevious: 'View previous period', indexPoints: 'point difference', summaryTitle: '30-day summary',
     zone: 'Zone analysis', zoneHelp: 'Draw a polygon on the map to calculate the area average.', drawAction: 'Enable drawing', clear: 'Clear zone', noZone: 'No zone selected yet.', measurements: 'measurements',
     reportTitle: 'Context report', reportHelp: 'Add a short note about the noise source. No audio or exact location is stored.', notePlaceholder: 'E.g. road works', send: 'Send report', sent: 'Report sent.',
     ranking: 'Zone ranking', loudest: 'Loudest', quietest: 'Quietest', alerts: 'Persistent alerts', noAlerts: 'No persistent zones detected.', confirm: 'Confirm noise here', confirmed: 'Noise confirmed.', confirmHelp: 'Click the map to choose an area and confirm if you also hear the noise.',
-    challengeTitle: 'Measurement challenges', challengeHelp: 'Complete consistent measurements to improve citizen coverage.', challengeProgress: 'progress', offline: 'Measurement saved offline.'
+    challengeTitle: 'Challenges', challengeHelp: 'Progress is saved in this browser from your contributions over the last 30 days, including those awaiting a connection. Impact challenges are completed with a report; noise ones, by measuring. Enable sharing to contribute.', challengeProgress: 'progress', offline: 'Measurement saved offline.'
   },
   pt: {
     tools: 'Ferramentas', compare: 'Comparar mês', draw: 'Desenhar zona', report: 'Relatar ruído', stats: 'Estatísticas', challenges: 'Desafios', theme: 'Tema escuro', language: 'Español', close: 'Fechar',
-    comparison: 'Antes e depois', comparisonHelp: 'Compare os últimos 30 dias com os 30 dias anteriores. Escolha um período para ver no mapa.', loading: 'Carregando dados…', noData: 'Dados insuficientes.', current: 'Últimos 30 dias', previous: '30 dias anteriores', average: 'Média do índice', difference: 'Mudança', index: 'índice', sector: 'setor', viewMap: 'Ver no mapa', viewCurrent: 'Ver período atual', viewPrevious: 'Ver período anterior', indexPoints: 'pontos do índice', summaryTitle: 'Resumo de 30 dias',
+    comparison: 'Antes e depois', comparisonHelp: 'Compare os últimos 30 dias com os 30 dias anteriores. Escolha um período para ver no mapa.', loading: 'Carregando dados…', noData: 'Dados insuficientes.', current: 'Últimos 30 dias', previous: '30 dias anteriores', average: 'Média em dB', difference: 'Mudança', index: 'dB', sector: 'setor', viewMap: 'Ver no mapa', viewCurrent: 'Ver período atual', viewPrevious: 'Ver período anterior', indexPoints: 'pontos de diferença', summaryTitle: 'Resumo de 30 dias',
     zone: 'Análise da zona', zoneHelp: 'Desenhe um polígono no mapa para calcular a média da área.', drawAction: 'Ativar desenho', clear: 'Limpar zona', noZone: 'Nenhuma zona selecionada.', measurements: 'medições',
     reportTitle: 'Relato de contexto', reportHelp: 'Adicione uma nota breve sobre a origem do ruído. Áudio e localização exata não são armazenados.', notePlaceholder: 'Ex.: obra na rua', send: 'Enviar relato', sent: 'Relato enviado.',
     ranking: 'Ranking de zonas', loudest: 'Mais barulhentas', quietest: 'Mais silenciosas', alerts: 'Alertas persistentes', noAlerts: 'Nenhuma zona persistente detectada.', confirm: 'Confirmar ruído aqui', confirmed: 'Ruído confirmado.', confirmHelp: 'Clique no mapa para escolher uma zona e confirme se também ouve o ruído.',
-    challengeTitle: 'Desafios de medição', challengeHelp: 'Complete medições consistentes para melhorar a cobertura cidadã.', challengeProgress: 'progresso', offline: 'Medição guardada offline.'
+    challengeTitle: 'Desafios', challengeHelp: 'O progresso é salvo neste navegador com suas contribuições dos últimos 30 dias, incluindo as pendentes de conexão. Os desafios de impacto são completados com um relato; os de ruído, medindo. Ative o compartilhamento para contribuir.', challengeProgress: 'progresso', offline: 'Medição guardada offline.'
   }
 };
 
@@ -96,9 +210,9 @@ function t(key) {
 }
 
 const interfaceCopy = {
-  es: { noteLabel: 'Nota', photoLabel: 'Foto opcional (JPG, PNG o WebP; máximo 5 MB)', selectPhoto: 'Seleccionar foto', chooseLocation: 'Elegir ubicación en el mapa', sendReport: 'Enviar reporte', selectedLocation: 'Ubicación seleccionada para el reporte.', reportNeed: 'Escribe una nota y selecciona una ubicación.', photoError: 'La foto debe ser JPG, PNG o WebP y pesar menos de 5 MB.', sending: 'Enviando reporte…', queuedReport: 'Reporte guardado y pendiente de conexión.', queueError: 'No se pudo guardar el reporte sin conexión.', chooseArea: 'Elegir zona en el mapa', chooseConfirm: 'Elegir zona para confirmar', trendTitle: 'Evolución de una zona', trendHelp: 'Elige un punto del mapa para ver su tendencia de 7 días.', emptyTrend: 'No hay mediciones en esta zona durante el periodo.', last30: 'últimos 30 días', noZone: 'Sin zona seleccionada.', rushTitle: 'Hora punta', rushDetail: 'Mide la misma zona entre 07:00 y 09:00 durante 3 días.', quietTitle: 'Ruta tranquila', quietDetail: 'Registra 5 mediciones tranquilas en ubicaciones distintas.', nightTitle: 'Cobertura nocturna', nightDetail: 'Comparte 3 mediciones entre las 18:00 y las 06:00.', completed: 'Completado', chooseMapPoint: 'Toca el mapa para elegir una ubicación.' },
-  en: { noteLabel: 'Note', photoLabel: 'Optional photo (JPG, PNG, or WebP; 5 MB max)', selectPhoto: 'Choose photo', chooseLocation: 'Choose a location on the map', sendReport: 'Send report', selectedLocation: 'Location selected for the report.', reportNeed: 'Add a note and choose a location.', photoError: 'Photo must be JPG, PNG, or WebP and under 5 MB.', sending: 'Sending report…', queuedReport: 'Report saved and waiting for a connection.', queueError: 'Could not save the report offline.', chooseArea: 'Choose an area on the map', chooseConfirm: 'Choose an area to confirm', trendTitle: 'Area trend', trendHelp: 'Choose a map point to view its 7-day trend.', emptyTrend: 'No measurements in this area for this period.', last30: 'last 30 days', noZone: 'No area selected.', rushTitle: 'Rush hour', rushDetail: 'Measure the same area between 07:00 and 09:00 on 3 days.', quietTitle: 'Quiet route', quietDetail: 'Record 5 quiet measurements in different locations.', nightTitle: 'Night coverage', nightDetail: 'Share 3 measurements between 18:00 and 06:00.', completed: 'Completed', chooseMapPoint: 'Tap the map to choose a location.' },
-  pt: { noteLabel: 'Nota', photoLabel: 'Foto opcional (JPG, PNG ou WebP; máximo 5 MB)', selectPhoto: 'Escolher foto', chooseLocation: 'Escolher local no mapa', sendReport: 'Enviar relato', selectedLocation: 'Local selecionado para o relato.', reportNeed: 'Escreva uma nota e escolha um local.', photoError: 'A foto deve ser JPG, PNG ou WebP e ter menos de 5 MB.', sending: 'Enviando relato…', queuedReport: 'Relato salvo e aguardando conexão.', queueError: 'Não foi possível salvar o relato offline.', chooseArea: 'Escolher área no mapa', chooseConfirm: 'Escolher área para confirmar', trendTitle: 'Tendência da área', trendHelp: 'Escolha um ponto no mapa para ver a tendência de 7 dias.', emptyTrend: 'Não há medições nesta área para o período.', last30: 'últimos 30 dias', noZone: 'Nenhuma área selecionada.', rushTitle: 'Hora de pico', rushDetail: 'Meça a mesma área entre 07:00 e 09:00 durante 3 dias.', quietTitle: 'Rota tranquila', quietDetail: 'Registre 5 medições tranquilas em locais diferentes.', nightTitle: 'Cobertura noturna', nightDetail: 'Compartilhe 3 medições entre 18:00 e 06:00.', completed: 'Concluído', chooseMapPoint: 'Toque no mapa para escolher um local.' }
+  es: { noteLabel: 'Nota', kindLabel: '¿Qué es?', photoLabel: 'Foto opcional (JPG, PNG o WebP; máximo 5 MB)', selectPhoto: 'Seleccionar foto', chooseLocation: 'Elegir ubicación en el mapa', sendReport: 'Enviar reporte', selectedLocation: 'Ubicación seleccionada para el reporte.', reportNeed: 'Escribe una nota y selecciona una ubicación.', photoError: 'La foto debe ser JPG, PNG o WebP y pesar menos de 5 MB.', sending: 'Enviando reporte…', queuedReport: 'Reporte guardado y pendiente de conexión.', queueError: 'No se pudo guardar el reporte sin conexión.', chooseArea: 'Elegir zona en el mapa', chooseConfirm: 'Elegir zona para confirmar', trendTitle: 'Evolución de una zona', trendHelp: 'Elige un punto del mapa para ver su tendencia de 7 días.', emptyTrend: 'No hay mediciones en esta zona durante el periodo.', last30: 'últimos 30 días', noZone: 'Sin zona seleccionada.', rushTitle: 'Hora punta', rushDetail: 'Mide la misma zona entre 07:00 y 09:00 durante 3 días.', quietTitle: 'Ruta tranquila', quietDetail: 'Registra 5 mediciones tranquilas en ubicaciones distintas.', nightTitle: 'Cobertura nocturna', nightDetail: 'Aporta mediciones entre las 18:00 y las 06:00, hora de Colombia, en 3 combinaciones distintas de zona y día.', litterTitle: 'Recoge basura', litterDetail: 'Reporta basura que hayas recogido, con foto, en 3 zonas y días distintos. La foto no se publica: solo queda en tu dispositivo.', worksTitle: 'Denuncia la obra', worksDetail: 'Reporta 2 obras activas en zonas distintas. No hace falta foto ni medir el ruido.', completed: 'Completado', chooseMapPoint: 'Toca el mapa para elegir una ubicación.' },
+  en: { noteLabel: 'Note', kindLabel: 'What is it?', photoLabel: 'Optional photo (JPG, PNG, or WebP; 5 MB max)', selectPhoto: 'Choose photo', chooseLocation: 'Choose a location on the map', sendReport: 'Send report', selectedLocation: 'Location selected for the report.', reportNeed: 'Add a note and choose a location.', photoError: 'Photo must be JPG, PNG, or WebP and under 5 MB.', sending: 'Sending report…', queuedReport: 'Report saved and waiting for a connection.', queueError: 'Could not save the report offline.', chooseArea: 'Choose an area on the map', chooseConfirm: 'Choose an area to confirm', trendTitle: 'Area trend', trendHelp: 'Choose a map point to view its 7-day trend.', emptyTrend: 'No measurements in this area for this period.', last30: 'last 30 days', noZone: 'No area selected.', rushTitle: 'Rush hour', rushDetail: 'Measure the same area between 07:00 and 09:00 on 3 days.', quietTitle: 'Quiet route', quietDetail: 'Record 5 quiet measurements in different locations.', nightTitle: 'Night coverage', nightDetail: 'Contribute measurements between 18:00 and 06:00, Colombian time, in 3 distinct area-and-day combinations.', litterTitle: 'Pick up litter', litterDetail: 'Report litter you have picked up, with a photo, in 3 different areas and days. The photo is not published: it stays on your device.', worksTitle: 'Report the works', worksDetail: 'Report 2 active construction sites in different areas. No photo and no noise reading needed.', completed: 'Completed', chooseMapPoint: 'Tap the map to choose a location.' },
+  pt: { noteLabel: 'Nota', kindLabel: 'O que é?', photoLabel: 'Foto opcional (JPG, PNG ou WebP; máximo 5 MB)', selectPhoto: 'Escolher foto', chooseLocation: 'Escolher local no mapa', sendReport: 'Enviar relato', selectedLocation: 'Local selecionado para o relato.', reportNeed: 'Escreva uma nota e escolha um local.', photoError: 'A foto deve ser JPG, PNG ou WebP e ter menos de 5 MB.', sending: 'Enviando relato…', queuedReport: 'Relato salvo e aguardando conexão.', queueError: 'Não foi possível salvar o relato offline.', chooseArea: 'Escolher área no mapa', chooseConfirm: 'Escolher área para confirmar', trendTitle: 'Tendência da área', trendHelp: 'Escolha um ponto no mapa para ver a tendência de 7 dias.', emptyTrend: 'Não há medições nesta área para o período.', last30: 'últimos 30 dias', noZone: 'Nenhuma área selecionada.', rushTitle: 'Hora de pico', rushDetail: 'Meça a mesma área entre 07:00 e 09:00 durante 3 dias.', quietTitle: 'Rota tranquila', quietDetail: 'Registre 5 medições tranquilas em locais diferentes.', nightTitle: 'Cobertura noturna', nightDetail: 'Contribua com medições entre 18:00 e 06:00, no horário da Colômbia, em 3 combinações distintas de área e dia.', litterTitle: 'Recolha lixo', litterDetail: 'Relate lixo que você recolheu, com foto, em 3 áreas e dias diferentes. A foto não é publicada: fica só no seu aparelho.', worksTitle: 'Denuncie a obra', worksDetail: 'Relate 2 obras ativas em áreas diferentes. Não precisa de foto nem de medir o ruído.', completed: 'Concluído', chooseMapPoint: 'Toque no mapa para escolher um local.' }
 };
 
 function u(key) { return interfaceCopy[currentLanguage][key] || interfaceCopy.es[key] || key; }
@@ -140,6 +254,7 @@ function createFeatureUi() {
     const isOpen = !menu.hidden;
     menu.hidden = isOpen;
     toolbar.querySelector('.feature-menu-toggle').setAttribute('aria-expanded', String(!isOpen));
+    if (!isOpen && typeof revealUi === 'function') revealUi(menu);
   });
 
   toolbar.addEventListener('click', (event) => {
@@ -155,34 +270,38 @@ function createFeatureUi() {
     else openFeaturePanel(feature);
   });
 
-  map.on('click', (event) => {
-    selectedMapPoint = event.latlng;
-    const status = document.getElementById('feature-status');
-    if (status) status.textContent = `${event.latlng.lat.toFixed(5)}, ${event.latlng.lng.toFixed(5)}`;
-    if (pendingMapSelection) {
-      pendingMapSelection = false;
-      switchTab('stats-view', document.querySelectorAll('.tab-btn')[2]);
-      openStatsTab('stats');
-      const confirmStatus = document.getElementById('confirm-status');
-      if (confirmStatus) confirmStatus.textContent = u('selectedLocation');
-      loadZoneConfirmations(event.latlng);
-      return;
-    }
-    if (pendingTrendSelection) {
-      pendingTrendSelection = false;
-      switchTab('stats-view', document.querySelectorAll('.tab-btn')[2]);
-      openStatsTab('stats');
-      loadZoneTrend(event.latlng);
-      return;
-    }
-    if (pendingReportSelection) {
-      pendingReportSelection = false;
-      switchTab('stats-view', document.querySelectorAll('.tab-btn')[2]);
-      const reportStatus = document.getElementById('stats-feature-content')?.querySelector('#feature-status');
-      if (reportStatus) reportStatus.textContent = u('selectedLocation');
-      return;
-    }
-  });
+  // Cambiar idioma reconstruye los botones, no debe registrar otro listener.
+  if (!createFeatureUi.mapClickBound) {
+    createFeatureUi.mapClickBound = true;
+    map.on('click', (event) => {
+      selectedMapPoint = event.latlng;
+      const status = document.getElementById('feature-status');
+      if (status) status.textContent = `${event.latlng.lat.toFixed(5)}, ${event.latlng.lng.toFixed(5)}`;
+      if (pendingMapSelection) {
+        pendingMapSelection = false;
+        switchTab('stats-view', document.querySelectorAll('.tab-btn')[2]);
+        openStatsTab('stats');
+        const confirmStatus = document.getElementById('confirm-status');
+        if (confirmStatus) confirmStatus.textContent = u('selectedLocation');
+        loadZoneConfirmations(event.latlng);
+        return;
+      }
+      if (pendingTrendSelection) {
+        pendingTrendSelection = false;
+        switchTab('stats-view', document.querySelectorAll('.tab-btn')[2]);
+        openStatsTab('stats');
+        loadZoneTrend(event.latlng);
+        return;
+      }
+      if (pendingReportSelection) {
+        pendingReportSelection = false;
+        switchTab('stats-view', document.querySelectorAll('.tab-btn')[2]);
+        const reportStatus = document.getElementById('stats-feature-content')?.querySelector('#feature-status');
+        if (reportStatus) reportStatus.textContent = u('selectedLocation');
+        return;
+      }
+    });
+  }
 
   return panel;
 }
@@ -209,6 +328,7 @@ function openStatsTab(view, render = true) {
   if (page) page.scrollTop = 0;
   const renderers = { compare: renderComparisonPanel, report: renderReportPanel, stats: renderStatsPanel, challenges: renderChallengesPanel };
   if (render) (renderers[view] || renderStatsPanel)(content);
+  if (typeof revealUi === 'function') revealUi(content);
 }
 
 function closeFeaturePanel() {
@@ -240,7 +360,8 @@ async function fetchFeatureMeasurements(start, end) {
   while (true) {
     let query = supabaseClient
       .from('noise_measurements')
-      .select('latitude, longitude, db_level, category, created_at')
+      .select('latitude, longitude, db_level, category, created_at, measurement_version, capture_profile')
+      .eq('measurement_version', MEASUREMENT_VERSION)
       .order('created_at', { ascending: false })
       .range(from, from + pageSize - 1);
     if (start) query = query.gte('created_at', start.toISOString());
@@ -254,8 +375,19 @@ async function fetchFeatureMeasurements(start, end) {
   return rows;
 }
 
+/*
+ * El promedio de la pestaña de Datos, energetico como el resto.
+ *
+ * Es el mismo error que se corrigio en el medidor y en la ventana de envio, en el
+ * tercer sitio donde se hacia: la media aritmetica de dB queda por debajo de la
+ * energia real, y cuanto mas varian las lecturas mas se separa. Aqui las filas son
+ * mediciones de distintos dias y horas, que es donde mas varian, asi que era el
+ * promedio mas sesgado de los tres.
+ */
 function averageDb(rows) {
-  return rows.length ? Math.round(rows.reduce((sum, row) => sum + row.db_level, 0) / rows.length) : null;
+  if (!rows.length) return null;
+  const energia = rows.reduce((sum, row) => sum + energiaDe(row.db_level), 0);
+  return Math.round(promedioEnergetico(energia, rows.length));
 }
 
 function noDataMessage() {
@@ -317,22 +449,33 @@ function showComparison(mode) {
 function activateComparisonLayer() {
   if (!comparisonMode || !window.L?.heatLayer || !map) return;
   const rows = comparisonRows[comparisonMode] || [];
-  const points = rows.map((row) => [row.latitude, row.longitude, normalizeDbForHeatmap(row.db_level)]);
-  if (!comparisonLayer) comparisonLayer = L.heatLayer([], {
-    radius: 42, blur: 30, maxZoom: 17, max: 1, minOpacity: 0.3,
+  const aggregated = aggregatePoints(rows);
+  const points = aggregated.map((point) => [point.lat, point.lng, normalizeDbForHeatmap(point.db)]);
+  if (!comparisonLayer) comparisonLayer = createRelativeHeatLayer([], {
+    radius: 42, blur: 30, maxZoom: 0, max: 1, minOpacity: 0.3,
     gradient: { 0.2: '#2563eb', 0.55: '#38bdf8', 1: '#1d4ed8' }
   });
-  if (!currentComparisonLayer) currentComparisonLayer = L.heatLayer([], {
-    radius: 42, blur: 30, maxZoom: 17, max: 1, minOpacity: 0.3,
+  if (!currentComparisonLayer) currentComparisonLayer = createRelativeHeatLayer([], {
+    radius: 42, blur: 30, maxZoom: 0, max: 1, minOpacity: 0.3,
     gradient: { 0.2: '#10b981', 0.55: '#f59e0b', 1: '#dc2626' }
   });
   communityLayer.clearLayers();
-  if (communityHeatLayer && map.hasLayer(communityHeatLayer)) map.removeLayer(communityHeatLayer);
-  if (map.hasLayer(comparisonLayer)) map.removeLayer(comparisonLayer);
-  if (map.hasLayer(currentComparisonLayer)) map.removeLayer(currentComparisonLayer);
+  suspendMapHeatLayers();
+  if (selectedVisualMode === 'zones') {
+    aggregated.forEach((point) => addCommunityPoint(point.lat, point.lng, point.db, point.category, point.createdAt, point.sampleCount));
+    return;
+  }
   const layer = comparisonMode === 'previous' ? comparisonLayer : currentComparisonLayer;
-  layer.setLatLngs(points);
+  layer._latlngs = points;
+  if (!points.length) return;
   layer.addTo(map);
+  layer.setLatLngs(points);
+}
+
+function exitComparisonMode() {
+  comparisonMode = null;
+  detachHeatLayer(comparisonLayer);
+  detachHeatLayer(currentComparisonLayer);
 }
 
 function enableZoneDrawing() {
@@ -350,12 +493,10 @@ function enableZoneDrawing() {
 }
 
 function clearDrawnZone() {
-  if (!drawnZone) return;
-  map.removeLayer(drawnZone);
+  if (drawnZone) map.removeLayer(drawnZone);
   drawnZone = null;
-  if (comparisonLayer && map.hasLayer(comparisonLayer)) map.removeLayer(comparisonLayer);
-  if (currentComparisonLayer && map.hasLayer(currentComparisonLayer)) map.removeLayer(currentComparisonLayer);
-  comparisonMode = null;
+  exitComparisonMode();
+  renderCommunityPoints(lastAggregatedPoints);
   closeFeaturePanel();
 }
 
@@ -397,20 +538,75 @@ async function analyzeDrawnZone(polygon) {
   }
 }
 
+/**
+ * Las categorías de reporte, y por qué existen.
+ *
+ * ## El problema que resuelven
+ *
+ * El reto de recoger basura se completaría con **cualquier** reporte que lleve una
+ * foto. Eso está mal: fotografiar una obra en seco lo completaría, que es justo lo
+ * contrario de lo que se busca. Para que un reto signifique algo tiene que poder
+ * distinguir de qué trata el reporte, y eso no se saca del texto libre.
+ *
+ * ## Por qué solo cuatro
+ *
+ * Porque cuatro son las que la app sabe nombrar sin inventar una taxonomía. Una
+ * lista larga de categorías que nadie usa es peor que cuatro que sí: el objetivo es
+ * que el dato sea fiable, no que haya muchas casillas. `'ruido'` es la que menos dice,
+ * y es la que corresponde a lo que había antes de esta columna, porque el 100 % de
+ * los reportes guardados hasta ahora son de ese tipo.
+ *
+ * El orden no es el de la base de datos ni el alfabético: empieza por `basura` porque
+ * es la que empuja el reto nuevo, y acaba por `ruido` porque es la que menos
+ * información aporta y así no se elige por defecto.
+ */
+const REPORT_KINDS = ['basura', 'obra', 'trafico', 'ruido'];
+
+const reportKindCopy = {
+  es: { basura: 'Basura acumulada', obra: 'Obra', trafico: 'Tráfico', ruido: 'Ruido' },
+  en: { basura: 'Litter', obra: 'Construction', trafico: 'Traffic', ruido: 'Noise' },
+  pt: { basura: 'Lixo acumulado', obra: 'Obra', trafico: 'Tráfego', ruido: 'Ruído' }
+};
+
+/** El `<option>` que viene marcado es `ruido`, el de menor información. */
+function reportKindOptions() {
+  const copy = reportKindCopy[currentLanguage] || reportKindCopy.es;
+  const selected = REPORT_KINDS.find((kind) => kind === 'ruido');
+  return REPORT_KINDS
+    .map((kind) => `<option value="${kind}"${kind === selected ? ' selected' : ''}>${copy[kind]}</option>`)
+    .join('');
+}
+
+function reportPhotoNotice(kind) {
+  const local = kind === 'basura' || kind === 'obra';
+  const copy = {
+    es: local ? 'La foto no se sube; solo cuenta para el reto.' : 'La foto se publicará con el reporte. Evita rostros y datos personales.',
+    en: local ? 'The photo is not uploaded; it only counts toward the challenge.' : 'The photo will be published with the report. Avoid faces and personal details.',
+    pt: local ? 'A foto não é enviada; só conta para o desafio.' : 'A foto será publicada com o relato. Evite rostos e dados pessoais.'
+  };
+  return copy[currentLanguage] || copy.es;
+}
+
 function renderReportPanel(panel) {
   panel.innerHTML = panelFrame(t('reportTitle'), `
     <p>${t('reportHelp')}</p>
+    <label for="report-kind">${u('kindLabel')}</label>
+    <select id="report-kind">${reportKindOptions()}</select>
     <label for="report-note">${u('noteLabel')}</label>
     <textarea id="report-note" maxlength="280" placeholder="${t('notePlaceholder')}" required></textarea>
     <label for="report-photo">${u('photoLabel')}</label>
     <input id="report-photo" type="file" accept="image/jpeg,image/png,image/webp" hidden />
     <button type="button" id="choose-report-photo">${u('selectPhoto')}</button>
     <div id="report-photo-name" class="photo-selection" role="status" aria-live="polite">${noPhotoLabel()}</div>
+    <p id="report-photo-privacy" role="status" aria-live="polite">${reportPhotoNotice('ruido')}</p>
     <div class="panel-actions"><button type="button" id="select-report-location">${u('chooseLocation')}</button></div>
     <div class="feature-status" id="feature-status" role="status" aria-live="polite"></div>
     <div class="panel-actions"><button type="button" class="primary-action" id="send-report">${u('sendReport')}</button></div>`, panel);
   panel.querySelector('[data-close]')?.addEventListener('click', closeFeaturePanel);
   panel.querySelector('#choose-report-photo').addEventListener('click', () => panel.querySelector('#report-photo').click());
+  panel.querySelector('#report-kind').addEventListener('change', (event) => {
+    panel.querySelector('#report-photo-privacy').textContent = reportPhotoNotice(event.target.value);
+  });
   panel.querySelector('#report-photo').addEventListener('change', (event) => {
     panel.querySelector('#report-photo-name').textContent = event.target.files?.[0]?.name || noPhotoLabel();
   });
@@ -431,7 +627,7 @@ async function loadCitizenReports(panel) {
   }
   const { data, error } = await supabaseClient
     .from('noise_reports')
-    .select('db_level, note, photo_path, created_at')
+    .select('db_level, note, photo_path, kind, created_at')
     .order('created_at', { ascending: false })
     .limit(20);
   if (error) {
@@ -446,7 +642,9 @@ async function loadCitizenReports(panel) {
   data.forEach((report) => {
     const item = document.createElement('li');
     const detail = document.createElement('span');
-    detail.textContent = `${report.db_level == null ? m('noMeasurement') : `${t('index')} ${report.db_level}`} · ${report.note} · ${timeAgo(report.created_at)}`;
+    const kindLabel = reportKindCopy[currentLanguage]?.[report.kind];
+    const nivel = report.db_level == null ? m('noMeasurement') : `${t('index')} ${report.db_level}`;
+    detail.textContent = `${kindLabel ? `${kindLabel} · ` : ''}${nivel} · ${report.note} · ${timeAgo(report.created_at)}`;
     item.appendChild(detail);
     if (report.photo_path) {
       const { data: photo } = supabaseClient.storage.from('noise-report-photos').getPublicUrl(report.photo_path);
@@ -460,12 +658,13 @@ async function loadCitizenReports(panel) {
   });
 }
 
-function buildReportRecord(id, position, db, note, photoType) {
+function buildReportRecord(id, position, db, note, photoType, kind) {
   const extension = photoType === 'image/png' ? 'png' : photoType === 'image/webp' ? 'webp' : 'jpg';
-  const photoPath = photoType ? `${id}/${id}.${extension}` : null;
+  const localPhoto = kind === 'basura' || kind === 'obra';
+  const photoPath = photoType && !localPhoto ? `${id}/${id}.${extension}` : null;
   return {
     photoPath,
-    payload: { id, latitude: position.lat, longitude: position.lng, db_level: db, note, photo_path: photoPath }
+    payload: { id, latitude: position.lat, longitude: position.lng, db_level: db, note, photo_path: photoPath, kind }
   };
 }
 
@@ -489,19 +688,23 @@ async function submitReport() {
   const parsedDb = Number.parseInt(document.getElementById('db-number')?.innerText, 10);
   const db = Number.isInteger(parsedDb) && parsedDb >= 20 && parsedDb <= 140 ? parsedDb : null;
   const reportId = crypto.randomUUID();
-  const reportRecord = buildReportRecord(reportId, snapped, db, note, photo?.type);
+  const kindInput = panel?.querySelector('#report-kind');
+  const kind = REPORT_KINDS.includes(kindInput?.value) ? kindInput.value : 'ruido';
+  const reportRecord = buildReportRecord(reportId, snapped, db, note, photo?.type, kind);
   const button = panel.querySelector('#send-report');
   button.disabled = true;
   status.textContent = u('sending');
   const photoPath = reportRecord.photoPath;
+  const uploadPhoto = photoPath ? photo : null;
   try {
-    if (photo) {
-      const { error: uploadError } = await supabaseClient.storage.from('noise-report-photos').upload(photoPath, photo, { contentType: photo.type, upsert: false });
+    if (uploadPhoto) {
+      const { error: uploadError } = await supabaseClient.storage.from('noise-report-photos').upload(photoPath, uploadPhoto, { contentType: uploadPhoto.type, upsert: false });
       if (uploadError) throw uploadError;
     }
     const { error } = await supabaseClient.from('noise_reports').insert(reportRecord.payload);
     if (error) throw error;
     status.textContent = t('sent');
+    recordLocalChallengeReport(reportRecord.payload, photo, new Date().toISOString());
     noteInput.value = '';
     if (photoInput) photoInput.value = '';
     const photoName = panel.querySelector('#report-photo-name');
@@ -510,8 +713,9 @@ async function submitReport() {
   } catch (error) {
     if (isOfflineError(error) && typeof enqueueOfflineRecord === 'function') {
       try {
-        await enqueueOfflineRecord('noise_reports', { ...reportRecord.payload, photo_path: null }, photo);
+        await enqueueOfflineRecord('noise_reports', { ...reportRecord.payload, photo_path: null }, uploadPhoto);
         status.textContent = u('queuedReport');
+        recordLocalChallengeReport(reportRecord.payload, photo, new Date().toISOString());
         noteInput.value = '';
         if (photoInput) photoInput.value = '';
         const photoName = panel.querySelector('#report-photo-name');
@@ -529,10 +733,88 @@ async function submitReport() {
   }
 }
 
+// Copy del resumen: breve, sin presentar el índice como una medición en dB.
+function summaryText(key) {
+  const copy = {
+    es: {
+      scope: `Ruido medido · método v${MEASUREMENT_VERSION}`, totalLabel: 'Mediciones', singleReading: 'medición', oneZone: 'zona analizada',
+      totalHint: 'Lecturas compartidas', averageLabel: 'Media en dB', averageHint: 'Escala orientativa, sin calibrar',
+      highLabel: 'Zona ruidosa', highHint: 'Lecturas por encima de 70 dB', loadingHint: 'Consultando las mediciones compartidas.',
+      emptyTitle: 'Aún no hay mediciones', emptyHint: `Los aportes del método v${MEASUREMENT_VERSION} aparecerán aquí. Puedes empezar desde el mapa.`,
+      disconnectedTitle: 'Resumen no disponible', disconnectedHint: 'Falta conectar la base de datos. Puedes probar el medidor en el mapa.',
+      errorTitle: 'No pudimos cargar el resumen', errorHint: 'Revisa la conexión e inténtalo de nuevo.', retry: 'Reintentar', map: 'Ir al mapa',
+      zonesHint: 'Promedios por zona · hasta 3 por lista', alertsHint: 'Ruido alto durante 3 días seguidos',
+      community: 'En tu zona', communityHint: '¿También escuchas el ruido? Elige un punto y confírmalo.', reports: 'Ver reportes ciudadanos'
+    },
+    en: {
+      scope: `Measured noise · method v${MEASUREMENT_VERSION}`, totalLabel: 'Measurements', singleReading: 'measurement', oneZone: 'area analyzed',
+      totalHint: 'Shared readings', averageLabel: 'Mean in dB', averageHint: 'Orientation scale, uncalibrated',
+      highLabel: 'Noisy area', highHint: 'Readings above 70 dB', loadingHint: 'Fetching shared measurements.',
+      emptyTitle: 'No measurements yet', emptyHint: `Contributions using method v${MEASUREMENT_VERSION} will appear here. You can start on the map.`,
+      disconnectedTitle: 'Summary unavailable', disconnectedHint: 'The database is not connected. You can try the meter on the map.',
+      errorTitle: 'Could not load the summary', errorHint: 'Check your connection and try again.', retry: 'Try again', map: 'Go to map',
+      zonesHint: 'Area averages · up to 3 per list', alertsHint: 'High noise for 3 days running',
+      community: 'In your area', communityHint: 'Can you hear it too? Choose a point and confirm the noise.', reports: 'View citizen reports'
+    },
+    pt: {
+      scope: `Ruído medido · método v${MEASUREMENT_VERSION}`, totalLabel: 'Medições', singleReading: 'medição', oneZone: 'área analisada',
+      totalHint: 'Leituras compartilhadas', averageLabel: 'Média em dB', averageHint: 'Escala orientativa, sem calibração',
+      highLabel: 'Área ruidosa', highHint: 'Leituras acima de 70 dB', loadingHint: 'Consultando as medições compartilhadas.',
+      emptyTitle: 'Ainda não há medições', emptyHint: `As contribuições do método v${MEASUREMENT_VERSION} aparecerão aqui. Comece pelo mapa.`,
+      disconnectedTitle: 'Resumo indisponível', disconnectedHint: 'O banco de dados não está conectado. Você pode testar o medidor no mapa.',
+      errorTitle: 'Não foi possível carregar o resumo', errorHint: 'Verifique a conexão e tente novamente.', retry: 'Tentar novamente', map: 'Ir ao mapa',
+      zonesHint: 'Médias por área · até 3 por lista', alertsHint: 'Ruído alto por 3 dias seguidos',
+      community: 'Na sua região', communityHint: 'Também ouve o ruído? Escolha um ponto e confirme.', reports: 'Ver relatos da comunidade'
+    }
+  };
+  return (copy[document.documentElement.lang] || copy.es)[key];
+}
+
+function summaryIcon(name) {
+  const paths = {
+    readings: '<path d="M4 19V9m5 10V5m5 14v-7m5 7V3"/>',
+    average: '<path d="M3 12h18M5 7h14M5 17h14"/>',
+    high: '<path d="m3 17 6-6 4 3 8-10m-6 0h6v6"/>',
+    map: '<path d="m3 6 6-3 6 3 6-3v15l-6 3-6-3-6 3Zm6-3v15m6-12v15"/>',
+    trend: '<path d="M3 3v18h18M6 15l5-6 4 3 6-7"/>',
+    community: '<path d="M21 11a8 8 0 0 1-8 8H5l-3 3V11a9 9 0 0 1 19 0ZM7 9h9M7 13h6"/>'
+  };
+  return `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths[name] || paths.map}</svg>`;
+}
+
 function renderStatsPanel(panel) {
   panel.dataset.subview = 'overview';
-  panel.innerHTML = panelFrame(t('summaryTitle'), `<div class="feature-status" role="status" aria-live="polite">${t('loading')}</div><div class="stats-metrics"><div><strong id="metric-total">--</strong><span>${t('measurements')} · ${u('last30')}</span></div><div><strong id="metric-average">--</strong><span>${t('average')}</span></div><div><strong id="metric-high">--</strong><span>${t('index')} &gt; 70</span></div></div><div class="stats-columns"><section><h2>${t('loudest')}</h2><ul class="feature-list" id="loudest-list"></ul></section><section><h2>${t('quietest')}</h2><ul class="feature-list" id="quietest-list"></ul></section></div><h2>${t('alerts')}</h2><ul class="feature-list" id="alerts-list"></ul><h2>${u('trendTitle')}</h2><p>${u('trendHelp')}</p><div class="panel-actions"><button type="button" id="select-trend-location">${u('chooseArea')}</button></div><div id="zone-trend" class="feature-status">${u('noZone')}</div><h2>${m('reportHeading')}</h2><ul class="feature-list" id="citizen-reports-list"><li>${t('loading')}</li></ul><div class="panel-actions"><button type="button" id="select-confirm-location">${u('chooseConfirm')}</button><button type="button" id="confirm-noise">🔊 ${t('confirm')}</button></div><p id="confirm-status" role="status" aria-live="polite">${t('confirmHelp')}</p>`, panel);
+  panel.innerHTML = panelFrame(t('summaryTitle'), `
+    <div class="summary-overview" data-state="loading">
+      <p class="summary-scope">${summaryText('scope')}</p>
+      <div class="stats-metrics summary-metrics" aria-busy="true">
+        <div class="summary-metric"><span class="summary-metric-label">${summaryIcon('readings')}${summaryText('totalLabel')}</span><strong id="metric-total">--</strong><small>${summaryText('totalHint')}</small></div>
+        <div class="summary-metric"><span class="summary-metric-label">${summaryIcon('average')}${summaryText('averageLabel')}</span><strong id="metric-average">--</strong><small>${summaryText('averageHint')}</small></div>
+        <div class="summary-metric"><span class="summary-metric-label">${summaryIcon('high')}${summaryText('highLabel')}</span><strong id="metric-high">--</strong><small>${summaryText('highHint')}</small></div>
+      </div>
+      <div class="summary-feedback" role="status" aria-live="polite" aria-atomic="true">
+        <span class="summary-feedback-icon">${summaryIcon('map')}</span>
+        <div><h3 id="summary-state-title">${t('loading')}</h3><p id="summary-state-hint">${summaryText('loadingHint')}</p></div>
+      </div>
+      <div class="summary-state-actions" hidden><button type="button" id="summary-state-action"></button></div>
+      <div class="summary-results" hidden>
+        <p class="summary-section-note">${summaryText('zonesHint')}</p>
+        <div class="stats-columns">
+          <section class="summary-zone-card"><h3><span class="summary-dot loud"></span>${t('loudest')}</h3><ul class="feature-list" id="loudest-list"></ul></section>
+          <section class="summary-zone-card"><h3><span class="summary-dot quiet"></span>${t('quietest')}</h3><ul class="feature-list" id="quietest-list"></ul></section>
+        </div>
+        <details class="summary-alerts"><summary>${t('alerts')}</summary><p>${summaryText('alertsHint')}</p><ul class="feature-list" id="alerts-list"></ul></details>
+      </div>
+      <div class="summary-tools">
+        <section class="summary-tool"><span class="summary-tool-icon">${summaryIcon('trend')}</span><h3>${u('trendTitle')}</h3><p>${u('trendHelp')}</p><div class="panel-actions"><button type="button" id="select-trend-location">${u('chooseArea')}</button></div><div id="zone-trend" class="feature-status" hidden></div></section>
+        <section class="summary-tool"><span class="summary-tool-icon">${summaryIcon('community')}</span><h3>${summaryText('community')}</h3><p>${summaryText('communityHint')}</p><div class="panel-actions"><button type="button" id="select-confirm-location">${u('chooseConfirm')}</button><button type="button" id="confirm-noise">${t('confirm')}</button></div><p id="confirm-status" role="status" aria-live="polite"></p><details class="summary-reports"><summary>${summaryText('reports')}</summary><ul class="feature-list" id="citizen-reports-list"><li>${t('loading')}</li></ul></details></section>
+      </div>
+    </div>`, panel);
   panel.querySelector('[data-close]')?.addEventListener('click', closeFeaturePanel);
+  panel.querySelector('#summary-state-action').addEventListener('click', () => {
+    if (panel.querySelector('.summary-overview').dataset.state === 'error') loadStats(panel);
+    else switchTab('map-view', document.querySelector('.tab-btn'));
+  });
   panel.querySelector('#confirm-noise').addEventListener('click', confirmNoise);
   panel.querySelector('#select-confirm-location').addEventListener('click', () => {
     pendingMapSelection = true;
@@ -548,6 +830,28 @@ function renderStatsPanel(panel) {
   loadCitizenReports(panel);
 }
 
+/** Un solo estado global: sin listas vacías repetidas ni ceros ante un error. */
+function updateSummaryState(panel, state, zoneCount = 0) {
+  const overview = panel.querySelector('.summary-overview');
+  overview.dataset.state = state;
+  panel.querySelector('.summary-metrics').setAttribute('aria-busy', String(state === 'loading'));
+  panel.querySelector('.summary-results').hidden = state !== 'ready';
+  const title = panel.querySelector('#summary-state-title');
+  const hint = panel.querySelector('#summary-state-hint');
+  title.textContent = state === 'ready' ? `${zoneCount} ${zoneCount === 1 ? summaryText('oneZone') : m('zonesAnalyzed')}`
+    : state === 'loading' ? t('loading') : summaryText(`${state}Title`);
+  hint.textContent = state === 'ready' ? '' : summaryText(`${state}Hint`);
+  hint.hidden = state === 'ready';
+  panel.querySelector('.summary-state-actions').hidden = state === 'ready' || state === 'loading';
+  panel.querySelector('#summary-state-action').textContent = summaryText(state === 'error' ? 'retry' : 'map');
+  if (state !== 'ready') {
+    panel.querySelector('#metric-total').textContent = state === 'empty' ? '0' : '--';
+    panel.querySelector('#metric-average').textContent = '--';
+    panel.querySelector('#metric-high').textContent = '--';
+    for (const id of ['loudest-list', 'quietest-list', 'alerts-list']) panel.querySelector(`#${id}`).innerHTML = '';
+  }
+}
+
 function appendRanking(list, rows) {
   if (!rows.length) {
     list.innerHTML = `<li>${noDataMessage()}</li>`;
@@ -561,7 +865,7 @@ function appendRanking(list, rows) {
     order.textContent = String(index + 1).padStart(2, '0');
     const detail = document.createElement('span');
     detail.className = 'ranking-detail';
-    detail.textContent = `${row.count} ${t('measurements')}`;
+    detail.textContent = `${row.count} ${row.count === 1 ? summaryText('singleReading') : t('measurements')}`;
     const level = document.createElement('strong');
     level.className = 'ranking-level';
     level.textContent = `${row.db} ${t('index')}`;
@@ -580,6 +884,7 @@ function appendRanking(list, rows) {
 }
 
 async function loadStats(panel) {
+  updateSummaryState(panel, 'loading');
   try {
     const end = new Date();
     const start = new Date(end);
@@ -588,6 +893,12 @@ async function loadStats(panel) {
     if (!panelIsCurrent(panel, 'stats') || panel.dataset.subview !== 'overview' || !panel.querySelector('#metric-total')) return;
     featureRows = rows;
     const zones = aggregatePoints(featureRows).map((point) => ({ ...point, count: point.sampleCount }));
+    if (!featureRows.length) {
+      updateSummaryState(panel, 'empty');
+      return;
+    }
+    updateSummaryState(panel, 'ready', zones.length);
+    for (const id of ['loudest-list', 'quietest-list', 'alerts-list']) panel.querySelector(`#${id}`).innerHTML = '';
     panel.querySelector('#metric-total').textContent = featureRows.length;
     panel.querySelector('#metric-average').textContent = averageDb(featureRows) ?? '--';
     panel.querySelector('#metric-high').textContent = featureRows.filter((row) => row.db_level > 70).length;
@@ -614,14 +925,10 @@ async function loadStats(panel) {
     const alertList = panel.querySelector('#alerts-list');
     if (!alerts.length) alertList.innerHTML = `<li>${t('noAlerts')}</li>`;
     alerts.forEach((zone) => { const item = document.createElement('li'); item.textContent = `⚠️ ${t('index')} ${averageDb(zone.dailyLevels.get([...zone.days].sort().at(-1)).map((db_level) => ({ db_level })))} · ${m('alertDays')}`; alertList.appendChild(item); });
-    panel.querySelector('.feature-status').textContent = featureRows.length ? `${zones.length} ${m('zonesAnalyzed')}` : noDataMessage();
   } catch (error) {
     if (supabaseClient) console.error('Error cargando estadísticas:', error);
     if (!panelIsCurrent(panel, 'stats') || panel.dataset.subview !== 'overview' || !panel.querySelector('#metric-total')) return;
-    panel.querySelector('.feature-status').textContent = error.message || noDataMessage();
-    panel.querySelector('#loudest-list').innerHTML = `<li>${error.message || noDataMessage()}</li>`;
-    panel.querySelector('#quietest-list').innerHTML = `<li>${error.message || noDataMessage()}</li>`;
-    panel.querySelector('#alerts-list').innerHTML = `<li>${error.message || noDataMessage()}</li>`;
+    updateSummaryState(panel, supabaseClient ? 'error' : 'disconnected');
   }
 }
 
@@ -696,16 +1003,18 @@ function renderTrendChart(container, rows) {
   const coords = series.map((item, index) => `${20 + index * (260 / Math.max(series.length - 1, 1))},${100 - ((item.db - min) / range) * 70}`).join(' ');
   target.textContent = '';
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-  svg.setAttribute('viewBox', '0 0 300 120'); svg.setAttribute('role', 'img'); svg.setAttribute('aria-label', `Tendencia del índice: ${series.map((item) => `${item.date}: ${item.db}`).join(', ')}`);
+  svg.setAttribute('viewBox', '0 0 300 120'); svg.setAttribute('role', 'img'); svg.setAttribute('aria-label', `Tendencia del ruido: ${series.map((item) => `${item.date}: ${item.db}`).join(', ')}`);
   const polyline = document.createElementNS(svg.namespaceURI, 'polyline');
   polyline.setAttribute('points', coords); polyline.setAttribute('fill', 'none'); polyline.setAttribute('stroke', '#2563eb'); polyline.setAttribute('stroke-width', '4'); polyline.setAttribute('stroke-linecap', 'round'); polyline.setAttribute('stroke-linejoin', 'round');
   svg.appendChild(polyline); target.appendChild(svg);
-  const caption = document.createElement('p'); caption.textContent = `${series[0].date} – ${series.at(-1).date} · índice ${min}–${max}`; target.appendChild(caption);
+  const caption = document.createElement('p'); caption.textContent = `${series[0].date} – ${series.at(-1).date} · ${min}–${max} dB`; target.appendChild(caption);
 }
 
 async function loadZoneTrend(position) {
   const target = document.getElementById('zone-trend');
-  if (!target || !supabaseClient) return;
+  if (!target) return;
+  target.hidden = false;
+  if (!supabaseClient) { target.textContent = noDataMessage(); return; }
   const center = snapToGrid(position.lat, position.lng);
   const start = new Date(); start.setDate(start.getDate() - 7);
   target.textContent = m('loadingTrend');
@@ -719,12 +1028,68 @@ async function loadZoneTrend(position) {
   }
 }
 
+/**
+ * Los retos.
+ *
+ * ## Qué cambió y por qué
+ *
+ * Antes los tres medían lo mismo: ruido. Medir más ruido es útil para el mapa, pero
+ * un reto de ruido empuja a la gente a medir en sitios ruidosos, y eso no reduce nada.
+ *
+ * Los dos nuevos son de huella: **recoger basura** y **denunciar la obra**. Los dos se
+ * cumplen con un reporte, no con una medición, y por eso usan la categoría y no el
+ * nivel de dB. La diferencia con los antiguos es de fondo: no piden esfuerzo de
+ * medición, piden un acto.
+ *
+ * ## Por qué los antiguos no se tocan
+ *
+ * Porque los tres hacen falta y funcionan: la cobertura horaria y la variabilidad en
+ * el tiempo son las dos cosas que un mapa de ruido no puede tener sin muchos
+ * voluntarios. Lo que se añade es una vía distinta, no se quita la anterior.
+ *
+ * ## El requisito de foto
+ *
+ * «Recoger basura» pide foto; «denunciar la obra» no. No es arbitrario: la foto es lo
+ * que distingue un acto de una queja, porque cualquiera puede escribir «hay basura».
+ * En la obra, en cambio, el propio motivo de quejarse es visible y la foto solo
+ * añadiría una imagen pública de un solar.
+ */
+const CHALLENGE_DEFS = [
+  { key: 'rush-hour', target: 3, type: 'measurement', titleKey: 'rushTitle', detailKey: 'rushDetail' },
+  { key: 'quiet-route', target: 5, type: 'measurement', titleKey: 'quietTitle', detailKey: 'quietDetail' },
+  { key: 'night-cover', target: 3, type: 'measurement', titleKey: 'nightTitle', detailKey: 'nightDetail' },
+  { key: 'litter-pickup', target: 3, type: 'report', kind: 'basura', needsPhoto: true,
+    titleKey: 'litterTitle', detailKey: 'litterDetail' },
+  { key: 'report-works', target: 2, type: 'report', kind: 'obra', needsPhoto: false,
+    titleKey: 'worksTitle', detailKey: 'worksDetail' }
+];
+
+/** Retos de reporte y su progreso, contados por categoría y sin salir del dispositivo. */
+function reportChallengeProgress(definitions) {
+  const rows = getLocalChallengeReports();
+  const byKind = new Map();
+  for (const definition of definitions.filter((d) => d.type === 'report')) {
+    const matching = rows.filter((row) => row.kind === definition.kind
+      && (definition.needsPhoto ? row.withPhoto === 1 : true));
+    // Celda y día distintos, como en los retos de medición: repetir el mismo reporte
+    // cinco veces no es cubrir más.
+    const places = new Set();
+    for (const row of matching) {
+      const day = coDayKey(row.created_at);
+      if (!day) continue;
+      places.add(`${Math.round(row.latitude / AGG_GRID)}_${Math.round(row.longitude / AGG_GRID)}|${day}`);
+    }
+    byKind.set(definition.key, places.size);
+  }
+  return byKind;
+}
+
 function renderChallengesPanel(panel) {
-  const challenges = [
-    { title: u('rushTitle'), detail: u('rushDetail'), key: 'rush-hour', target: 3 },
-    { title: u('quietTitle'), detail: u('quietDetail'), key: 'quiet-route', target: 5 },
-    { title: u('nightTitle'), detail: u('nightDetail'), key: 'night-cover', target: 3 }
-  ];
+  const challenges = CHALLENGE_DEFS.map((definition) => ({
+    ...definition,
+    title: u(definition.titleKey),
+    detail: u(definition.detailKey)
+  }));
   panel.innerHTML = panelFrame(t('challengeTitle'), `<p>${t('challengeHelp')}</p><ul class="feature-list" id="challenge-list"></ul>`, panel);
   panel.querySelector('[data-close]')?.addEventListener('click', closeFeaturePanel);
   const list = panel.querySelector('#challenge-list');
@@ -735,24 +1100,34 @@ async function loadChallengeProgress(list, challenges) {
   try {
     const rows = getLocalChallengeMeasurements();
     const rushByZone = new Map();
-    const nightRows = [];
+    const nightZoneDays = new Set();
     const quietLocations = new Set();
     rows.forEach((row) => {
-      const date = new Date(row.created_at);
-      const hour = date.getHours();
-      const day = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+      // La hora y el día se calculan en hora de Colombia (UTC−5), no en la del
+      // dispositivo. Antes usaba getHours()/getFullYear(), que seguían la zona
+      // del navegador mientras el mapa se filtraba por America/Bogota en el servidor.
+      const hour = coHour(row.created_at);
+      const day = coDayKey(row.created_at);
+      if (hour === null || day === null) return;
       const challengeCell = `${Math.round(row.latitude / AGG_GRID)}_${Math.round(row.longitude / AGG_GRID)}`;
+      // Hora punta: ventana de 7:00 a 9:00, que es una sub-ventana de la
+      // franja "morning" a propósito. Conservamos el horario del reto existente;
+      // no tiene que abarcar toda la franja del filtro del mapa.
       if (hour >= 7 && hour < 9) {
         if (!rushByZone.has(challengeCell)) rushByZone.set(challengeCell, new Set());
         rushByZone.get(challengeCell).add(day);
       }
-      if (hour >= 18 || hour < 6) nightRows.push(row);
+      if (inCoTimeBand(row.created_at, 'night')) {
+        // Repetir una lectura en la misma zona y día no aumenta el progreso.
+        nightZoneDays.add(`${challengeCell}|${day}`);
+      }
       if (row.db_level < 55) quietLocations.add(challengeCell);
     });
     const progress = {
       'rush-hour': Math.max(0, ...[...rushByZone.values()].map((days) => days.size)),
       'quiet-route': quietLocations.size,
-      'night-cover': nightRows.length
+      'night-cover': nightZoneDays.size,
+      ...Object.fromEntries(reportChallengeProgress(challenges))
     };
     list.innerHTML = '';
     challenges.forEach((challenge) => {
@@ -767,7 +1142,7 @@ async function loadChallengeProgress(list, challenges) {
           <span class="challenge-count">${current}/${challenge.target}</span>
         </div>
         <span class="challenge-detail">${challenge.detail}</span>
-        <div class="challenge-track" aria-label="${percentage}% ${t('challengeProgress')}">
+        <div class="challenge-track" role="progressbar" aria-label="${challenge.title}" aria-valuemin="0" aria-valuemax="${challenge.target}" aria-valuenow="${current}">
           <span class="challenge-fill"></span>
         </div>
         <span class="challenge-state">${percentage === 100 ? `✓ ${u('completed')}` : `${percentage}% ${t('challengeProgress')}`}</span>`;
@@ -801,24 +1176,41 @@ function rotateLanguage() {
 
 function updateStaticLanguage() {
   const details = {
-    es: { intro: 'Entiende el ruido de tu entorno y cómo los datos ciudadanos ayudan a mejorar la ciudad.', cardDescriptions: ['La exposición prolongada al ruido puede afectar el sueño, la concentración y la salud cardiovascular.', 'AcoustiMap muestra patrones relativos de ruido; su índice no permite evaluar exposición ni riesgo clínico.', 'Las mediciones anónimas aportan información ciudadana para una planificación urbana más sostenible.'], badges: ['Salud', 'ODS 3', 'ODS 11'], cardLabels: ['Bienestar', 'Salud', 'Ciudad'], legend: 'Información' },
+    es: { intro: 'Entiende el ruido de tu entorno y cómo los datos ciudadanos ayudan a mejorar la ciudad.', cardDescriptions: ['El ruido sostenido en el tiempo puede afectar el sueño, la concentración y la salud cardiovascular.', 'AcoustiMap muestra dónde hay más y menos ruido, para comparar una calle con otra.', 'Con miles de mediciones de la gente, las ciudades pueden ver el problema antes de que sea un aviso.'], badges: ['Salud', 'ODS 3', 'ODS 11'], cardLabels: ['Bienestar', 'Salud', 'Ciudad'], legend: 'Información' },
     en: { intro: 'Explore local noise patterns and how citizen data can improve the city.', cardDescriptions: ['Long-term noise exposure can affect sleep, concentration, and cardiovascular health.', 'AcoustiMap shows relative noise patterns; its index cannot assess exposure or clinical risk.', 'Anonymous measurements provide information for more sustainable urban planning.'], badges: ['Health', 'SDG 3', 'SDG 11'], cardLabels: ['Wellbeing', 'Health', 'City'], legend: 'Map information' },
-    pt: { intro: 'Explore padrões de ruído e como os dados cidadãos podem melhorar a cidade.', cardDescriptions: ['A exposição prolongada ao ruído pode afetar o sono, a concentração e a saúde cardiovascular.', 'O AcoustiMap mostra padrões relativos de ruído; o índice não avalia exposição nem risco clínico.', 'Medições anônimas fornecem informações para um planejamento urbano mais sustentável.'], badges: ['Saúde', 'ODS 3', 'ODS 11'], cardLabels: ['Bem-estar', 'Saúde', 'Cidade'], legend: 'Informações do mapa' }
+    pt: { intro: 'Explore padrões de ruído e como os dados cidadãos podem melhorar a cidade.', cardDescriptions: ['O ruído contínuo pode afetar o sono, a concentração e a saúde cardiovascular.', 'O AcoustiMap mostra onde há mais e menos ruído, para comparar uma rua com outra.', 'Com milhares de medições, as cidades podem ver o problema antes que vire denúncia.'], badges: ['Saúde', 'ODS 3', 'ODS 11'], cardLabels: ['Bem-estar', 'Saúde', 'Cidade'], legend: 'Informações do mapa' }
   }[currentLanguage];
   const copy = {
-    es: { map: 'Mapa', health: 'Salud y ODS', healthShort: 'Salud', stats: 'Estadísticas', statsShort: 'Datos', title: 'Salud y ODS', detail: 'Mostrar detalles', hide: 'Ocultar detalles', all: 'Todo', morning: 'Mañana', afternoon: 'Tarde', night: 'Noche', exportCsv: 'Exportar CSV', exportGeo: 'Exportar GeoJSON', statsTitle: 'Datos del ruido', statsIntro: 'Mediciones ciudadanas, tendencias y reportes de tu zona.', tabs: ['Resumen', 'Reportar', 'Comparar', 'Retos'], visualHeat: 'Mapa de calor', visualZones: 'Puntos', privacy: 'Privacidad por diseño', privacyCopy: 'AcoustiMap no graba audio, no requiere login y guarda las coordenadas ancladas a una cuadrícula aproximada de 70 m.', mapHelp: 'Cómo interpretar el mapa', mapHelpCopy: 'Verde indica valores bajos, amarillo moderados y rojo altos del índice relativo. No equivale a decibelios calibrados ni evalúa exposición.', cardTitles: ['Menos ruido, más descanso', 'Ciudades más saludables', 'Participación local'] },
+    es: { map: 'Mapa', health: 'Salud y ODS', healthShort: 'Salud', stats: 'Estadísticas', statsShort: 'Datos', title: 'Salud y ODS', detail: 'Mostrar detalles', hide: 'Ocultar detalles', all: 'Todo', morning: 'Mañana', afternoon: 'Tarde', night: 'Noche', exportCsv: 'Exportar CSV', exportGeo: 'Exportar GeoJSON', statsTitle: 'Datos del ruido', statsIntro: 'Mediciones ciudadanas, tendencias y reportes de tu zona.', tabs: ['Resumen', 'Reportar', 'Comparar', 'Retos'], visualHeat: 'Mapa de calor', visualZones: 'Puntos', privacy: 'Privacidad por diseño', privacyCopy: 'AcoustiMap no graba audio, no requiere login y guarda las coordenadas ancladas a una cuadrícula aproximada de 70 m.', mapHelp: 'Cómo interpretar el mapa', mapHelpCopy: 'Verde son zonas tranquilas, amarillo el ruido normal de la calle y rojo las zonas ruidosas. Sirve para comparar zonas entre sí.', cardTitles: ['Menos ruido, más descanso', 'Ciudades más saludables', 'Participación local'] },
     en: { map: 'Map', health: 'Health and SDGs', healthShort: 'Health', stats: 'Statistics', statsShort: 'Data', title: 'Health and SDGs', detail: 'Show details', hide: 'Hide details', all: 'All', morning: 'Morning', afternoon: 'Afternoon', night: 'Night', exportCsv: 'Export CSV', exportGeo: 'Export GeoJSON', statsTitle: 'Noise data', statsIntro: 'Citizen measurements, trends, and reports for your area.', tabs: ['Summary', 'Report', 'Compare', 'Challenges'], visualHeat: 'Heatmap', visualZones: 'Points', privacy: 'Privacy by design', privacyCopy: 'AcoustiMap does not record audio, requires no login, and stores coordinates snapped to an approximate 70 m grid.', mapHelp: 'How to read the map', mapHelpCopy: 'Green shows low, yellow moderate, and red high relative index values. This is not calibrated decibel data and cannot assess exposure.', cardTitles: ['Less noise, better rest', 'Healthier cities', 'Local participation'] },
-    pt: { map: 'Mapa', health: 'Saúde e ODS', healthShort: 'Saúde', stats: 'Estatísticas', statsShort: 'Dados', title: 'Saúde e ODS', detail: 'Mostrar detalhes', hide: 'Ocultar detalhes', all: 'Tudo', morning: 'Manhã', afternoon: 'Tarde', night: 'Noite', exportCsv: 'Exportar CSV', exportGeo: 'Exportar GeoJSON', statsTitle: 'Dados do ruído', statsIntro: 'Medições cidadãs, tendências e relatos da sua região.', tabs: ['Resumo', 'Relatar', 'Comparar', 'Desafios'], visualHeat: 'Mapa de calor', visualZones: 'Pontos', privacy: 'Privacidade desde o início', privacyCopy: 'O AcoustiMap não grava áudio, não exige login e salva coordenadas em uma grade aproximada de 70 m.', mapHelp: 'Como interpretar o mapa', mapHelpCopy: 'Verde indica valores baixos, amarelo moderados e vermelho altos do índice relativo. Não equivale a decibéis calibrados nem avalia exposição.', cardTitles: ['Menos ruído, mais descanso', 'Cidades mais saudáveis', 'Participação local'] }
+    pt: { map: 'Mapa', health: 'Saúde e ODS', healthShort: 'Saúde', stats: 'Estatísticas', statsShort: 'Dados', title: 'Saúde e ODS', detail: 'Mostrar detalhes', hide: 'Ocultar detalhes', all: 'Tudo', morning: 'Manhã', afternoon: 'Tarde', night: 'Noite', exportCsv: 'Exportar CSV', exportGeo: 'Exportar GeoJSON', statsTitle: 'Dados do ruído', statsIntro: 'Medições cidadãs, tendências e relatos da sua região.', tabs: ['Resumo', 'Relatar', 'Comparar', 'Desafios'], visualHeat: 'Mapa de calor', visualZones: 'Pontos', privacy: 'Privacidade desde o início', privacyCopy: 'O AcoustiMap não grava áudio, não exige login e salva coordenadas em uma grade aproximada de 70 m.', mapHelp: 'Como interpretar o mapa', mapHelpCopy: 'Verde são zonas tranquilas, amarelo o ruído normal da rua e vermelho as zonas ruidosas. Serve para comparar áreas entre si.', cardTitles: ['Menos ruído, mais descanso', 'Cidades mais saudáveis', 'Participação local'] }
   }[currentLanguage];
   const extra = {
-    es: { timeLabel: 'Hora CO', timeGroup: 'Filtrar por franja horaria de Colombia', visualGroup: 'Forma de visualizar el mapa', low: 'Índice < 55 · Bajo', medium: 'Índice 55–70 · Moderado', high: 'Índice > 70 · Alto', legendNote: 'Escala relativa orientativa; no equivale a dB físicos ni sirve para evaluar exposición.', legendHint: 'Cada círculo rotula <b>índice · mediciones</b>. El borde se marca más cuanto más mediciones sostienen ese promedio; el color y el relleno dependen solo del índice.', yourLocation: 'Tu ubicación (solo tú)', shareTitle: 'Compartir ubicación', shareText: 'Tu ubicación se <strong>ancla a una cuadrícula de ~70 m</strong> antes de enviarse a la base de datos. Tú verás tu posición exacta en azul; los demás solo verán la zona.', shareNote: '🔒 <strong>Datos compartidos:</strong> Tu audio nunca se graba ni transmite. Se guarda el índice relativo y la celda aproximada.', micTitle: 'Activar micrófono', micText: 'La app usará tu micrófono para calcular un <strong>índice relativo de ruido</strong>. No es una medición calibrada en decibelios y no sirve para evaluar la exposición acústica.<br><br><strong>No se graba audio.</strong> Solo se analiza la intensidad del sonido en tiempo real.', micNote: '🔒 <strong>Privacidad garantizada:</strong> El audio nunca sale de tu dispositivo ni se transmite a ningún servidor.', cancel: 'Cancelar', acceptShare: 'Aceptar y compartir', acceptMic: 'Aceptar y activar', activate: 'Activar', stop: 'Detener', share: 'Compartir', measuring: 'Midiendo en vivo', idle: 'Inactivo', startHint: 'Presiona para empezar', average: 'Promedio', noSession: 'Sin datos' },
-    en: { timeLabel: 'CO time', timeGroup: 'Filter by Colombian time of day', visualGroup: 'Map display mode', low: 'Index < 55 · Low', medium: 'Index 55–70 · Moderate', high: 'Index > 70 · High', legendNote: 'Relative scale only; it is not calibrated dB and cannot assess noise exposure.', legendHint: 'Each circle is labelled <b>index · measurements</b>. The outline gets bolder the more measurements back that average; colour and fill depend on the index alone.', yourLocation: 'Your location (only you)', shareTitle: 'Share location', shareText: 'Your location is <strong>snapped to an approximately 70 m grid</strong> before it is sent to the database. You see your exact position in blue; others see only the area.', shareNote: '🔒 <strong>Shared data:</strong> Audio is never recorded or transmitted. Only the relative index and approximate cell are stored.', micTitle: 'Enable microphone', micText: 'The app uses your microphone to calculate a <strong>relative noise index</strong>. It is not calibrated in decibels and cannot assess noise exposure.<br><br><strong>Audio is not recorded.</strong> Sound intensity is analyzed on your device.', micNote: '🔒 <strong>Privacy:</strong> Audio never leaves your device or reaches a server.', cancel: 'Cancel', acceptShare: 'Accept and share', acceptMic: 'Accept and enable', activate: 'Enable', stop: 'Stop', share: 'Share', measuring: 'Measuring live', idle: 'Inactive', startHint: 'Press to start', average: 'Average', noSession: 'No data' },
-    pt: { timeLabel: 'Hora CO', timeGroup: 'Filtrar por horário da Colômbia', visualGroup: 'Modo de exibição do mapa', low: 'Índice < 55 · Baixo', medium: 'Índice 55–70 · Moderado', high: 'Índice > 70 · Alto', legendNote: 'Escala relativa; não equivale a dB calibrados nem avalia exposição.', legendHint: 'Cada círculo mostra <b>índice · medições</b>. O contorno fica mais forte quanto mais medições sustentam essa média; cor e preenchimento dependem só do índice.', yourLocation: 'Sua localização (só você)', shareTitle: 'Compartilhar localização', shareText: 'Sua localização é <strong>ajustada a uma grade de aproximadamente 70 m</strong> antes de ser enviada ao banco de dados. Você vê sua posição exata em azul; os demais veem apenas a área.', shareNote: '🔒 <strong>Dados compartilhados:</strong> O áudio nunca é gravado ou transmitido. Apenas o índice relativo e a célula aproximada são armazenados.', micTitle: 'Ativar microfone', micText: 'O aplicativo usa seu microfone para calcular um <strong>índice relativo de ruído</strong>. Não é calibrado em decibéis e não avalia exposição.<br><br><strong>O áudio não é gravado.</strong> A intensidade é analisada no dispositivo.', micNote: '🔒 <strong>Privacidade:</strong> O áudio nunca sai do dispositivo nem chega a um servidor.', cancel: 'Cancelar', acceptShare: 'Aceitar e compartilhar', acceptMic: 'Aceitar e ativar', activate: 'Ativar', stop: 'Parar', share: 'Compartilhar', measuring: 'Medindo ao vivo', idle: 'Inativo', startHint: 'Toque para começar', average: 'Média', noSession: 'Sem dados' }
+    es: { timeLabel: 'Hora CO', timeGroup: 'Filtrar por franja horaria de Colombia', visualGroup: 'Forma de visualizar el mapa', low: 'dB < 55 · Bajo', medium: 'dB 55–70 · Moderado', high: 'dB > 70 · Alto', legendNote: 'Escala orientativa sin calibrar. Sirve para comparar zonas entre sí, no para medir exposición.', legendHint: 'Cada círculo rotula <b>dB · mediciones</b>. El color depende solo del promedio de esa zona.', yourLocation: 'Tu ubicación (solo tú)', shareTitle: 'Compartir ubicación', shareText: 'Tu ubicación se <strong>ancla a una cuadrícula de ~70 m</strong> antes de enviarse a la base de datos. Tú verás tu posición exacta en azul; los demás solo verán la zona.', shareNote: '🔒 <strong>Datos compartidos:</strong> solo tu nivel de ruido y la zona aproximada. Nunca el audio.', micTitle: 'Activar micrófono', micText: 'Vamos a usar tu micrófono para medir el ruido de donde estás.<br><br><strong>No se graba audio.</strong> Solo leemos el nivel del sonido, aquí mismo.', micNote: '🔒 <strong>Privacidad garantizada:</strong> El audio nunca sale de tu dispositivo ni se transmite a ningún servidor.', cancel: 'Cancelar', acceptShare: 'Aceptar y compartir', acceptMic: 'Aceptar y activar', activate: 'Activar', stop: 'Detener', share: 'Compartir', measuring: 'Midiendo en vivo', idle: 'Inactivo', startHint: 'Presiona para empezar', average: 'Promedio', noSession: 'Sin datos' },
+    en: { timeLabel: 'CO time', timeGroup: 'Filter by Colombian time of day', visualGroup: 'Map display mode', low: 'dB < 55 · Low', medium: 'dB 55–70 · Moderate', high: 'dB > 70 · High', legendNote: 'Uncalibrated scale for orientation. It is useful to compare areas with each other, not to assess exposure.', legendHint: 'Each circle is labelled <b>dB · measurements</b>. Colour depends only on that area’s average.', yourLocation: 'Your location (only you)', shareTitle: 'Share location', shareText: 'Your location is <strong>snapped to an approximately 70 m grid</strong> before it is sent to the database. You see your exact position in blue; others see only the area.', shareNote: '🔒 <strong>Shared data:</strong> only your noise level and the approximate area. Never the audio.', micTitle: 'Enable microphone', micText: 'We will use your microphone to measure the noise where you are.<br><br><strong>Audio is not recorded.</strong> We only read the sound level, right here on your device.', micNote: '🔒 <strong>Privacy:</strong> Audio never leaves your device or reaches a server.', cancel: 'Cancel', acceptShare: 'Accept and share', acceptMic: 'Accept and enable', activate: 'Enable', stop: 'Stop', share: 'Share', measuring: 'Measuring live', idle: 'Inactive', startHint: 'Press to start', average: 'Average', noSession: 'No data' },
+    pt: { timeLabel: 'Hora CO', timeGroup: 'Filtrar por horário da Colômbia', visualGroup: 'Modo de exibição do mapa', low: 'dB < 55 · Baixo', medium: 'dB 55–70 · Moderado', high: 'dB > 70 · Alto', legendNote: 'Escala orientativa sem calibração. Serve para comparar áreas entre si, não para avaliar exposição.', legendHint: 'Cada círculo mostra <b>dB · medições</b>. A cor depende só da média daquela área.', yourLocation: 'Sua localização (só você)', shareTitle: 'Compartilhar localização', shareText: 'Sua localização é <strong>ajustada a uma grade de aproximadamente 70 m</strong> antes de ser enviada ao banco de dados. Você vê sua posição exata em azul; os demais veem apenas a área.', shareNote: '🔒 <strong>Dados compartilhados:</strong> apenas o nível de ruído e a área aproximada. Nunca o áudio.', micTitle: 'Ativar microfone', micText: 'Vamos usar seu microfone para medir o ruído de onde você está.<br><br><strong>O áudio não é gravado.</strong> Só lemos o nível do som, aqui no aparelho.', micNote: '🔒 <strong>Privacidade:</strong> O áudio nunca sai do dispositivo nem chega a um servidor.', cancel: 'Cancelar', acceptShare: 'Aceitar e compartilhar', acceptMic: 'Aceitar e ativar', activate: 'Ativar', stop: 'Parar', share: 'Compartilhar', measuring: 'Medindo ao vivo', idle: 'Inativo', startHint: 'Toque para começar', average: 'Média', noSession: 'Sem dados' }
   }[currentLanguage];
+  /*
+   * La unidad del número grande y del promedio.
+   *
+   * Antes decía «índice» y la línea de debajo añadía «· 1 s · no son dB». Eso
+   * obligaba a leer tres cosas para entender una: un término que no es una
+   * unidad, una advertencia partida en tres trozos, y un segundo número en dBFS
+   * que no se parecía al primero. Alguien que mide en la calle no iba a leer
+   * ninguna de las tres, y el número se quedaba sin explicación.
+   *
+   * Ahora dice `dB`, que es lo que la gente entiende de un ruido, con una sola
+   * línea debajo que dice la única cosa que hay que saber: **sin calibrar**.
+   *
+   * La honestidad no se pierde, cambia de sitio. Antes la advertencia ocupaba la
+   * pantalla entera; ahora ocupa tres palabras y la leyenda del mapa la
+   * desarrolla para quien quiera el matiz. Es el mismo dato con el orden de las
+   * prioridades invertido: primero lo que hay que leer, y el resto a un clic.
+   */
   const meterLabels = {
-    es: { index: 'índice', min: 'Mín', max: 'Máx', samples: 'Muestras', locate: 'Centrar en mi ubicación' },
-    en: { index: 'index', min: 'Min', max: 'Max', samples: 'Samples', locate: 'Center on my location' },
-    pt: { index: 'índice', min: 'Mín', max: 'Máx', samples: 'Amostras', locate: 'Centralizar na minha localização' }
+    es: { index: 'dB', min: 'Mín', max: 'Máx', samples: 'Muestras', locate: 'Centrar en mi ubicación' },
+    en: { index: 'dB', min: 'Min', max: 'Max', samples: 'Samples', locate: 'Center on my location' },
+    pt: { index: 'dB', min: 'Mín', max: 'Máx', samples: 'Amostras', locate: 'Centralizar na minha localização' }
   }[currentLanguage];
   const periodLabels = {
     es: { history: 'Historial · 90 días', historyShort: '90 días', live: 'En vivo · 24 h', liveShort: '24 h', heatShort: 'Calor', pointsShort: 'Puntos', group: 'Periodo y visualización del mapa' },
@@ -846,7 +1238,7 @@ function updateStaticLanguage() {
   const statsIntro = document.querySelector('.stats-page-header p'); if (statsIntro) statsIntro.textContent = copy.statsIntro;
   document.querySelectorAll('.stats-section-btn').forEach((button, index) => { if (copy.tabs[index]) button.textContent = copy.tabs[index]; });
   const handle = document.getElementById('stats-handle-label');
-  if (handle) handle.textContent = document.getElementById('stats-panel')?.classList.contains('collapsed') ? copy.detail : copy.hide;
+  if (handle) handle.textContent = sharingText(document.getElementById('stats-panel')?.classList.contains('collapsed') ? 'showDetails' : 'hideDetails');
   [['time-all', copy.all], ['time-morning', copy.morning], ['time-afternoon', copy.afternoon], ['time-night', copy.night]].forEach(([id, value]) => { const el = document.getElementById(id); if (el) el.textContent = value; });
   [
     ['mode-history', periodLabels.history, periodLabels.historyShort],
@@ -861,6 +1253,7 @@ function updateStaticLanguage() {
   const geo = document.getElementById('export-geojson-btn'); if (geo) geo.textContent = copy.exportGeo;
   const legendTitle = document.querySelector('.legend-header span'); if (legendTitle) legendTitle.textContent = details.legend;
   const legendButton = document.getElementById('legend-toggle'); if (legendButton) legendButton.setAttribute('aria-label', details.legend);
+  const legendClose = document.querySelector('.legend-close'); if (legendClose) legendClose.setAttribute('aria-label', t('close'));
   const statsTabs = document.querySelector('.stats-section-nav'); if (statsTabs) statsTabs.setAttribute('aria-label', m('statsTabLabel'));
   const timeGroup = document.querySelector('.time-filters'); if (timeGroup) timeGroup.setAttribute('aria-label', extra.timeGroup);
   const timeLabel = document.querySelector('.time-filters-label'); if (timeLabel) timeLabel.textContent = extra.timeLabel;
@@ -884,10 +1277,11 @@ function updateStaticLanguage() {
   });
   const monitoring = document.getElementById('stats-panel')?.classList.contains('monitoring');
   const actionText = document.querySelector('#btn-toggle .action-text'); if (actionText) actionText.textContent = monitoring ? extra.stop : extra.activate;
-  const shareText = document.querySelector('#btn-share .action-text'); if (shareText) shareText.textContent = extra.share;
-  const statusText = document.getElementById('status-text'); if (statusText) statusText.textContent = monitoring ? extra.measuring : extra.idle;
+  if (typeof updateActionButtons === 'function') updateActionButtons();
+  if (typeof updateSharingStatus === 'function') updateSharingStatus();
+  const statusText = document.getElementById('status-text'); if (statusText) statusText.textContent = meterText(monitoring ? 'measuring' : 'idle');
   if (!monitoring) {
-    const startHint = document.getElementById('db-status-text'); if (startHint) startHint.textContent = extra.startHint;
+    const startHint = document.getElementById('db-status-text'); if (startHint) startHint.textContent = meterText('start');
     const noSession = document.getElementById('avg-tag'); if (noSession && ['Sin datos', 'No data', 'Sem dados'].includes(noSession.textContent.trim())) noSession.textContent = extra.noSession;
   }
   const averageLabel = document.querySelector('.avg-head span'); if (averageLabel) averageLabel.textContent = extra.average;
@@ -897,7 +1291,11 @@ function updateStaticLanguage() {
   });
   const locate = document.querySelector('.locate-btn'); if (locate) locate.title = meterLabels.locate;
   if (typeof updateGpsChip === 'function') updateGpsChip(Boolean(sharingEnabled), currentPosition?.accuracy);
-  document.title = `AcoustiMap — ${copy.title}`;
+  if (typeof updateAudioDiagnostics === 'function') updateAudioDiagnostics();
+  const mapStatus = document.getElementById('map-data-status');
+  if (mapStatus?.dataset.state) setMapDataStatus(mapStatus.dataset.state);
+  if (typeof updateAvgUI === 'function') updateAvgUI();
+  document.title = `AcoustiMap — ${copy.title} · v${APP_ASSET_VERSION}`;
 }
 
 const OFFLINE_DB_NAME = 'acoustimap-offline-v2';
@@ -974,6 +1372,8 @@ async function removeOfflineRecord(id) {
 async function flushOfflineMeasurements() {
   if (!supabaseClient || !navigator.onLine || flushOfflineMeasurements.running) return;
   flushOfflineMeasurements.running = true;
+  const sharingGeneration = typeof sharingRequestId !== 'undefined' ? sharingRequestId : null;
+  let syncedMeasurement = false;
   try {
     const records = (await getOfflineRecords()).sort((a, b) => a.queuedAt.localeCompare(b.queuedAt));
     for (const record of records) {
@@ -990,7 +1390,9 @@ async function flushOfflineMeasurements() {
           const rebuilt = await buildConfirmation({ lat: payload.latitude, lng: payload.longitude }, payload.measurement_time);
           payload.confirmation_key = rebuilt.confirmation_key;
         }
-        if (record.table === 'noise_reports' && record.photo) {
+        const localPhoto = record.table === 'noise_reports' && ['basura', 'obra'].includes(payload.kind);
+        if (localPhoto) payload.photo_path = null;
+        if (record.table === 'noise_reports' && record.photo && !localPhoto) {
           const photoPath = buildReportRecord(payload.id, { lat: payload.latitude, lng: payload.longitude }, payload.db_level, payload.note, record.photo.type).photoPath;
           const { error: uploadError } = await supabaseClient.storage.from('noise-report-photos').upload(photoPath, record.photo, { contentType: record.photo.type, upsert: false });
           if (uploadError && uploadError.statusCode !== '409' && uploadError.status !== 409 && uploadError.code !== 'Duplicate') throw uploadError;
@@ -999,10 +1401,18 @@ async function flushOfflineMeasurements() {
         const { error } = await supabaseClient.from(record.table).insert(payload);
         if (error && error.code !== '23505') throw error;
         await removeOfflineRecord(record.id);
+        if (record.table === 'noise_measurements') syncedMeasurement = true;
       } catch (error) {
         console.warn(`Sincronización pendiente (${record.table}):`, error.message || error);
         break;
       }
+    }
+    if (syncedMeasurement) {
+      if (typeof updateSharingDelivery === 'function' && sharingDeliveryState === 'queued'
+        && !(await getOfflineRecords()).some((record) => record.table === 'noise_measurements')) {
+        updateSharingDelivery('published', sharingGeneration);
+      }
+      if (document.getElementById('map-view')?.classList.contains('active')) loadCommunityPoints();
     }
   } catch (error) {
     console.warn('No se pudo leer la cola offline:', error);
@@ -1012,6 +1422,39 @@ async function flushOfflineMeasurements() {
 }
 
 window.addEventListener('online', flushOfflineMeasurements);
+
+/** En desarrollo se evita servir otra configuración desde una PWA antigua. */
+async function configureServiceWorker() {
+  if (!('serviceWorker' in navigator)) return;
+  const local = ['localhost', '127.0.0.1', '[::1]', '::1'].includes(window.location.hostname);
+  if (local) {
+    const scope = new URL('./', window.location.href).href;
+    const script = new URL('./sw.js', window.location.href).href;
+    let removed = false;
+    for (const registration of await navigator.serviceWorker.getRegistrations()) {
+      const worker = registration.active || registration.waiting || registration.installing;
+      if (registration.scope === scope && worker?.scriptURL.split('?')[0] === script) {
+        removed = (await registration.unregister()) || removed;
+      }
+    }
+    if (window.caches) {
+      const keys = await window.caches.keys();
+      await Promise.all(keys.filter((key) => key.startsWith('acoustimap-shell-'))
+        .map((key) => window.caches.delete(key)));
+    }
+    console.log('Desarrollo local: caché PWA desactivada; la cola offline se conserva.');
+    if (removed && navigator.serviceWorker.controller) window.location.reload();
+    return;
+  }
+  let reloadingForUpdate = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (reloadingForUpdate) return;
+    reloadingForUpdate = true;
+    window.location.reload();
+  });
+  // register ya comprueba actualizaciones; no se lanza otro update redundante.
+  await navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' });
+}
 
 document.addEventListener('DOMContentLoaded', async () => {
   if (localStorage.getItem('acoustimap-theme') === 'dark') document.body.classList.add('dark-theme');
@@ -1028,17 +1471,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     tabs[next]?.click();
     event.preventDefault();
   });
-  if ('serviceWorker' in navigator) {
-    let reloadingForUpdate = false;
-    navigator.serviceWorker.addEventListener('controllerchange', () => {
-      if (reloadingForUpdate) return;
-      reloadingForUpdate = true;
-      window.location.reload();
-    });
-    navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' })
-      .then((registration) => registration.update())
-      .catch((error) => console.warn('PWA no disponible:', error));
-  }
+  configureServiceWorker().catch((error) => console.warn('PWA no disponible:', error));
   try {
     const legacy = JSON.parse(localStorage.getItem('acoustimap-pending-measurements') || '[]');
     const migration = await Promise.allSettled(legacy.map((measurement) => queueOfflineMeasurement({ ...measurement, id: measurement.id || crypto.randomUUID() })));

@@ -20,6 +20,27 @@ function communityText(key) {
   return (communityCopy[language] || communityCopy.es)[key];
 }
 
+function mapDataText(key) {
+  const copy = {
+    es: { disconnected: 'Supabase sin configurar. No se pueden consultar ni publicar datos.', loading: 'Comprobando conexión con Supabase…', ready: 'Supabase conectado · RPC v5 OK', empty: 'Supabase conectado · 0 zonas en esta vista.', sdkError: 'No se cargó la biblioteca de Supabase. Revisa la red.', configError: 'Configuración Supabase inválida.', denied: 'Supabase rechazó la consulta. Revisa la clave pública y los permisos.', missingMethod: 'Supabase responde, pero falta aplicar la migración v5.', error: 'No se pudo comprobar la conexión con Supabase.' },
+    en: { disconnected: 'Supabase not configured. Data cannot be loaded or published.', loading: 'Checking Supabase connection…', ready: 'Supabase connected · v5 RPC OK', empty: 'Supabase connected · 0 areas in this view.', sdkError: 'Supabase library did not load. Check the network.', configError: 'Invalid Supabase configuration.', denied: 'Supabase rejected the query. Check the public key and permissions.', missingMethod: 'Supabase responds, but the v5 migration is missing.', error: 'Could not verify the Supabase connection.' },
+    pt: { disconnected: 'Supabase não configurado. Não é possível consultar nem publicar dados.', loading: 'Verificando conexão com o Supabase…', ready: 'Supabase conectado · RPC v5 OK', empty: 'Supabase conectado · 0 áreas nesta vista.', sdkError: 'A biblioteca do Supabase não carregou. Verifique a rede.', configError: 'Configuração Supabase inválida.', denied: 'O Supabase rejeitou a consulta. Verifique a chave pública e as permissões.', missingMethod: 'O Supabase responde, mas falta aplicar a migração v5.', error: 'Não foi possível verificar a conexão com o Supabase.' }
+  };
+  return (copy[document.documentElement.lang] || copy.es)[key];
+}
+
+function setMapDataStatus(state) {
+  const status = document.getElementById('map-data-status');
+  if (!status) return;
+  status.dataset.state = state;
+  status.dataset.cells = String(lastAggregatedPoints.length);
+  const count = state === 'ready'
+    ? ` · ${lastAggregatedPoints.length} ${communityText(lastAggregatedPoints.length === 1 ? 'zone' : 'zones')}` : '';
+  status.textContent = `${mapDataText(state)}${count} · v${APP_ASSET_VERSION}`;
+  status.hidden = false;
+  status.setAttribute?.('aria-busy', String(state === 'loading'));
+}
+
 /**
  * Compone el contador de la leyenda distinguiendo singular de plural.
  * Sin esto el modo "En vivo" mostraba "1 zonas" cuando solo había una celda.
@@ -51,13 +72,14 @@ function addCommunityPoint(lat, lng, db, category, createdAt, sampleCount = 1) {
     sampleCount > 1 ? `<small>${sampleCount} ${communityText('cumulative')}</small>` : ''
   ].filter(Boolean).join('<br>');
 
-  // Halo exterior tenue
+  // Huella visual dentro de la celda (~70 m), no radio de propagación sonora.
+  // El halo anterior de 90 m superponía varias celdas incluso al acercar.
   L.circle([lat, lng], {
     color,
     fillColor: color,
     fillOpacity: 0.08,
     weight: 0,
-    radius: CIRCLE_VISUAL_RADIUS_M * 1.8,
+    radius: Math.min(CIRCLE_VISUAL_RADIUS_M * 1.8, CELL_SIZE_M / 2),
     interactive: false
   }).addTo(communityLayer);
 
@@ -71,7 +93,7 @@ function addCommunityPoint(lat, lng, db, category, createdAt, sampleCount = 1) {
     fillOpacity: 0.18,
     weight: 1.2 + 1.3 * densityConfidence(sampleCount),
     opacity: cellBorderOpacity(sampleCount),
-    radius: CIRCLE_VISUAL_RADIUS_M,
+    radius: Math.min(CIRCLE_VISUAL_RADIUS_M, CELL_SIZE_M * 0.42),
     interactive: false
   }).addTo(communityLayer);
 
@@ -85,7 +107,8 @@ function addCommunityPoint(lat, lng, db, category, createdAt, sampleCount = 1) {
     interactive: false
   }).addTo(communityLayer);
 
-  // Marcador invisible con tooltip permanente
+  // Etiquetas permanentes solo si hay espacio; al tocar el marcador siempre
+  // se puede consultar el índice/cantidad en su popup, incluso en zoom lejano.
   L.circleMarker([lat, lng], {
     radius: 20,
     color: 'transparent',
@@ -95,12 +118,25 @@ function addCommunityPoint(lat, lng, db, category, createdAt, sampleCount = 1) {
   })
     .addTo(communityLayer)
     .bindTooltip(`${db} · ${sampleCount}`, {
-      permanent: true,
+      permanent: communityLabelVisible(lat, lng),
       direction: 'top',
       offset: [0, -30],
       className: `zone-tooltip tooltip-${category}`
     })
     .bindPopup(popupHtml);
+}
+
+function communityLabelVisible(lat, lng) {
+  if (typeof map.getZoom !== 'function' || typeof map.latLngToContainerPoint !== 'function') return true;
+  if (map.getZoom() < 16) return false;
+  const pixel = map.latLngToContainerPoint([lat, lng]);
+  let room = true;
+  communityLayer.eachLayer((layer) => {
+    if (!layer.getTooltip?.()?.options.permanent) return;
+    const previous = map.latLngToContainerPoint(layer.getLatLng());
+    if (Math.abs(pixel.x - previous.x) < 100 && Math.abs(pixel.y - previous.y) < 48) room = false;
+  });
+  return room;
 }
 
 // ============================================
@@ -149,6 +185,8 @@ function renderCommunityPoints(points) {
     return;
   }
   clearCommunityLayers();
+  const view = document.getElementById('map-view');
+  if (view && !view.classList.contains('active')) return;
   if (selectedVisualMode === 'heatmap') {
     setCommunityHeatPoints(points);
     return;
@@ -159,13 +197,15 @@ function renderCommunityPoints(points) {
 }
 
 function setCommunityVisualMode(mode) {
+  if (!['heatmap', 'zones'].includes(mode)) return;
+  if (typeof exitComparisonMode === 'function') exitComparisonMode();
   selectedVisualMode = mode;
   document.querySelectorAll('.visual-filter-btn').forEach((button) => {
     const active = button.id === `visual-${mode}`;
     button.classList.toggle('active', active);
     button.setAttribute('aria-pressed', String(active));
   });
-  if (lastAggregatedPoints.length) renderCommunityPoints(lastAggregatedPoints);
+  renderCommunityPoints(lastAggregatedPoints);
 }
 
 // ============================================
@@ -192,7 +232,8 @@ async function exportMeasurementsCsv() {
     while (true) {
       const { data, error } = await supabaseClient
         .from('noise_measurements')
-        .select('id, latitude, longitude, db_level, category, created_at')
+        .select('id, latitude, longitude, db_level, category, created_at, measurement_version, capture_profile')
+        .eq('measurement_version', MEASUREMENT_VERSION)
         .order('created_at', { ascending: false })
         .range(from, from + pageSize - 1);
 
@@ -202,7 +243,7 @@ async function exportMeasurementsCsv() {
       from += pageSize;
     }
 
-    const columns = ['id', 'latitude', 'longitude', 'noise_index', 'category', 'created_at'];
+    const columns = ['id', 'latitude', 'longitude', 'noise_index', 'category', 'created_at', 'measurement_version', 'capture_profile'];
     const csv = [
       columns.join(','),
       ...rows.map((row) => columns.map((column) => escapeCsvValue(column === 'noise_index' ? row.db_level : row[column])).join(','))
@@ -242,7 +283,8 @@ async function exportMeasurementsGeoJson() {
     while (true) {
       const { data, error } = await supabaseClient
         .from('noise_measurements')
-        .select('id, latitude, longitude, db_level, category, created_at')
+        .select('id, latitude, longitude, db_level, category, created_at, measurement_version, capture_profile')
+        .eq('measurement_version', MEASUREMENT_VERSION)
         .order('created_at', { ascending: false })
         .range(from, from + pageSize - 1);
 
@@ -255,7 +297,9 @@ async function exportMeasurementsGeoJson() {
             id: row.id,
             noise_index: row.db_level,
             category: row.category,
-            created_at: row.created_at
+            created_at: row.created_at,
+            measurement_version: row.measurement_version,
+            capture_profile: row.capture_profile
           }
         });
       });
@@ -297,10 +341,15 @@ async function loadCommunityPoints() {
   if (!counter) return;
 
   if (!supabaseClient) {
-    counter.innerText = communityText('noCommunity');
+    const state = typeof backendInitializationState === 'string' ? backendInitializationState : 'disconnected';
+    counter.innerText = mapDataText(state);
+    lastAggregatedPoints = [];
+    renderCommunityPoints([]);
+    setMapDataStatus(state);
     return;
   }
 
+  setMapDataStatus('loading');
   try {
     const rows = [];
     const pageSize = 1000;
@@ -315,7 +364,7 @@ async function loadCommunityPoints() {
     };
     for (let from = 0; ; from += pageSize) {
       const { data: page, error } = await supabaseClient
-        .rpc('noise_map_cells', queryParams)
+        .rpc('noise_map_cells_v5', queryParams)
         .range(from, from + pageSize - 1);
       if (error) throw error;
       rows.push(...(page || []));
@@ -327,6 +376,8 @@ async function loadCommunityPoints() {
 
     if (rows.length === 0) {
       lastAggregatedPoints = [];
+      renderCommunityPoints([]);
+      setMapDataStatus('empty');
       counter.innerText = mapMode === 'live' ? communityText('noLive') : communityText('noHistory');
       return;
     }
@@ -338,6 +389,7 @@ async function loadCommunityPoints() {
     }));
     lastAggregatedPoints = aggregated;
     renderCommunityPoints(aggregated);
+    setMapDataStatus('ready');
 
     const mostRecent = rows[0].created_at;
     const modeLabel  = communityText(mapMode === 'live' ? 'live' : 'history');
@@ -349,7 +401,14 @@ async function loadCommunityPoints() {
   } catch (err) {
     if (requestToken !== communityLoadToken) return;
     console.error('Error cargando mediciones:', err);
-    counter.innerText = communityText('loadError');
+    const state = err.code === 'PGRST202' ? 'missingMethod'
+      : err.code === '42501' || err.code === 'PGRST301' || err.status === 401 || err.status === 403 ? 'denied' : 'error';
+    counter.innerText = mapDataText(state);
+    // Un fallo de red no invalida la última carga de esta misma vista.
+    // Una RPC inexistente sí impide interpretar sus datos como método v3.
+    if (state === 'missingMethod') lastAggregatedPoints = [];
+    renderCommunityPoints(lastAggregatedPoints);
+    setMapDataStatus(state);
   }
 }
 
@@ -378,13 +437,23 @@ async function sendMeasurementIfDue() {
   if (now - lastSendTime < SEND_INTERVAL_MS) return;
   if (sendWindowCount === 0) return;
 
-  const avg = Math.round(sendWindowSum / sendWindowCount);
-  const windowSum = sendWindowSum;
+  /*
+   * El promedio que se guarda en `db_level` es energetico, no aritmetico.
+   *
+   * Este valor es la unidad con la que la base de datos agrega las celdas del mapa,
+   * asi que el sesgo de la media aritmetica no se quedaba en la sesion del usuario:
+   * se guardaba ya rebajado y despues se promediaba otra vez en SQL. Corregir solo
+   * el promedio de pantalla habria dejado el mapa igual de sesgado.
+   */
+  const avg = Math.round(promedioEnergetico(sendWindowEnergia, sendWindowCount));
+  const windowEnergia = sendWindowEnergia;
   const windowCount = sendWindowCount;
-  sendWindowSum = 0;
+  sendWindowEnergia = 0;
   sendWindowCount = 0;
   lastSendTime = now;
   sendMeasurementIfDue.pending = true;
+  const sharingGeneration = typeof sharingRequestId !== 'undefined' ? sharingRequestId : null;
+  if (typeof updateSharingDelivery === 'function') updateSharingDelivery('sending', sharingGeneration);
   const snapped  = snapToGrid(currentPosition.lat, currentPosition.lng);
   const category = classifyDb(avg);
   const nowIso   = new Date().toISOString();
@@ -393,10 +462,13 @@ async function sendMeasurementIfDue() {
     latitude: snapped.lat,
     longitude: snapped.lng,
     db_level: avg,
-    category
+    category,
+    measurement_version: MEASUREMENT_VERSION,
+    capture_profile: captureProfile
   };
 
   let success = false;
+  let persisted = false;
   try {
     if (supabaseClient) {
       let error;
@@ -407,7 +479,33 @@ async function sendMeasurementIfDue() {
       }
       if (error) {
         console.error('Supabase insert error:', error);
-        if (typeof isOfflineError === 'function' ? isOfflineError(error) : !navigator.onLine) {
+        /*
+         * Un rechazo de Postgres **no** es un problema de red, y por eso no debe
+         * seguir el camino de la cola offline.
+         *
+         * `isOfflineError()` solo reconoce fallos de red, así que un 23514 —una
+         * restricción violada— no se guardaba en ninguna parte: la lectura se
+         * descartaba en silencio y el botón ponía «Error de envío». Fue lo que pasó
+         * al subir a la v4 sin aplicar la migración que admitiera el 4 en el CHECK:
+         * cada medición del mundo se perdió sin dejar rastro, y el aviso que sí se
+         * veía era el del mapa, que habla de la RPC y no del INSERT.
+         *
+         * Lo que se hace aquí:
+         *
+         *  - Se distingue el error de esquema del de red, y el de esquema **dice
+         *    qué hacer** en lugar de recomendar revisar la conexión, que no es el
+         *    problema.
+         *  - El rechazo de esquema **no** se mete en la cola: esa cola acaba
+         *    sincronizando en segundo plano y volvería a fallar igual, acumulándose
+         *    de filas que la base va a rechazar otra vez. Perder una medición por un
+         *    error de configuración es malo; perderla otra vez cada vez que se
+         *    reintenta, en silencio, es peor.
+         */
+        const esEsquema = typeof isSchemaError === 'function' ? isSchemaError(error) : false;
+        if (esEsquema) {
+          sharingDeliveryState = 'error';
+          updateSharingStatus('schemaOutOfDate');
+        } else if (typeof isOfflineError === 'function' ? isOfflineError(error) : !navigator.onLine) {
           if (typeof queueOfflineMeasurement === 'function') {
             await queueOfflineMeasurement(measurement);
             success = true;
@@ -415,6 +513,7 @@ async function sendMeasurementIfDue() {
         }
       } else {
         success = true;
+        persisted = true;
       }
     } else {
       if (typeof queueOfflineMeasurement === 'function') {
@@ -426,28 +525,21 @@ async function sendMeasurementIfDue() {
     if (success && typeof recordLocalChallengeMeasurement === 'function') {
       recordLocalChallengeMeasurement({ ...measurement, created_at: nowIso });
     }
-    if (success) {
-      if (mapMode === 'live') {
-        if (selectedVisualMode === 'heatmap') {
-          addCommunityHeatPoint(snapped.lat, snapped.lng, avg);
-        } else {
-          addCommunityPoint(snapped.lat, snapped.lng, avg, category, nowIso, 1);
-        }
-        lastAggregatedPoints.push({
-          lat: snapped.lat, lng: snapped.lng, db: avg, category,
-          createdAt: nowIso, sampleCount: 1
-        });
-      } else {
-        addCommunityPoint(snapped.lat, snapped.lng, avg, category, nowIso, 1);
-      }
-    }
+    // La RPC vuelve a agregar la celda y respeta periodo/franja/viewport.
+    // Añadir un punto suelto duplicaba celdas, ignoraba filtros y mezclaba
+    // círculos con Calor en Historial. La cola offline no es un aporte público.
+    const view = document.getElementById('map-view');
+    if (persisted && view?.classList.contains('active')) loadCommunityPoints();
 
   } finally {
     if (!success) {
-      sendWindowSum += windowSum;
+      sendWindowEnergia += windowEnergia;
       sendWindowCount += windowCount;
     }
     sendMeasurementIfDue.pending = false;
+    if (typeof updateSharingDelivery === 'function') {
+      updateSharingDelivery(persisted ? 'published' : success ? 'queued' : 'error', sharingGeneration);
+    }
   }
 }
 
@@ -455,13 +547,21 @@ async function sendMeasurementIfDue() {
 // CAMBIAR MODO EN VIVO / HISTORIAL
 // ============================================
 function setMapMode(mode) {
-  if (!['history', 'live'].includes(mode) || mode === mapMode) return;
+  if (!['history', 'live'].includes(mode)) return;
+  const comparing = typeof comparisonMode !== 'undefined' && comparisonMode;
+  if (typeof exitComparisonMode === 'function') exitComparisonMode();
+  if (mode === mapMode) {
+    if (comparing) renderCommunityPoints(lastAggregatedPoints);
+    return;
+  }
   mapMode = mode;
   document.querySelectorAll('.mode-btn').forEach((button) => {
     const active = button.id === `mode-${mode}`;
     button.classList.toggle('active', active);
     button.setAttribute('aria-pressed', String(active));
   });
+  lastAggregatedPoints = [];
+  clearCommunityLayers();
   loadCommunityPoints();
 }
 
@@ -472,11 +572,14 @@ const TIME_FILTERS = ['all', 'morning', 'afternoon', 'night'];
 
 function setTimeFilter(filter) {
   if (!TIME_FILTERS.includes(filter)) return;
+  if (typeof exitComparisonMode === 'function') exitComparisonMode();
   selectedTimeFilter = filter;
   document.querySelectorAll('.time-filter-btn').forEach((button) => {
     const active = button.id === `time-${filter}`;
     button.classList.toggle('active', active);
     button.setAttribute('aria-pressed', String(active));
   });
+  lastAggregatedPoints = [];
+  clearCommunityLayers();
   loadCommunityPoints();
 }

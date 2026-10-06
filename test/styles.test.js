@@ -73,3 +73,8 @@ test('el zoom no esta bloqueado en el viewport', () => {
   assert.doesNotMatch(indice, /user-scalable\s*=\s*no/i);
   assert.doesNotMatch(indice, /maximum-scale\s*=\s*1\b/i);
 });
+
+test('el título de Salud hereda el color del tema, también en oscuro', () => {
+  const info = hojas.find((hoja) => hoja.name === 'info.css').texto;
+  assert.match(info, /\.info-header h1\s*\{[^}]*color:\s*var\(--text-main\)/);
+});

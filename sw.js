@@ -1,5 +1,5 @@
-const CACHE_NAME = 'acoustimap-shell-v35';
-const ASSET_VERSION = '35';
+const CACHE_NAME = 'acoustimap-shell-v45';
+const ASSET_VERSION = '45';
 const APP_SHELL = [
   './',
   './index.html',
@@ -14,6 +14,7 @@ const APP_SHELL = [
   './js/config.js',
   './js/map.js',
   './js/audio.js',
+  './js/audio-level-processor.js',
   './js/community.js',
   './js/app.js',
   './js/features.js',
@@ -27,6 +28,7 @@ self.addEventListener('install', (event) => {
     await cache.addAll(APP_SHELL);
     // Libraries CDN: best-effort cache. A CDN outage must not block app install.
     await Promise.allSettled([
+      'https://cdn.jsdelivr.net/npm/motion@14.0.0/dist/motion.js',
       'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js',
       'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',
       'https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js',
@@ -44,7 +46,7 @@ self.addEventListener('install', (event) => {
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) => Promise.all(
-      keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))
+      keys.filter((key) => key.startsWith('acoustimap-shell-') && key !== CACHE_NAME).map((key) => caches.delete(key))
     ))
   );
   self.clients.claim();
@@ -65,6 +67,24 @@ self.addEventListener('fetch', (event) => {
 
   event.respondWith(
     (async () => {
+      // La configuración puede cambiar sin cambiar la versión de los assets.
+      // Red primero; nunca se guarda una plantilla desconectada en la PWA.
+      if (url.origin === self.location.origin && url.pathname.endsWith('/js/config.local.js')) {
+        const cache = await caches.open(CACHE_NAME);
+        try {
+          const response = await fetch(event.request, { cache: 'no-store' });
+          if (response.ok) {
+            const source = await response.clone().text();
+            if (source.includes('__ACOUSTIMAP_CONFIG__')
+              && !/TU-PROYECTO|TU_ANON_KEY_AQUI/.test(source)) {
+              await cache.put(event.request, response.clone());
+            } else await cache.delete(event.request);
+          }
+          return response;
+        } catch (_) {
+          return (await cache.match(event.request)) || Response.error();
+        }
+      }
       if (event.request.mode === 'navigate') {
         try {
           const response = await fetch(event.request);

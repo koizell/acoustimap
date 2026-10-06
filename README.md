@@ -6,11 +6,33 @@ AcoustiMap convierte tu dispositivo en un sensor de ruido ciudadano. Mide el niv
 
 🌐 **Abrir la aplicación:** [https://koizell.github.io/acoustimap/](https://koizell.github.io/acoustimap/)
 
-La aplicación usa la Web Audio API para calcular un **índice relativo de ruido** en tiempo real. No graba audio. **Los valores no son decibelios calibrados (dB SPL)** y no sirven para evaluar exposición, cumplimiento normativo ni riesgo para la salud. Los dispositivos y navegadores pueden producir valores distintos ante el mismo sonido.
+La aplicación usa la Web Audio API para medir el nivel de ruido de tu entorno en tiempo real. No graba audio.
 
-El índice se obtiene del **RMS del dominio temporal** (`getFloatTimeDomainData`), que mide la energía total de la señal, convertido a dBFS y llevado al rango 30-95: un punto de índice por decibelio. Hasta el 28 de septiembre de 2026 se usaba el promedio de los 128 bins del espectro, que se hundía con sonidos tonales: un pitido fuerte de prueba dejaba la media en 93 de 255 y el índice en 64, sin poder alcanzar la categoría «alto», y con datos reales el mapa salía siempre verde. Ese rango 30-95 está **calibrado por simulación, no medido en condiciones reales**: las mediciones anteriores al 29 de septiembre de 2026 se tomaron con la métrica vieja y no son comparables con las nuevas. Conviene recoger lecturas reales en varios entornos y ajustar si hace falta. `test/index-calibration.test.js` documenta la tabla de conversión.
+**Lo que ve quien mide: un número en dB, la palabra «Sin calibrar» debajo, y el color.** Es una escala orientativa para comparar una calle con otra, no un sonómetro. **No sirve para evaluar exposición, cumplimiento normativo ni riesgo para la salud**, y los dispositivos y navegadores producen valores distintos ante el mismo sonido. Esa advertencia no está en cada pantalla: está en la leyenda del mapa, que es donde alguien va a mirar para entender qué significa un color, y aquí.
 
-Los umbrales siguen siendo bajo (<55), moderado (55–70) y alto (>70). El gradiente del mapa de calor sitúa el ámbar en 0.385 y el naranja en 0.615, que son exactamente los índices 55 y 70 sobre ese rango, así que el color cambia donde cambia la categoría.
+El método **v5** analiza el espectro con FFT de 8192 muestras y ventana Hann, aplica ponderación A por frecuencia y promedia la energía sobre una ventana móvil de aproximadamente **3 segundos**. Actualiza la lectura cada 200 ms. La escala sigue siendo `dBFS + 100`, acotada a 30–95: **no es presión sonora calibrada ni un sonómetro certificado**. Las pruebas con señales sintéticas verifican el cálculo, no la precisión acústica del dispositivo.
+
+La instrumentación —señal en dBFS, filtros del navegador, versión del método y avisos de recorte— **no está en la pantalla**. Se abre escribiendo `verCalidadMicrofono()` en la consola. Se quitó de ahí porque para quien mide ruido en la calle eran cuatro datos que no cambian lo que haría con la cifra, y ocupaban el sitio de los botones; para quien audita la medida son los cuatro que importan. Los identificadores se conservan porque el código los escribe, y ningún dato se recalcula por haberlos escondido.
+
+Los umbrales bajo (<55), moderado (55–70) y alto (>70) son categorías orientativas de la aplicación, **no límites ambientales aplicables a esta escala sin calibrar**. El gradiente del mapa cambia de color en esos mismos puntos.
+
+### El promedio es en energía, no aritmético
+
+Desde v4, varias lecturas se combinan con `10·log10(media(10^(nivel/10)))`. La v5 conserva esa fórmula, pero las lecturas ya incorporan la ponderación frecuencial.
+
+El promedio móvil reduce la variación momentánea; **no elimina eventos fuertes reales**. Un golpe audible contribuye por su energía y duración. El diagnóstico muestra un máximo espectral reciente por separado, que caduca al salir de la ventana; no debe confundirse con un Lmax normalizado Fast/Slow.
+
+Corregidos los cinco sitios: el promedio de pantalla, el resumen de sesión, la ventana que se envía, la media de la pestaña de Datos y la agregación por celda (`migrations/20261015_energy_average_v4.sql`).
+
+**El mapa v5 empieza sin celdas hasta recibir lecturas v5.** No se mezcla RMS sin ponderar con energía ponderada A. Las RPC antiguas permanecen, las filas anteriores no se borran ni se convierten. La RPC v4 conserva su filtro histórico v3/v4.
+
+Aplicar la curva A no certifica cumplimiento de IEC 61672 ni calibra la sensibilidad del micrófono. No usar estas lecturas para evaluar exposición, salud o cumplimiento normativo.
+
+### Historial de métodos
+
+El método inicial promediaba bytes del espectro. v2 tomó ventanas temporales de 2048 valores con suavizado; v3 pasó a RMS continuo de un segundo, con media aritmética; v4 cambió a promedio energético. **v5 analiza el espectro ponderado A con promedio móvil de 3 s**. El rango 30–95 es una decisión de interfaz: las simulaciones no equivalen a calibración acústica.
+
+Las lecturas sin versión declarada permanecen con `measurement_version = NULL` y cada versión conserva la suya: **ninguna se convierte retroactivamente**, tampoco al sincronizar la cola offline. Mapa, estadísticas, comparación y exportaciones del frontend usan solo la versión vigente. Es normal que inicialmente aparezcan vacíos; el histórico se conserva en la base, sujeto a su retención normal. Incluso entre lecturas de la misma versión, diferentes micrófonos y tratamientos activos/no verificables pueden producir valores distintos.
 
 ---
 
@@ -51,14 +73,14 @@ Pulsa el botón **🎤 Activar** y acepta el permiso que te pedirá el navegador
 
 Verás en pantalla:
 
-- **Índice instantáneo** en tiempo real (grande y destacado).
+- **El nivel de ruido del último segundo**, en dB, grande y destacado. Debajo pone **«Sin calibrar»**, que es lo único que hay que saber antes de usarlo.
 - **Promedio** de tu sesión, con mínimo, máximo y número de muestras.
 - Una **clasificación por color**:
   - 🟢 **Bajo** (< 55) · Entrazable
   - 🟡 **Moderado** (55 – 70) · Molesto
   - 🔴 **Alto** (> 70) · Molesto de forma sostenida
 
-> Estos valores son un **índice relativo**, no dB. No miden exposición ni cumplen límites.
+> Sin calibrar significa eso: sirve para comparar zonas entre sí, no para medir exposición ni cumplir límites. Los límites que definen cada color están en la leyenda del mapa, no aquí.
 
 ### 3. Compartir en el mapa (opcional)
 
@@ -84,7 +106,7 @@ Esta es la sección más completa. Tiene 4 subsecciones:
 Vista general con:
 
 - **Total de mediciones** registradas en la ciudad.
-- **Promedio general** del índice.
+- **Promedio general** en dB.
 - **Niveles altos** detectados.
 - **Zonas más ruidosas** (Top 3 con sus coordenadas y número de mediciones).
 - **Zonas más silenciosas** (Top 3).
@@ -98,7 +120,7 @@ Puedes dejar un **reporte ciudadano** sobre un problema específico:
 - Añade la ubicación (se difumina igual que las mediciones).
 - El reporte queda visible para toda la comunidad.
 
-> Los reportes ciudadanos **humanizan los datos**: no solo dicen "índice 72" sino también *"obra en la calle desde las 7 AM"*.
+> Los reportes ciudadanos **humanizan los datos**: no solo dicen "72 dB" sino también *"obra en la calle desde las 7 AM"*.
 
 ### ↔️ Comparar meses
 
@@ -162,7 +184,7 @@ Tu ubicación real **nunca sale de tu dispositivo**. Lo que se envía es una coo
 
 ## ⚠️ Qué mide y qué no mide
 
-AcoustiMap calcula un **índice relativo de ruido**, no decibelios calibrados profesionalmente.
+AcoustiMap muestra el nivel de ruido en **dB sin calibrar**. Es una escala para orientarse y comparar, no un sonómetro.
 
 **✅ Sirve para:**
 - Comparar zonas de la ciudad.
@@ -203,7 +225,7 @@ No. La app es completamente anónima. No hay registro ni inicio de sesión.
 Sí, funciona en navegadores modernos (Chrome, Firefox, Edge, Safari). Requiere HTTPS, que GitHub Pages ya proporciona.
 
 **¿Los datos son precisos?**
-No son decibelios calibrados. Son un índice relativo útil para comparar zonas, no para mediciones profesionales.
+Son dB **sin calibrar**. Sirven para comparar zonas entre sí, no como medición profesional: dos móviles distintos pueden dar cifras diferentes ante el mismo ruido.
 
 **¿Cuánto tiempo se guardan mis datos?**
 - Mediciones: 90 días.
@@ -250,10 +272,19 @@ Para un proyecto nuevo, ejecuta en el SQL Editor de Supabase, en este orden:
 1. [`setup.sql`](setup.sql)
 2. [`migrations/20260923_complete_features.sql`](migrations/20260923_complete_features.sql)
 3. [`migrations/20260925_privacy_and_retention.sql`](migrations/20260925_privacy_and_retention.sql)
+4. [`migrations/20260928_schema_hygiene.sql`](migrations/20260928_schema_hygiene.sql)
+5. [`migrations/20260929_drop_unused_measurement_link.sql`](migrations/20260929_drop_unused_measurement_link.sql)
+6. [`migrations/20261005_audio_measurement_v2.sql`](migrations/20261005_audio_measurement_v2.sql)
+7. [`migrations/20261005_audio_measurement_v3.sql`](migrations/20261005_audio_measurement_v3.sql)
+8. [`migrations/20261015_energy_average_v4.sql`](migrations/20261015_energy_average_v4.sql)
+9. [`migrations/20261016_report_kind.sql`](migrations/20261016_report_kind.sql)
+10. [`migrations/20261017_weighted_a_v5.sql`](migrations/20261017_weighted_a_v5.sql)
 
-En un proyecto que ya tenga las dos primeras migraciones, ejecuta solo la tercera. Revisa cualquier política RLS adicional creada manualmente: **las políticas permisivas de `INSERT` se combinan con OR** y pueden eludir las restricciones nuevas. La migración retira las políticas conocidas del repositorio, no las que se crearon a mano fuera de él.
+En un proyecto existente ya migrado hasta v3, ejecuta [`deploy/apply-v5.sql`](deploy/apply-v5.sql): reúne v4, categorías y v5 en ese orden. No es un instalador desde cero. Si ya aplicaste v4/categorías, puedes ejecutar solo la migración v5. Revisa cualquier política RLS adicional creada manualmente: **las políticas permisivas de `INSERT` se combinan con OR** y pueden eludir restricciones.
 
-Aplica la migración de privacidad y confirma que `noise_map_cells` responde **antes** de publicar este frontend: el mapa nuevo depende de esa función.
+En SQL Editor, pega el contenido del archivo y pulsa **Run**; con conexión PostgreSQL también puedes usar `psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f deploy/apply-v5.sql`. No compartas esa URL ni la incluyas en el frontend.
+
+Confirma que `noise_map_cells_v5` responde con el rol `anon` **antes** de publicar. La migración concede ejecución a `anon` y `authenticated`; conserva RLS y no borra histórico. Es normal ver cero celdas v5 al principio. Este archivo no se ha aplicado automáticamente a tu Supabase.
 
 Después despliega la Edge Function `cleanup-noise-photos` desde [`supabase/functions/cleanup-noise-photos`](supabase/functions/cleanup-noise-photos) con Supabase CLI y configura un secreto aleatorio `PHOTO_CLEANUP_TOKEN` en los secretos de la función. La función tiene `verify_jwt = false` en [`supabase/config.toml`](supabase/config.toml) y exige ese token en la cabecera `x-cleanup-token` de cada petición; no pongas el token en el frontend.
 

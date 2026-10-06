@@ -1,7 +1,7 @@
 /* ============================================================
    responsive.css
    Media queries para adaptar el layout a móvil y escritorio.
-   SIEMPRE debe ser el último archivo en cargar.
+   experience.css aplica los tokens visuales finales.
    ============================================================ */
 
 /* ============================================================
@@ -9,21 +9,8 @@
    ============================================================ */
 @media (min-width: 720px) {
   .leaflet-top.leaflet-left {
-    top: calc(var(--header-h) + 10px) !important;
+    top: 10px !important;
   }
-
-  .stats-panel {
-    max-width: 420px;
-    max-height: 70vh;
-    padding: 14px 16px;
-  }
-
-  /* En PC no se necesita el handle: siempre expandido */
-  .stats-handle { display: none; }
-  .stats-panel.collapsed .stats-content { display: flex; }
-
-  .db-value { font-size: 2.6rem; }
-  .avg-value { font-size: 1.8rem; }
 }
 
 /* ============================================================
@@ -66,7 +53,7 @@
     max-width: none;
   }
 
-  /* ✅ Panel más compacto */
+  /* Mantiene lectura y acciones visibles; solo los detalles se pliegan. */
   .stats-panel {
     bottom: 8px;
     left: 8px;
@@ -74,32 +61,18 @@
     width: auto;
     transform: none;
     max-width: none;
-    max-height: 42dvh;
-    padding: 8px 12px 10px;
+    max-height: none;
+    padding: 10px 14px 4px;
     border-radius: 16px;
-    padding-bottom: calc(10px + env(safe-area-inset-bottom));
-    gap: 4px;
+    gap: 5px;
   }
 
-  /* Mostrar handle en móvil */
-  .stats-handle { display: flex; }
-
-  /* Textos más pequeños */
-  .db-value { font-size: 1.9rem; }
-  .db-unit { font-size: 0.85rem; }
-  .db-status { font-size: 0.66rem; margin-top: 2px; }
-  .db-bar-bg { height: 6px; margin-top: 6px; }
-
-  .meter-container { margin: 2px 0; }
-
-  .avg-block { padding: 8px 10px; }
-  .avg-value { font-size: 1.35rem; }
-  .avg-meta { font-size: 0.65rem; margin-top: 6px; }
-
-  .main-actions { gap: 6px; padding-top: 6px; }
-  .action-btn { padding: 9px 6px; font-size: 0.7rem; }
-  .action-icon { font-size: 1rem; }
-  .action-text { font-size: 0.68rem; }
+  .db-value { font-size: 2.75rem; }
+  .avg-block { padding: 6px 0; }
+  .stats-handle { min-height: 32px; }
+  .stats-panel:not(.collapsed) { max-height: calc(100dvh - var(--header-h) - 20px); z-index: 1100; }
+  .avg-meta { font-size: 0.7rem; }
+  .main-actions { gap: 8px; }
 
   /* Controles de Leaflet */
   .leaflet-top.leaflet-left {
@@ -124,72 +97,6 @@
 @media (max-width: 400px) {
   .brand { font-size: 0.85rem; }
   .tab-btn { padding: 5px 6px; font-size: 0.65rem; }
-  .db-value { font-size: 1.7rem; }
-  .avg-value { font-size: 1.25rem; }
-  .action-text { font-size: 0.62rem; }
-}
-
-/* ============================================================
-   FIX DEFINITIVO: panel colapsado solo con handle + botones
-   ============================================================ */
-@media (max-width: 719px) {
-
-  /* Panel colapsado: alto suficiente para handle + botones */
-  .stats-panel.collapsed {
-    max-height: 108px !important;
-    padding: 6px 12px calc(10px + env(safe-area-inset-bottom)) !important;
-    overflow: hidden !important;
-  }
-
-  /* En colapsado, OCULTAR la cabecera (badge + GPS) para dejar espacio */
-  .stats-panel.collapsed .stats-header {
-    display: none !important;
-  }
-
-  /* En colapsado, OCULTAR el contenido (medidor + promedio) */
-  .stats-panel.collapsed .stats-content {
-    display: none !important;
-  }
-
-  /* Los botones siempre visibles */
-  .stats-panel .main-actions {
-    display: flex !important;
-    flex-shrink: 0 !important;
-    margin-top: 0 !important;
-    padding-top: 0 !important;
-    border-top: none !important;
-  }
-
-  /* Cuando está expandido, mostrar todo de nuevo */
-  .stats-panel:not(.collapsed) .stats-header {
-    display: flex !important;
-  }
-
-  .stats-panel:not(.collapsed) .stats-content {
-    display: flex !important;
-  }
-
-  .stats-panel:not(.collapsed) .main-actions {
-    padding-top: 8px !important;
-    border-top: 1px solid #e2e8f0 !important;
-  }
-
-  /* El handle se ve siempre */
-  .stats-panel .stats-handle {
-    display: flex !important;
-    padding: 2px 0 8px !important;
-    width: 100%;
-    border: 0;
-    background: transparent;
-    color: inherit;
-    font: inherit;
-  }
-
-  /* Y el panel en general */
-  .stats-panel {
-    max-height: 42dvh !important;
-    padding: 8px 12px calc(10px + env(safe-area-inset-bottom)) !important;
-  }
 }
 
 /* ============================================================
@@ -201,8 +108,4 @@
       bottom: calc(8px + env(safe-area-inset-bottom)) !important;
     }
   }
-}
-
-@media (max-width: 400px) {
-  .stats-panel:not(.collapsed) { max-height: 46dvh !important; }
 }

@@ -5,23 +5,23 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#0f172a" />
     <title>AcoustiMap - Mapeo de Contaminación Acústica</title>
-    <link rel="manifest" href="manifest.webmanifest?v=35" />
+    <link rel="manifest" href="manifest.webmanifest?v=45" />
 
-    <link rel="icon" href="assets/icon.svg?v=35" type="image/svg+xml" />
+    <link rel="icon" href="assets/icon.svg?v=45" type="image/svg+xml" />
 
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css" />
 
     <!-- Estilos modulares -->
-    <link rel="stylesheet" href="css/base.css?v=35" />
-    <link rel="stylesheet" href="css/layout.css?v=35" />
-    <link rel="stylesheet" href="css/map.css?v=35" />
-    <link rel="stylesheet" href="css/panel.css?v=35" />
-    <link rel="stylesheet" href="css/info.css?v=35" />
-    <link rel="stylesheet" href="css/responsive.css?v=35" />
-    <link rel="stylesheet" href="css/features.css?v=35" />
-    <link rel="stylesheet" href="css/experience.css?v=35" />
+    <link rel="stylesheet" href="css/base.css?v=45" />
+    <link rel="stylesheet" href="css/layout.css?v=45" />
+    <link rel="stylesheet" href="css/map.css?v=45" />
+    <link rel="stylesheet" href="css/panel.css?v=45" />
+    <link rel="stylesheet" href="css/info.css?v=45" />
+    <link rel="stylesheet" href="css/responsive.css?v=45" />
+    <link rel="stylesheet" href="css/features.css?v=45" />
+    <link rel="stylesheet" href="css/experience.css?v=45" />
   </head>
   <body>
     <header>
@@ -60,13 +60,14 @@
       </div>
 
       <!-- Botón de leyenda -->
+      <div class="map-data-status" id="map-data-status" role="status" aria-live="polite">Comprobando conexión con Supabase…</div>
       <button class="legend-toggle" id="legend-toggle" onclick="toggleLegend()" aria-label="Información del mapa" aria-controls="map-legend" aria-expanded="false">ℹ️</button>
 
       <!-- Leyenda colapsable -->
-      <div class="map-legend collapsed" id="map-legend" role="region" aria-label="Información del mapa">
+      <div class="map-legend collapsed" id="map-legend" role="region" aria-label="Información del mapa" inert>
         <div class="legend-header">
           <span>Información</span>
-          <button class="legend-close" onclick="toggleLegend()">✕</button>
+          <button class="legend-close" onclick="toggleLegend()" aria-label="Cerrar información">✕</button>
         </div>
         <div class="legend-body">
           <div><span class="dot" style="background: #10b981"></span>Índice &lt; 55 · Bajo</div>
@@ -74,6 +75,7 @@
           <div><span class="dot" style="background: #ef4444"></span>Índice &gt; 70 · Alto</div>
           <p>Escala relativa orientativa; no equivale a dB físicos ni sirve para evaluar exposición.</p>
           <p class="legend-hint" id="legend-hint">Cada círculo rotula <b>índice · mediciones</b>. El borde se marca más cuanto más mediciones sostienen ese promedio; el color y el relleno dependen solo del índice.</p>
+          <p id="measurement-method-note">Mapa y estadísticas: solo método v5. El histórico anterior se conserva por separado.</p>
           <hr class="legend-divider">
           <div class="legend-count" id="community-count">Cargando datos…</div>
           <div class="legend-me">
@@ -91,66 +93,89 @@
 
       <!-- PANEL DE ESTADÍSTICAS -->
       <div class="stats-panel collapsed" id="stats-panel">
-        <button class="stats-handle" type="button" onclick="toggleStatsPanel()" aria-expanded="false" aria-controls="stats-content">
-          <span class="handle-bar"></span>
-          <span class="handle-label" id="stats-handle-label">Mostrar detalles</span>
-        </button>
-
         <div class="stats-header">
           <span class="status-badge" id="status-badge">
             <span class="pulse-dot" id="pulse-dot" style="display: none"></span>
             <span id="status-text">Inactivo</span>
           </span>
-          <span class="gps-chip" id="gps-chip">📡 GPS: sin permiso</span>
+          <span class="gps-chip" id="gps-chip">GPS apagado</span>
         </div>
 
-        <div class="stats-content" id="stats-content">
-          <!-- Medidor principal -->
-          <div class="meter-container">
-            <div class="db-display">
-              <span class="db-value" id="db-number">--</span>
-              <span class="db-unit">índice</span>
-            </div>
-            <div class="db-status" id="db-status-text">Presiona para empezar</div>
-            <div class="db-bar-bg">
-              <div class="db-bar-fill" id="db-bar"></div>
-            </div>
-          </div>
+        <p id="share-status" class="sharing-status" role="status" aria-live="polite"></p>
 
-          <!-- Promedio de sesión -->
-          <div class="avg-block">
-            <div class="avg-head">
-              <span>📊 Promedio</span>
-              <span id="avg-time">00:00</span>
-            </div>
-            <div class="avg-main">
-              <span class="avg-value" id="avg-number">--</span>
-              <span class="avg-unit">índice</span>
-              <span class="avg-tag" id="avg-tag">Sin datos</span>
-            </div>
-            <div class="avg-meta">
-              <span>Mín <b id="min-db">--</b></span>
-              <span>Máx <b id="max-db">--</b></span>
-              <span>Muestras <b id="sample-count">0</b></span>
-            </div>
+        <!-- Lectura y acciones siempre visibles, también en móvil. -->
+        <div class="meter-container">
+          <div class="meter-reading">
+            <div class="db-display"><span class="db-value" id="db-number">--</span><span class="db-unit">dB</span></div>
+            <div class="db-status" id="db-status-text">Sin medir</div>
           </div>
+          <div class="db-bar-bg"><div class="db-bar-fill" id="db-bar"></div></div>
+          <p class="measurement-caveat" id="measurement-caveat">Sin calibrar</p>
+          <!--
+            Los dos avisos se quedan FUERA del bloque oculto, y es un error que
+            cometí al esconderlo todo junto: un aviso no es texto innecesario, es
+            la única vez que la app te dice que el número de ahora no describe el
+            ruido de tu calle.
+
+            - `audio-processing-warning`: el navegador tiene la ganancia o el filtro
+              de ruido puestos, y por eso el número puede moverse solo.
+            - `audio-quality-warning`: la señal se recorta contra el límite digital,
+              y el número de un recorte no es una medida.
+
+            Los dos son cortos, sólo aparecen cuando hay algo que avisar, y
+            desaparecen solos. Lo que no se merecía una línea propia es el resto.
+          -->
+          <p class="audio-quality-warning" id="audio-processing-warning" role="status" aria-live="polite"></p>
+          <p class="audio-quality-warning" id="audio-quality-warning" role="status" aria-live="polite"></p>
+          <!--
+            Y aquí sí, lo que es instrumentación y no consejo: la señal en dBFS, los
+            ajustes declarados y la versión del método. Se abre desde la consola con
+            `verCalidadMicrofono()`, y está en el README para quien quiera auditar la
+            medida. Antes ocupaba tres líneas de la pantalla de medición y no le
+            decía nada a quien mide; ahora está a un paso, no a la vista.
+          -->
+          <div class="mic-detail" hidden>
+            <p class="audio-signal-reading" id="audio-signal-reading">Señal del micrófono: sin lectura</p>
+            <details class="audio-diagnostics">
+              <summary id="audio-diagnostics-title">Diagnóstico del micrófono</summary>
+              <p id="audio-capture-note" class="measurement-guidance"></p>
+              <pre id="audio-diagnostics-data">Activa el micrófono para comprobar los ajustes.</pre>
+            </details>
+          </div>
+        </div>
+
+        <div class="avg-block">
+          <div class="avg-head"><span>Promedio</span><span id="avg-time">00:00</span></div>
+          <div class="avg-main"><span class="avg-value" id="avg-number">--</span><span class="avg-unit">dB</span></div>
         </div>
 
         <div class="main-actions">
           <button class="action-btn primary" id="btn-toggle" onclick="openMicModal()">
-            <span class="action-icon">🎤</span>
-            <span class="action-text">Activar</span>
+            <span class="action-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10v2a7 7 0 0 0 14 0v-2M12 19v3M8 22h8"/></svg></span><span class="action-text">Activar</span>
           </button>
-          <button class="action-btn secondary" id="btn-share" onclick="openShareModal()">
-            <span class="action-icon">📡</span>
-            <span class="action-text">Compartir</span>
+          <button class="action-btn secondary" id="btn-share" onclick="openShareModal()" aria-pressed="false">
+            <span class="action-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="2.5"/></svg></span><span class="action-text">Compartir</span>
           </button>
+        </div>
+
+        <button class="stats-handle" type="button" onclick="toggleStatsPanel()" aria-expanded="false" aria-controls="stats-content">
+          <span class="handle-label" id="stats-handle-label">Detalles y ayuda</span><span class="handle-chevron" aria-hidden="true">⌄</span>
+        </button>
+        <div class="stats-content" id="stats-content" inert>
+          <div class="session-details">
+            <span class="avg-tag" id="avg-tag">Sin datos</span>
+            <div class="avg-meta"><span>Mín <b id="min-db">--</b></span><span>Máx <b id="max-db">--</b></span><span>Muestras <b id="sample-count">0</b></span></div>
+          </div>
+          <details class="measurement-help">
+            <summary id="measurement-help-title">Cómo medir</summary>
+            <p class="measurement-guidance" id="measurement-guidance">No tapes ni roces el micrófono, y evita hablarle de cerca o con viento directo.</p>
+          </details>
         </div>
       </div>
     </div>
 
     <!-- MODAL: COMPARTIR -->
-    <div class="modal-overlay" id="share-modal">
+    <div class="modal-overlay" id="share-modal" inert>
       <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="share-modal-title">
         <div class="modal-icon">📍</div>
         <h2 id="share-modal-title">Compartir ubicación</h2>
@@ -169,7 +194,7 @@
     </div>
 
     <!-- MODAL: MICRÓFONO -->
-    <div class="modal-overlay" id="mic-modal">
+    <div class="modal-overlay" id="mic-modal" inert>
       <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="mic-modal-title">
         <div class="modal-icon">🎤</div>
         <h2 id="mic-modal-title">Activar micrófono</h2>
@@ -193,7 +218,7 @@
     <div id="ods-view" class="tab-content legacy-hidden"></div>
 
     <!-- PESTAÑA: SALUD Y ODS -->
-    <div id="health-view" class="tab-content info-tab-content">
+    <div id="health-view" class="tab-content info-tab-content" tabindex="0">
       <div class="info-wrapper">
         <div class="info-header">
           <h1>Salud y ODS</h1>
@@ -243,6 +268,7 @@
     </div>
 
     <!-- Librerías externas -->
+    <script src="https://cdn.jsdelivr.net/npm/motion@14.0.0/dist/motion.js"></script>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
     <script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
@@ -255,12 +281,12 @@
          Ver test/coupling.test.js.
          js/kalman.js no se carga: define la clase KalmanLatLong pero la app
          suaviza el GPS con su propio filtro de estabilidad en map.js. -->
-    <script src="js/config.local.js?v=35"></script>
-    <script src="js/config.js?v=35"></script>
-    <script src="js/map.js?v=35"></script>
-    <script src="js/audio.js?v=35"></script>
-    <script src="js/community.js?v=35"></script>
-    <script src="js/app.js?v=35"></script>
-    <script src="js/features.js?v=35"></script>
+    <script src="js/config.local.js?v=45"></script>
+    <script src="js/config.js?v=45"></script>
+    <script src="js/map.js?v=45"></script>
+    <script src="js/audio.js?v=45"></script>
+    <script src="js/community.js?v=45"></script>
+    <script src="js/app.js?v=45"></script>
+    <script src="js/features.js?v=45"></script>
   </body>
 </html>

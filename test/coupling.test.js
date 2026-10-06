@@ -11,7 +11,8 @@ const DE_FEATURES = [
   'comparisonMode', 'comparisonLayer', 'currentComparisonLayer', 'comparisonRows',
   'drawnZone', 'selectedMapPoint', 'featureClientId',
   'activateComparisonLayer', 'createFeatureUi', 'openFeaturePanel',
-  'flushOfflineMeasurements', 'queueOfflineMeasurement', 'enqueueOfflineRecord'
+  'flushOfflineMeasurements', 'queueOfflineMeasurement', 'enqueueOfflineRecord',
+  'summaryText', 'summaryIcon', 'updateSummaryState', 'exitComparisonMode'
 ];
 
 const hojasDeFeatures = () =>

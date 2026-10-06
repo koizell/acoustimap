@@ -22,8 +22,12 @@ test('comparison renders the selected period without a ReferenceError', () => {
     communityHeatLayer: null,
     window: { L: { heatLayer: () => true } },
     L: { heatLayer: () => ({ setLatLngs(points) { this.points = points; }, addTo() { layers.push(this); } }) },
+    createRelativeHeatLayer: () => ({ setLatLngs(points) { this.points = points; }, addTo() { layers.push(this); } }),
     map: { hasLayer: () => false, removeLayer() {} },
     communityLayer: { clearLayers() {} },
+    selectedVisualMode: 'heatmap',
+    aggregatePoints: (rows) => rows.map((row) => ({ lat: row.latitude, lng: row.longitude, db: row.db_level })),
+    suspendMapHeatLayers() {},
     normalizeDbForHeatmap: () => 0.6
   };
   vm.runInNewContext(`${functionSource('features.js', 'activateComparisonLayer')}\nthis.run = activateComparisonLayer;`, context);
@@ -45,13 +49,25 @@ test('a pending measurement request does not send the same window twice', async 
     currentPosition: { lat: 8.75, lng: -75.88 },
     lastSendTime: 0,
     SEND_INTERVAL_MS: 10000,
+    MEASUREMENT_VERSION: 4,
+    captureProfile: 'unknown',
     sendWindowCount: 1,
-    sendWindowSum: 50,
+    /*
+     * Energía, no suma de dB: el acumulador guarda 10^(dB/10). Se dan también las
+     * dos funciones reales de config.js en vez de una equivalencia escrita aquí, para
+     * que si la fórmula cambia el test lo note en vez de seguir pasando con su
+     * propia copia.
+     */
+    sendWindowEnergia: 1e5,
+    energiaDe: (db) => Math.pow(10, db / 10),
+    promedioEnergetico: (energia, cantidad) =>
+      (!cantidad || !(energia > 0)) ? 0 : 10 * Math.log10(energia / cantidad),
     snapToGrid: (lat, lng) => ({ lat, lng }),
     classifyDb: () => 'bajo',
     featureClientId: 'browser-id',
     mapMode: 'history',
     addCommunityPoint() {},
+    document: { getElementById: () => null },
     supabaseClient: { from: () => ({ insert: (payload) => { inserts++; payloads.push(payload); return pending; } }) },
     console
   };
@@ -60,6 +76,8 @@ test('a pending measurement request does not send the same window twice', async 
   const second = context.run();
   assert.equal(inserts, 1);
   assert.equal(Object.hasOwn(payloads[0], 'client_id'), false);
+  assert.equal(payloads[0].measurement_version, 4);
+  assert.equal(payloads[0].capture_profile, 'unknown');
   finishRequest({ error: null });
   await Promise.all([first, second]);
 });
@@ -134,6 +152,7 @@ test('map requests aggregated cells for the visible area and selected time windo
     selectedTimeFilter: 'morning',
     renderCommunityPoints: (points) => { rendered = points; },
     clearCommunityLayers() {},
+    setMapDataStatus() {},
     timeAgo: () => 'hace tiempo',
     // El doble de traduccion incluye las formas singulares: el contador real
     // las pide para no escribir "1 zonas". La concordancia se verifica en
@@ -153,7 +172,7 @@ test('map requests aggregated cells for the visible area and selected time windo
   };
   vm.runInNewContext(`${functionSource('community.js', 'loadCommunityPoints')}\nthis.run = loadCommunityPoints;`, context);
   await context.run();
-  assert.equal(rpcName, 'noise_map_cells');
+  assert.equal(rpcName, 'noise_map_cells_v5');
   assert.equal(rpcParams.p_time_filter, 'morning');
   assert.equal(rpcParams.p_south, 8.7);
   assert.equal(rpcParams.p_north, 8.8);
@@ -178,6 +197,7 @@ test('initial heatmap data mounts the Leaflet layer before redraw', () => {
   const context = {
     communityLayer: { clearLayers() {} },
     ensureHeatLayer: () => layer,
+    communityHeatRenderToken: 0,
     map: { hasLayer: () => layer.attached },
     normalizeDbForHeatmap: () => 0.5,
     waitForMapSize: (callback) => callback(),
@@ -203,6 +223,7 @@ test('a newly shared point mounts the heat layer before redraw', () => {
   };
   const context = {
     ensureHeatLayer: () => layer,
+    communityHeatRenderToken: 0,
     map: { hasLayer: () => layer.attached },
     normalizeDbForHeatmap: () => 0.5,
     waitForMapSize: (callback) => callback(),

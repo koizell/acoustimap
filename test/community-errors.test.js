@@ -5,7 +5,9 @@ const { createBrowserContext } = require('./helpers/browser-context');
 test('envío: recupera las muestras rechazadas sin perder las recibidas durante la petición', async () => {
   let finish;
   const sent = [];
+  const delivery = [];
   const browser = createBrowserContext({
+    updateSharingDelivery: state => delivery.push(state),
     client: { from: (table) => ({ insert: (payload) => {
       assert.equal(table, 'noise_measurements');
       sent.push(payload);
@@ -14,16 +16,18 @@ test('envío: recupera las muestras rechazadas sin perder las recibidas durante 
   });
   browser.load('config.js', 'community.js');
   browser.evaluate(`supabaseClient = client; sharingEnabled = true;
-    currentPosition = { lat: 8.75, lng: -75.88 }; sendWindowSum = 150; sendWindowCount = 3;`);
+    currentPosition = { lat: 8.75, lng: -75.88 }; sendWindowEnergia = 3e5; sendWindowCount = 3;`);
   const sending = browser.evaluate('sendMeasurementIfDue()');
-  browser.evaluate('sendWindowSum = 120; sendWindowCount = 2');
+  browser.evaluate('sendWindowEnergia = 2e5; sendWindowCount = 2');
   finish({ error: { code: '42501', message: 'Insert denied' } });
   await sending;
   assert.equal(sent.length, 1);
+    // Tres muestras de 50 dB: energia 3 x 10^5, y 10*log10(10^5) = 50.
   assert.equal(sent[0].db_level, 50);
-  assert.equal(browser.evaluate('sendWindowSum'), 270);
+  assert.equal(browser.evaluate('sendWindowEnergia'), 5e5);
   assert.equal(browser.evaluate('sendWindowCount'), 5);
   assert.equal(browser.evaluate('sendMeasurementIfDue.pending'), false);
+  assert.deepEqual(delivery, ['sending', 'error']);
 });
 
 test('mapa: una respuesta antigua no borra los datos de la consulta más reciente', async () => {
@@ -32,7 +36,7 @@ test('mapa: una respuesta antigua no borra los datos de la consulta más recient
   let clears = 0;
   const browser = createBrowserContext({
     client: { rpc: (name) => {
-      assert.equal(name, 'noise_map_cells');
+      assert.equal(name, 'noise_map_cells_v5');
       return { range: () => new Promise((resolve) => pending.push(resolve)) };
     } },
     map: { on() {}, getBounds: () => ({

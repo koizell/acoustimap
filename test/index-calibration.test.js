@@ -14,36 +14,29 @@ const context = {
   Date
 };
 vm.runInNewContext(`${source}\nthis.api = { classifyDb, normalizeDbForHeatmap };`, context);
+vm.runInNewContext(fs.readFileSync(path.join(root, 'js', 'audio.js'), 'utf8')
+  + '\nthis.audioApi = { rmsToIndex };', context);
 const { classifyDb, normalizeDbForHeatmap } = context.api;
 
-/**
- * Reproduce la conversion de audio.js: rms del dominio temporal -> indice.
- * El codigo real calcula el RMS sobre un Float32Array, lo convierte a dBFS y
- * lo lleva al rango 30-95. No es una funcion aparte en el fuente, asi que se
- * replica aqui a proposito: si alguien la cambia, esta prueba deja de reflejar
- * la app real.
- */
-function indiceDesdeRms(rms) {
-  const dbfs = 20 * Math.log10(rms || 1e-6);
-  return Math.min(95, Math.max(30, Math.round(dbfs + 100)));
-}
+// Ejecuta la fórmula real, no una réplica que pueda separarse del medidor.
+const indiceDesdeRms = context.audioApi.rmsToIndex;
 
 // Stops del gradiente de ensureHeatLayer en map.js.
 const STOPS_GRADIENTE = [0.0, 0.25, 0.385, 0.615, 1.0];
 
-/** RMS tipicos por entorno, de la literatura de medida de sonido. */
+/** Amplitudes sintéticas para verificar la escala, no entornos calibrados. */
 const ESCENARIOS = [
-  { nombre: 'silencio total', rms: 0.0002 },
-  { nombre: 'habitacion en silencio', rms: 0.0008 },
-  { nombre: 'habitacion tranquila', rms: 0.003 },
-  { nombre: 'conversacion a un metro', rms: 0.012 },
-  { nombre: 'calle con trafico', rms: 0.04 },
-  { nombre: 'calle muy ruidosa', rms: 0.12 },
-  { nombre: 'obra o bocina cercana', rms: 0.35 },
-  { nombre: 'analizador saturado', rms: 0.707 }
+  { nombre: 'amplitud 0.0002', rms: 0.0002 },
+  { nombre: 'amplitud 0.0008', rms: 0.0008 },
+  { nombre: 'amplitud 0.003', rms: 0.003 },
+  { nombre: 'amplitud 0.012', rms: 0.012 },
+  { nombre: 'amplitud 0.04', rms: 0.04 },
+  { nombre: 'amplitud 0.12', rms: 0.12 },
+  { nombre: 'amplitud 0.35', rms: 0.35 },
+  { nombre: 'amplitud 0.707', rms: 0.707 }
 ];
 
-test('el indice recorre todo el rango con rms reales', () => {
+test('el indice recorre todo el rango con amplitudes sintéticas', () => {
   const tabla = ESCENARIOS.map(({ nombre, rms }) => {
     const index = indiceDesdeRms(rms);
     return { nombre, rms, index, categoria: classifyDb(index) };
@@ -106,10 +99,8 @@ test('el gradiente entero queda accesible con el rango del indice', () => {
 });
 
 test('las mediciones historicas siguen siendo representables', () => {
-  // Las 490 filas de produccion se Took con la metrica anterior, entre 35 y 61.
-  // Con la escala nueva caen entre 0.077 y 0.477, o sea verde a lima: sigue
-  // siendo una lectura valida, no se rompe nada, pero el historico y lo que
-  // se mida a partir de ahora no son directamente comparables.
+   // Los valores antiguos siguen dentro de la escala, pero no deben mezclarse
+   // en los promedios actuales: la RPC los deja fuera sin borrar los registros.
   assert.equal(Number(normalizeDbForHeatmap(35).toFixed(3)), 0.077);
   assert.equal(Number(normalizeDbForHeatmap(61).toFixed(3)), 0.477);
   assert.equal(classifyDb(35), 'bajo');
@@ -131,6 +122,12 @@ test('el indice ya no depende de getByteFrequencyData', () => {
     'updateMeter no debe seguir usando el promedio espectral');
   assert.doesNotMatch(cuerpo, /20\s*\*\s*Math\.log10\([^)]*average/,
     'no debe quedar la conversion del promedio de bytes');
-  assert.match(cuerpo, /getFloatTimeDomainData/);
-  assert.match(cuerpo, /Math\.sqrt\(energy/);
+  // v3 obtiene la señal temporal del AudioWorklet, no del AnalyserNode.
+  assert.match(audio, /audioWorklet\.addModule\(AUDIO_PROCESSOR_URL\)/);
+   assert.match(cuerpo, /weightedDbToIndex\(aDbfs\)/);
+  const processor = fs.readFileSync(path.join(root, 'js', 'audio-level-processor.js'), 'utf8');
+  assert.match(processor, /const channels = inputs\[0\]/);
+   assert.match(processor, /power \+= value \* value/);
+   assert.match(processor, /this\.fft\.transform\(this\.re, this\.im\)/);
+  assert.doesNotMatch(processor, /getByteFrequencyData/);
 });

@@ -17,6 +17,7 @@ limitaciones tiene. Se aplica al sitio publicado en
 | Ubicación exacta | **Nunca** | Solo se ve en tu pantalla |
 | Ubicación aproximada | Sí | Anclada a una cuadrícula de ~70 m |
 | Índice de ruido | Sí | Junto a la ubicación aproximada |
+| Versión del método y perfil de captura | Sí | Mediciones y sesiones; sin modelo ni identificador del micrófono |
 | Tu identidad | **Nunca** | Sin cuentas, correos ni nombres |
 | Identificador estable del navegador | **Nunca** | Tus retos se calculan en tu dispositivo |
 | Seguimiento | **Nunca** | Sin cookies de rastreo |
@@ -69,6 +70,11 @@ permisiva creada a mano.
 | Confirmaciones | 24 horas |
 | Fotografías de reportes | 30 días, o hasta que se borren junto a su reporte |
 
+En reportes de basura y obra, la foto solo acredita progreso local del reto: no se
+sube ni se guarda en la cola offline. El progreso conserva únicamente si había foto,
+la categoría, la celda y la fecha durante 30 días. Los reportes normales de ruido y
+tráfico sí pueden publicar una foto, con aviso explícito antes del envío.
+
 Lo aplica un trabajo programado cada hora. Las fotos se borran con un función
 de servidor que primero elimina el archivo del almacenamiento y luego la fila,
 para no dejar objetos huérfanos. Si el almacenamiento falla, la fila se
@@ -83,10 +89,22 @@ dispositivo y se pierden si borras los datos del sitio.
 momento de la medición. El resultado depende del micrófono del dispositivo y
 del navegador, así que dos equipos distintos pueden leer valores distintos
 ante el mismo sonido.
+Se solicita desactivar ganancia automática, reducción de ruido y cancelación
+de eco; algunos navegadores mantienen esos tratamientos o no permiten verificarlos.
+Solo se comparte un perfil genérico (`unprocessed`, `processed` o `unknown`)
+y la versión del método. RMS, dBFS y el diagnóstico detallado permanecen en
+memoria local. No se envían `deviceId`, `groupId` ni etiquetas del micrófono.
+Desde v4 los promedios se calculan en energía. El método v5 analiza el espectro
+con ponderación A y una ventana móvil de 3 segundos en AudioWorklet. Mantiene
+muestras temporalmente en memoria para la FFT; no las persiste ni transmite.
+Solo comunica resúmenes numéricos a la interfaz y su salida de audio es cero.
+No resta un supuesto ruido de fondo ni calibra el equipo: no es un nivel SPL
+calibrado ni un sonómetro certificado.
 
 **2. Cualquiera puede insertar mediciones dentro de los rangos válidos.** Las
 restricciones comprueban que las coordenadas caigan en la cuadrícula y que el
-índice esté entre 20 y 140, pero no que la medición sea real. Una persona con
+índice esté entre 20 y 140 para registros sin versión, y entre 30 y 95 para
+v2/v3/v4/v5, pero no que la medición sea real. Una persona con
 conocimientos técnicos podría enviar lecturas inventadas.
 
 **3. El GPS se desvía.** En interiores y zonas densas la precisión puede caer
@@ -94,10 +112,14 @@ a decenas o cientos de metros. La app muestra el margen real y suaviza
 lecturas, pero la celda final depende de esa precisión. Con ±150 m de error,
 tu lectura puede caer en una celda distinta de la que estabas realmente.
 
-**4. Historial heterogéneo.** Hasta el 29 de septiembre de 2026 el índice se
-calculaba con el promedio del espectro de frecuencias; desde entonces usa la
-energía total de la señal en el tiempo. Las dos escalas no son comparables
-entre sí. Las mediciones antiguas aparecen más bajas de lo que indican.
+**4. Historial heterogéneo.** Antes se utilizaba promedio espectral y luego
+RMS con captura por defecto y suavizado por fotograma. El método v2 usa captura
+con tratamientos solicitados desactivados y suavizado temporal. El v3 calcula
+RMS continuo sobre 1 segundo con los mismos ajustes solicitados. La v4 cambió
+los promedios a energía y la v5 aplica ponderación A sobre el espectro. No se atribuye
+v5 a lecturas antiguas: conservan su versión original y la nueva vista del mapa,
+estadísticas y exportaciones las excluye para no mezclar métodos. No se borran
+por esta migración: siguen sujetas a la retención normal.
 
 **5. Un plan gratuito puede pausarse.** Si el proyecto queda inactivo, el
 proveedor puede suspenderlo. Al reactivarse, el servicio vuelve por su cuenta.
@@ -122,4 +144,4 @@ público a quien lo solicite.
 
 ---
 
-<sub>Última revisión: 2026-09-29 · ver <a href="README.md">README</a></sub>
+<sub>Última revisión: 2026-10-05 · ver <a href="README.md">README</a></sub>
