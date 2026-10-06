@@ -251,6 +251,9 @@ alter table public.noise_reports add constraint noise_reports_kind_check
   not valid;
 alter table public.noise_reports validate constraint noise_reports_kind_check;
 
+-- La migración de privacidad concedió SELECT por columna: la nueva necesita permiso.
+grant select (kind) on public.noise_reports to anon, authenticated;
+
 comment on column public.noise_reports.kind is
   'Categoría del reporte: ruido (observación del nivel), basura, obra o trafico. Por defecto ruido, que es lo que había antes de esta columna. Los retos se cuentan por categoría, no por texto.';
 
@@ -272,6 +275,7 @@ begin
   end if;
 end;
 $$;
+
 
 -- =============================================================================
 -- v5: el mismo promedio energético, ahora con mediciones ponderadas A

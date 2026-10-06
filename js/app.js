@@ -186,6 +186,13 @@ const sharingCopy = {
 };
 
 function sharingText(key) {
+  const gpsErrors = {
+    es: { timeout: 'La ubicación tardó demasiado. Activa la ubicación del dispositivo e inténtalo de nuevo.', unavailable: 'El dispositivo no pudo obtener la ubicación. Revisa la señal e inténtalo de nuevo.' },
+    en: { timeout: 'Location timed out. Enable device location and try again.', unavailable: 'The device could not obtain a location. Check the signal and try again.' },
+    pt: { timeout: 'A localização demorou demais. Ative a localização do dispositivo e tente novamente.', unavailable: 'O dispositivo não conseguiu obter a localização. Verifique o sinal e tente novamente.' }
+  };
+  const language = document.documentElement.lang;
+  if ((gpsErrors[language] || gpsErrors.es)[key]) return (gpsErrors[language] || gpsErrors.es)[key];
   return (sharingCopy[document.documentElement.lang] || sharingCopy.es)[key];
 }
 
@@ -237,36 +244,44 @@ function toggleSharing() {
     updateGpsChip(true);
     positionHistory = [];
 
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        if (!sharingEnabled || requestId !== sharingRequestId) return;
-        processNewPosition(pos);
-        map.setView([currentPosition.lat, currentPosition.lng], 17);
-        updateSharingStatus('sharing');
-        updateActionButtons();
-        lastSendTime = 0;
-        loadCommunityPoints();
+    const onPosition = (pos) => {
+      if (!sharingEnabled || requestId !== sharingRequestId) return;
+      processNewPosition(pos);
+      map.setView([currentPosition.lat, currentPosition.lng], 17);
+      updateSharingStatus('sharing');
+      updateActionButtons();
+      lastSendTime = 0;
+      loadCommunityPoints();
 
-        if (geoWatchId === null) {
-          geoWatchId = navigator.geolocation.watchPosition(
-            (nextPosition) => {
-              if (sharingEnabled && requestId === sharingRequestId) processNewPosition(nextPosition);
-            },
-            (err) => console.warn('watchPosition:', err),
-            { enableHighAccuracy: true, maximumAge: 0, timeout: 20000 }
-          );
-        }
-      },
-      (err) => {
-        if (!sharingEnabled || requestId !== sharingRequestId) return;
-        console.warn(err);
-        updateSharingStatus('denied');
-        sharingEnabled = false;
-        updateActionButtons();
-        updateGpsChip(false);
-      },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-    );
+      if (geoWatchId === null) {
+        geoWatchId = navigator.geolocation.watchPosition(
+          (nextPosition) => {
+            if (sharingEnabled && requestId === sharingRequestId) processNewPosition(nextPosition);
+          },
+          (err) => console.warn('watchPosition:', err),
+          { enableHighAccuracy: true, maximumAge: 0, timeout: 20000 }
+        );
+      }
+    };
+    let triedFallback = false;
+    const onError = (err) => {
+      if (!sharingEnabled || requestId !== sharingRequestId) return;
+      // El GPS preciso puede tardar o no estar disponible en interiores/PC.
+      // Reintentar una vez con ubicación de red; no reintentar permisos denegados.
+      if (err.code !== 1 && !triedFallback) {
+        triedFallback = true;
+        navigator.geolocation.getCurrentPosition(onPosition, onError,
+          { enableHighAccuracy: false, timeout: 20000, maximumAge: 30000 });
+        return;
+      }
+      console.warn(err);
+      updateSharingStatus(err.code === 1 ? 'denied' : err.code === 3 ? 'timeout' : 'unavailable');
+      sharingEnabled = false;
+      updateActionButtons();
+      updateGpsChip(false);
+    };
+    navigator.geolocation.getCurrentPosition(onPosition, onError,
+      { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 });
   } else {
     updateSharingStatus('disabled');
     updateGpsChip(false);

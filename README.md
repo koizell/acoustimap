@@ -279,6 +279,7 @@ Para un proyecto nuevo, ejecuta en el SQL Editor de Supabase, en este orden:
 8. [`migrations/20261015_energy_average_v4.sql`](migrations/20261015_energy_average_v4.sql)
 9. [`migrations/20261016_report_kind.sql`](migrations/20261016_report_kind.sql)
 10. [`migrations/20261017_weighted_a_v5.sql`](migrations/20261017_weighted_a_v5.sql)
+11. [`migrations/20261018_report_kind_read_grant.sql`](migrations/20261018_report_kind_read_grant.sql): permiso de lectura de `kind`, para bases ya migradas que rechacen los reportes con 401/42501.
 
 En un proyecto existente ya migrado hasta v3, ejecuta [`deploy/apply-v5.sql`](deploy/apply-v5.sql): reúne v4, categorías y v5 en ese orden. No es un instalador desde cero. Si ya aplicaste v4/categorías, puedes ejecutar solo la migración v5. Revisa cualquier política RLS adicional creada manualmente: **las políticas permisivas de `INSERT` se combinan con OR** y pueden eludir restricciones.
 

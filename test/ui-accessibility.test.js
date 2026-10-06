@@ -42,7 +42,7 @@ function appBrowser() {
   const browser = createBrowserContext({
     document, requestAnimationFrame() {},
     navigator: { geolocation: {
-      getCurrentPosition(success, error) { positionRequests.push({ success, error }); },
+      getCurrentPosition(success, error, options) { positionRequests.push({ success, error, options }); },
       clearWatch() {}, watchPosition(success) { watchSuccess = success; return 1; }
     } },
     processNewPosition() {
@@ -103,6 +103,32 @@ test('GPS: detener Compartir ignora actualizaciones pendientes del watch', () =>
   browser.watch({ coords: { latitude: 8.76, longitude: -75.89 } });
   assert.equal(browser.processed(), 1);
   assert.equal(browser.evaluate('currentPosition'), null);
+});
+
+test('GPS: timeout reintenta con red y no se confunde con permiso denegado', () => {
+  const browser = appBrowser();
+  browser.evaluate('toggleSharing()');
+  browser.positionRequests[0].error({ code: 3, message: 'Timeout expired' });
+  assert.equal(browser.evaluate('sharingEnabled'), true);
+  assert.equal(browser.positionRequests.length, 2);
+  assert.equal(browser.positionRequests[1].options.enableHighAccuracy, false);
+  browser.positionRequests[1].error({ code: 3 });
+  assert.equal(browser.evaluate('sharingEnabled'), false);
+  assert.match(browser.elements.get('share-status').innerText, /tardó/);
+  assert.doesNotMatch(browser.elements.get('share-status').innerText, /permiso/);
+});
+
+test('GPS: éxito del reintento funciona y cancelarlo descarta respuestas tardías', () => {
+  const browser = appBrowser();
+  browser.evaluate('toggleSharing()');
+  browser.positionRequests[0].error({ code: 2 });
+  browser.positionRequests[1].success({ coords: { latitude: 8.75, longitude: -75.88 } });
+  assert.equal(browser.processed(), 1);
+  browser.evaluate('toggleSharing(); toggleSharing()');
+  browser.positionRequests[2].error({ code: 3 });
+  browser.evaluate('toggleSharing()');
+  browser.positionRequests[3].success({ coords: { latitude: 8.75, longitude: -75.88 } });
+  assert.equal(browser.processed(), 1);
 });
 
 test('Compartir: GPS activado no se presenta como una publicación confirmada', () => {

@@ -50,6 +50,7 @@ test('la columna es NOT NULL con default, para que las filas viejas no fallen', 
     path.join(root, 'migrations', '20261016_report_kind.sql'), 'utf8');
   assert.match(sql, /add column if not exists kind text not null default 'ruido'/);
   assert.match(sql, /validate constraint noise_reports_kind_check/);
+  assert.match(sql, /grant select \(kind\) on public\.noise_reports to anon, authenticated/);
 });
 
 test('un reporte de basura sin foto no cuenta para el reto de basura', () => {
