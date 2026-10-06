@@ -1,5 +1,8 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
 const { createDevServer, openBrowser } = require('../scripts/dev-server');
 
 test('servidor local: versión verificable, sin caché y sin publicar archivos privados', async (t) => {
@@ -26,4 +29,18 @@ test('servidor local: versión verificable, sin caché y sin publicar archivos p
 test('abrir navegador: no admite URLs o comandos externos como entrada', async () => {
   await assert.rejects(openBrowser('https://outside.test/'), /URL local inválida/);
   await assert.rejects(openBrowser("http://localhost:3000/'; Remove-Item x"), /URL local inválida/);
+});
+
+test('servidor local: copia limpia sin config.local.js responde sin configurar', async (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'acoustimap-dev-empty-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  fs.writeFileSync(path.join(root, 'index.html'), '<script src="js/config.js?v=45"></script>');
+  const server = createDevServer(root);
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  t.after(() => new Promise(resolve => { server.closeAllConnections?.(); server.close(resolve); }));
+  const response = await fetch(`http://127.0.0.1:${server.address().port}/_dev/status`);
+  assert.equal(response.status, 200);
+  const metadata = await response.json();
+  assert.equal(metadata.configured, false);
+  assert.equal(metadata.version, '45');
 });

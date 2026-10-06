@@ -25,7 +25,12 @@ function createDevServer(root = projectRoot) {
     try { pathname = decodeURIComponent(new URL(request.url, 'http://localhost').pathname); }
     catch (_) { response.writeHead(400); response.end(); return; }
     if (pathname === '/_dev/status') {
-      const config = fs.readFileSync(path.join(root, 'js/config.local.js'), 'utf8');
+      let config = '';
+      try { config = fs.readFileSync(path.join(root, 'js/config.local.js'), 'utf8'); }
+      catch (error) {
+        // Una copia limpia (incluido CI) no contiene la configuración local ignorada.
+        if (error.code !== 'ENOENT') { response.writeHead(500); response.end(); return; }
+      }
       response.setHeader('Content-Type', 'application/json; charset=utf-8');
       const currentVersion = fs.readFileSync(path.join(root, 'index.html'), 'utf8').match(/\?v=(\d+)/)?.[1] || version;
       response.end(JSON.stringify({ version: currentVersion, root,
