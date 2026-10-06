@@ -9,6 +9,9 @@
   suben fotos ni encolan sus bytes; solo cuentan presencia de foto localmente.
 - La comprobación anterior en Chromium utilizó señal sintética mediante
   OfflineAudioContext, no el micrófono real ni escrituras remotas.
+- Confirmación previa al push: Chromium cargó recursos v45 y método v5 sin
+  errores JavaScript. La RPC real de Supabase respondió correctamente (0 zonas
+  en la vista consultada), tras la aplicación manual del SQL por el usuario.
 
 El resto de este documento es un registro histórico de verificaciones anteriores,
 no una afirmación de que esas versiones o todos sus resultados sigan vigentes.
