@@ -35,12 +35,22 @@ test('la hora del reto es la de Colombia, no la del dispositivo', () => {
   assert.equal(coDayKey('no es una fecha'), null);
 });
 
-test('las franjas del cliente cubren las mismas horas que las del SQL', () => {
+test('las franjas del cliente cubren las mismas horas que la RPC viva', () => {
   // El servidor decide con extract(hour from created_at at time zone
-  // 'America/Bogota'). Si alguien cambia un corte en SQL y no en config.js, el
-  // mapa y los retos empiezan a discrepar y nada más lo nota.
-  const sql = fs.readFileSync(
-    path.join(root, 'migrations', '20261005_audio_measurement_v2.sql'), 'utf8');
+  // 'America/Bogota'). Se valida contra la ULTIMA definicion de
+  // noise_map_cells_v5, que es la que el mapa usa de verdad. La version previa de
+  // esta prueba miraba la v2 y no noto que la v5 comparaba con 'noche' mientras
+  // el cliente envia 'night': el filtro no se aplicaba y las cuatro franjas
+  // devolvian exactamente el mismo conjunto.
+  const migrationDir = path.join(root, 'migrations');
+  const rpcFile = fs.readdirSync(migrationDir).filter((name) => name.endsWith('.sql')).sort()
+    .filter((name) => fs.readFileSync(path.join(migrationDir, name), 'utf8')
+      .includes('function public.noise_map_cells_v5')).at(-1);
+  assert.ok(rpcFile, 'no se encontro ninguna definicion de noise_map_cells_v5');
+  const source = fs.readFileSync(path.join(migrationDir, rpcFile), 'utf8');
+  // Se ignoran los comentarios: solo cuenta el codigo que se ejecuta.
+  const sql = source.replace(/--[^\n]*/g, '');
+  assert.doesNotMatch(sql, /'noche'/, 'la RPC no puede comparar con una clave que el cliente nunca envia');
 
   const morning = sql.match(/p_time_filter = 'morning'[\s\S]{0,200}?between (\d+) and (\d+)/);
   const afternoon = sql.match(/p_time_filter = 'afternoon'[\s\S]{0,200}?between (\d+) and (\d+)/);

@@ -178,3 +178,36 @@ Pendiente (pasos siguientes, aún sin implementar):
 
 Este filtro **no** convierte el índice en dB SPL ni lo hace comparable con los
 65 dB de la OMS; solo impide mezclar escalas distintas en el mapa.
+
+## Filtros del mapa: franja horaria y periodo (revisión v50)
+
+**Periodo — correcto.** `Historial 90 días` y `En vivo 24 h` sí recortan. Con
+datos reales: últimas 24 h = 645 muestras, últimas 2 h = 255, y una ventana
+antigua (3 d → 1 d) = 0. Parecían iguales solo porque todas las mediciones son
+recientes.
+
+**Franja horaria — estaba roto, y no era el cliente.** La RPC v5 comparaba con la
+clave en español:
+
+```sql
+and (p_time_filter is null or p_time_filter <> 'noche' or (...))
+```
+
+El cliente envía `'all'`/`'morning'`/`'afternoon'`/`'night'`, así que
+`p_time_filter <> 'noche'` era **siempre verdadera** y el filtro no se aplicaba:
+Todo, Mañana, Tarde y Noche devolvían el **mismo** conjunto. Evidencia real:
+`p_time_filter = 'night'` devolvía 645 muestras con lecturas de las **09:41 de
+Colombia** (mañana).
+
+Corrección: `migrations/20261019_fix_time_filter_v5.sql` redefine la misma
+función con los cortes de `CO_TIME_BANDS` (mañana 6–11, tarde 12–17, noche ≥18 o
+<6, en `America/Bogota`). No borra ni modifica datos.
+
+La prueba `test/challenge-bands.test.js` validaba contra la migración **v2** y por
+eso no lo detectó. Ahora valida contra la **última definición** de
+`noise_map_cells_v5` y rechaza cualquier comparación con una clave que el cliente
+no envía.
+
+**Pendiente al aplicar:** tras ejecutar la migración, comprobar con una consulta
+de solo lectura que las cuatro franjas devuelven conjuntos distintos, y que
+`night` durante el día devuelve 0.
