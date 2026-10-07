@@ -299,6 +299,8 @@ Para un proyecto nuevo, ejecuta en el SQL Editor de Supabase, en este orden:
 11. [`migrations/20261018_report_kind_read_grant.sql`](migrations/20261018_report_kind_read_grant.sql): permiso de lectura de `kind`, para bases ya migradas que rechacen los reportes con 401/42501.
 12. [`migrations/20261019_fix_time_filter_v5.sql`](migrations/20261019_fix_time_filter_v5.sql): corrige el filtro de franja horaria de la RPC v5. Antes comparaba con `'noche'` y el cliente envía `'night'`, así que **Todo, Mañana, Tarde y Noche devolvían el mismo conjunto**. Necesaria en cualquier base, nueva o existente, que ya tenga la v5.
 
+En una base existente con v5, aplica solo la migración `20261019_fix_time_filter_v5.sql` para corregir las franjas. Si usas el paquete `deploy/apply-v5.sql`, aplica esta corrección después del paquete: volver a ejecutar la definición original de v5 restaura el filtro anterior.
+
 En un proyecto existente ya migrado hasta v3, ejecuta [`deploy/apply-v5.sql`](deploy/apply-v5.sql): reúne v4, categorías y v5 en ese orden. No es un instalador desde cero. Si ya aplicaste v4/categorías, puedes ejecutar solo la migración v5. Revisa cualquier política RLS adicional creada manualmente: **las políticas permisivas de `INSERT` se combinan con OR** y pueden eludir restricciones.
 
 En SQL Editor, pega el contenido del archivo y pulsa **Run**; con conexión PostgreSQL también puedes usar `psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f deploy/apply-v5.sql`. No compartas esa URL ni la incluyas en el frontend.

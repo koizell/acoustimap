@@ -208,6 +208,18 @@ eso no lo detectó. Ahora valida contra la **última definición** de
 `noise_map_cells_v5` y rechaza cualquier comparación con una clave que el cliente
 no envía.
 
-**Pendiente al aplicar:** tras ejecutar la migración, comprobar con una consulta
-de solo lectura que las cuatro franjas devuelven conjuntos distintos, y que
-`night` durante el día devuelve 0.
+**Verificado tras la aplicación manual en Supabase (2026-10-07):** consultas
+reales como `anon`, con un mismo instante de corte, devolvieron 774 muestras:
+384 de mañana, 260 de tarde y 130 de noche. La suma de las tres franjas coincide
+con Todo. Los periodos de 90 días y 24 horas coincidían porque las mediciones
+disponibles estaban dentro de las últimas 24 horas; últimas 2 horas devolvió
+384 y la ventana antigua (3 d → 1 d), 0.
+
+También se probaron en un navegador los ocho cruces de periodo y franja en
+`https://koizell.github.io/acoustimap/`, versión v50: RPC HTTP 200, horas dentro
+de la franja seleccionada, número de celdas representadas correcto y ningún
+error JavaScript. Sin activar el micrófono ni publicar aportes de prueba.
+
+El filtro usa la hora de cada medición (`created_at`), no la hora de consulta.
+Noche puede mostrar mediciones nocturnas anteriores aunque se consulte de día;
+lo que debe excluir son las mediciones de mañana y tarde.
