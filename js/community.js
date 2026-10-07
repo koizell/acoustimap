@@ -470,6 +470,30 @@ async function sendMeasurementIfDue() {
     capture_profile: captureProfile
   };
 
+  /*
+   * Filtro de calidad del navegador.
+   *
+   * El AGC y la supresión de ruido alteran la amplitud que recibe el medidor: es
+   * la causa principal de que el mismo ambiente dé cifras distintas según el
+   * aparato. Si el navegador CONFIRMA que está procesando (`processed`), la
+   * medición no se publica, para no contaminar el mapa con una escala distinta.
+   *
+   * No se pierde: queda en el progreso local de este dispositivo, y el usuario
+   * puede autorizar el envío desde el diagnóstico si asume la limitación.
+   * `unknown` no se bloquea a propósito: demasiados equipos no reportan sus
+   * ajustes y bloquearlos dejaría el mapa sin aportes.
+   */
+  if (captureProfile === 'processed' && !forceProcessedPublish) {
+    if (typeof recordLocalChallengeMeasurement === 'function') {
+      recordLocalChallengeMeasurement({ ...measurement, created_at: nowIso });
+    }
+    sendMeasurementIfDue.pending = false;
+    if (typeof updateSharingDelivery === 'function') {
+      updateSharingDelivery('reducedQuality', sharingGeneration);
+    }
+    return;
+  }
+
   let success = false;
   let persisted = false;
   try {

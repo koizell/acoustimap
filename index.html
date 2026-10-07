@@ -5,23 +5,23 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#0f172a" />
     <title>AcoustiMap - Mapeo de Contaminación Acústica</title>
-    <link rel="manifest" href="manifest.webmanifest?v=49" />
+    <link rel="manifest" href="manifest.webmanifest?v=50" />
 
-    <link rel="icon" href="assets/icon.svg?v=49" type="image/svg+xml" />
+    <link rel="icon" href="assets/icon.svg?v=50" type="image/svg+xml" />
 
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css" />
 
     <!-- Estilos modulares -->
-    <link rel="stylesheet" href="css/base.css?v=49" />
-    <link rel="stylesheet" href="css/layout.css?v=49" />
-    <link rel="stylesheet" href="css/map.css?v=49" />
-    <link rel="stylesheet" href="css/panel.css?v=49" />
-    <link rel="stylesheet" href="css/info.css?v=49" />
-    <link rel="stylesheet" href="css/responsive.css?v=49" />
-    <link rel="stylesheet" href="css/features.css?v=49" />
-    <link rel="stylesheet" href="css/experience.css?v=49" />
+    <link rel="stylesheet" href="css/base.css?v=50" />
+    <link rel="stylesheet" href="css/layout.css?v=50" />
+    <link rel="stylesheet" href="css/map.css?v=50" />
+    <link rel="stylesheet" href="css/panel.css?v=50" />
+    <link rel="stylesheet" href="css/info.css?v=50" />
+    <link rel="stylesheet" href="css/responsive.css?v=50" />
+    <link rel="stylesheet" href="css/features.css?v=50" />
+    <link rel="stylesheet" href="css/experience.css?v=50" />
   </head>
   <body>
     <header>
@@ -165,6 +165,10 @@
             <details class="audio-diagnostics">
               <summary id="audio-diagnostics-title">Diagnóstico del micrófono</summary>
               <p id="audio-capture-note" class="measurement-guidance"></p>
+              <label class="allow-processed" id="allow-processed-label" hidden>
+                <input type="checkbox" id="allow-processed-publish" onchange="setForceProcessedPublish(this.checked)" />
+                <span id="allow-processed-text"></span>
+              </label>
               <pre id="audio-diagnostics-data">Activa el micrófono para comprobar los ajustes.</pre>
             </details>
           </div>
@@ -307,12 +311,12 @@
          Ver test/coupling.test.js.
          js/kalman.js no se carga: define la clase KalmanLatLong pero la app
          suaviza el GPS con su propio filtro de estabilidad en map.js. -->
-    <script src="js/config.local.js?v=49"></script>
-    <script src="js/config.js?v=49"></script>
-    <script src="js/map.js?v=49"></script>
-    <script src="js/audio.js?v=49"></script>
-    <script src="js/community.js?v=49"></script>
-    <script src="js/app.js?v=49"></script>
-    <script src="js/features.js?v=49"></script>
+    <script src="js/config.local.js?v=50"></script>
+    <script src="js/config.js?v=50"></script>
+    <script src="js/map.js?v=50"></script>
+    <script src="js/audio.js?v=50"></script>
+    <script src="js/community.js?v=50"></script>
+    <script src="js/app.js?v=50"></script>
+    <script src="js/features.js?v=50"></script>
   </body>
 </html>

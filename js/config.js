@@ -158,6 +158,14 @@ let mapMode         = 'history';
 let isMonitoring    = false;
 let sharingEnabled  = false;
 let sharingDeliveryState = 'idle';
+/**
+ * Autorización explícita para publicar una medición pese al procesado del navegador.
+ *
+ * Por defecto `false`: si el navegador confirma ganancia automática o supresión de
+ * ruido, la medición no entra al mapa para no mezclar escalas distintas. El usuario
+ * puede habilitarlo desde el diagnóstico asumiendo esa limitación; nunca se activa solo.
+ */
+let forceProcessedPublish = false;
 let currentPosition = null;
 let geoWatchId      = null;
 let wakeLock        = null;

@@ -146,3 +146,35 @@ Se aplicaron criterios al HTML/CSS/JS existente, sin añadir Tailwind ni framewo
 Límite Kanban: una corrección en curso. Se priorizaron D11–D14 y después
 lectura/acciones. Cada cierre exige reproducción, prueba de regresión, revisión
 en navegador y apertura de la versión actual.
+
+## Filtro de calidad del micrófono (v50)
+
+Motivo: el AGC y la supresión de ruido del navegador alteran la amplitud que
+recibe el medidor y son la causa principal de que el mismo ambiente dé cifras
+distintas según el aparato («en algunos se dispara y en otros no»).
+
+Regla aplicada en el cliente:
+
+- Si el navegador **confirma** procesamiento (`capture_profile === 'processed'`),
+  la medición **no se publica** al mapa. Queda en el progreso local del
+  dispositivo y el botón muestra «No enviada (audio procesado)».
+- `unknown` **no** se bloquea: demasiados equipos no reportan sus ajustes y
+  bloquearlos dejaría el mapa sin aportes.
+- El usuario puede autorizar el envío desde el diagnóstico («Publicar igualmente
+  (calidad reducida)»). Entonces se publica etiquetada con su `capture_profile`.
+- No se activa solo: `forceProcessedPublish` empieza en `false`.
+
+Verificado en navegador con captura procesada simulada y etiquetada como tal:
+0 publicaciones al bloquear; 1 publicación con `capture_profile: 'processed'`
+tras autorizar; 0 escrituras reales; aviso y casilla en es/en/pt; sin errores JS.
+`npm run check`: 212 pruebas y sintaxis de 54 archivos.
+
+Pendiente (pasos siguientes, aún sin implementar):
+
+- **Servidor:** que la RPC pueda separar por `capture_profile` para no mezclar
+  en el mapa celdas ya publicadas con procesamiento.
+- **Estabilizar la lectura mostrada** (suavizado/histéresis) sin cambiar la fórmula.
+- **Calibración por referencia** si algún día hay un sonómetro.
+
+Este filtro **no** convierte el índice en dB SPL ni lo hace comparable con los
+65 dB de la OMS; solo impide mezclar escalas distintas en el mapa.

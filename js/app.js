@@ -234,9 +234,9 @@ let sharingStatusKey = null;
 
 function sharingDeliveryText(key) {
   const copy = {
-    es: { locating: 'Buscando GPS', gpsReady: 'GPS activo', waiting: 'Esperando lectura', sending: 'Enviando', queued: 'En cola local', published: 'Enviado', error: 'Error de envío', disconnected: 'Sin backend: se guarda en cola local, no en el mapa público.', queuedHelp: 'Pendiente de sincronizar; todavía no está publicado.', errorHelp: 'No se confirmó el envío. Revisa la conexión y Supabase.' },
-    en: { locating: 'Locating', gpsReady: 'GPS enabled', waiting: 'Awaiting reading', sending: 'Sending', queued: 'Queued locally', published: 'Sent', error: 'Send failed', disconnected: 'No backend: saved in the local queue, not on the public map.', queuedHelp: 'Awaiting sync; not published yet.', errorHelp: 'Delivery not confirmed. Check the connection and Supabase.' },
-    pt: { locating: 'Buscando GPS', gpsReady: 'GPS ativo', waiting: 'Aguardando leitura', sending: 'Enviando', queued: 'Na fila local', published: 'Enviado', error: 'Erro de envio', disconnected: 'Sem backend: salvo na fila local, não no mapa público.', queuedHelp: 'Aguardando sincronização; ainda não publicado.', errorHelp: 'Envio não confirmado. Verifique a conexão e o Supabase.' }
+    es: { locating: 'Buscando GPS', gpsReady: 'GPS activo', waiting: 'Esperando lectura', sending: 'Enviando', queued: 'En cola local', published: 'Enviado', error: 'Error de envío', disconnected: 'Sin backend: se guarda en cola local, no en el mapa público.', queuedHelp: 'Pendiente de sincronizar; todavía no está publicado.', errorHelp: 'No se confirmó el envío. Revisa la conexión y Supabase.', reducedQuality: 'No enviada (audio procesado)', reducedHelp: 'Tu navegador aplica ganancia automática o reducción de ruido. La medición no se publicó para no mezclar escalas; puedes autorizarlo en el diagnóstico.' },
+    en: { locating: 'Locating', gpsReady: 'GPS enabled', waiting: 'Awaiting reading', sending: 'Sending', queued: 'Queued locally', published: 'Sent', error: 'Send failed', disconnected: 'No backend: saved in the local queue, not on the public map.', queuedHelp: 'Awaiting sync; not published yet.', errorHelp: 'Delivery not confirmed. Check the connection and Supabase.', reducedQuality: 'Not sent (processed audio)', reducedHelp: 'Your browser applies automatic gain or noise suppression. The reading was not published to avoid mixing scales; you can allow it in diagnostics.' },
+    pt: { locating: 'Buscando GPS', gpsReady: 'GPS ativo', waiting: 'Aguardando leitura', sending: 'Enviando', queued: 'Na fila local', published: 'Enviado', error: 'Erro de envio', disconnected: 'Sem backend: salvo na fila local, não no mapa público.', queuedHelp: 'Aguardando sincronização; ainda não publicado.', errorHelp: 'Envio não confirmado. Verifique a conexão e o Supabase.', reducedQuality: 'Não enviada (áudio processado)', reducedHelp: 'O navegador aplica ganho automático ou redução de ruído. A medição não foi publicada para não misturar escalas; você pode autorizar no diagnóstico.' }
   };
   return (copy[document.documentElement.lang] || copy.es)[key];
 }
@@ -255,6 +255,7 @@ function updateSharingStatus(key = sharingStatusKey) {
     ? sharingDeliveryState === 'error' ? sharingDeliveryText('errorHelp')
       : !supabaseClient ? sharingDeliveryText('disconnected')
       : sharingDeliveryState === 'queued' ? sharingDeliveryText('queuedHelp')
+        : sharingDeliveryState === 'reducedQuality' ? sharingDeliveryText('reducedHelp')
         : ''
     : key && !['sharing', 'disabled'].includes(key) ? sharingText(key) : '';
 }

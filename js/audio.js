@@ -65,10 +65,22 @@ function clippingFraction(samples) {
 }
 
 const diagnosticCopy = {
-  es: { title: 'Diagnóstico del micrófono', help: 'No tapes ni roces el micrófono, y evita hablarle de cerca o con viento directo.', idle: 'Activa el micrófono para comprobar los ajustes.', gain: 'Ganancia automática', noise: 'Reducción de ruido', echo: 'Cancelación de eco', on: 'activa', off: 'desactivada', unknown: 'no verificable', rate: 'Muestreo', version: 'Método', clean: 'Tratamientos del navegador desactivados; el micrófono sigue sin calibrar.', processed: 'El navegador mantiene tratamientos activos: pueden modificar el índice.', uncertain: 'No se pudieron verificar todos los tratamientos: pueden modificar el índice.', clipped: 'Señal próxima al límite digital. Aleja la fuente y evita soplar o rozar el micrófono.', history: 'Mapa y estadísticas: solo método v5. El histórico anterior se conserva por separado.' },
-  en: { title: 'Microphone diagnostics', help: 'Do not cover or rub the microphone, and avoid close speech or direct wind.', idle: 'Enable the microphone to check its settings.', gain: 'Automatic gain', noise: 'Noise suppression', echo: 'Echo cancellation', on: 'enabled', off: 'disabled', unknown: 'unverified', rate: 'Sampling', version: 'Method', clean: 'Browser processing disabled; the microphone is still uncalibrated.', processed: 'Browser processing is active and may change the index.', uncertain: 'Not all processing settings could be verified; they may change the index.', clipped: 'Signal near the digital limit. Move the source away and avoid blowing on or rubbing the microphone.', history: 'Map and statistics: v5 only. Earlier history is kept separately.' },
-  pt: { title: 'Diagnóstico do microfone', help: 'Não cubra nem esfregue o microfone, e evite falar de perto ou com vento direto.', idle: 'Ative o microfone para verificar os ajustes.', gain: 'Ganho automático', noise: 'Redução de ruído', echo: 'Cancelamento de eco', on: 'ativo', off: 'desativado', unknown: 'não verificável', rate: 'Amostragem', version: 'Método', clean: 'Tratamentos do navegador desativados; o microfone continua sem calibração.', processed: 'O navegador mantém tratamentos ativos: podem modificar o índice.', uncertain: 'Não foi possível verificar todos os tratamentos: podem modificar o índice.', clipped: 'Sinal próximo ao limite digital. Afaste a fonte e evite soprar ou esfregar o microfone.', history: 'Mapa e estatísticas: apenas método v5. O histórico anterior é mantido separadamente.' }
+  es: { title: 'Diagnóstico del micrófono', help: 'No tapes ni roces el micrófono, y evita hablarle de cerca o con viento directo.', idle: 'Activa el micrófono para comprobar los ajustes.', gain: 'Ganancia automática', noise: 'Reducción de ruido', echo: 'Cancelación de eco', on: 'activa', off: 'desactivada', unknown: 'no verificable', rate: 'Muestreo', version: 'Método', clean: 'Tratamientos del navegador desactivados; el micrófono sigue sin calibrar.', processed: 'El navegador mantiene tratamientos activos: pueden modificar el índice.', uncertain: 'No se pudieron verificar todos los tratamientos: pueden modificar el índice.', clipped: 'Señal próxima al límite digital. Aleja la fuente y evita soplar o rozar el micrófono.', history: 'Mapa y estadísticas: solo método v5. El histórico anterior se conserva por separado.', allow: 'Publicar igualmente (calidad reducida)' },
+  en: { title: 'Microphone diagnostics', help: 'Do not cover or rub the microphone, and avoid close speech or direct wind.', idle: 'Enable the microphone to check its settings.', gain: 'Automatic gain', noise: 'Noise suppression', echo: 'Echo cancellation', on: 'enabled', off: 'disabled', unknown: 'unverified', rate: 'Sampling', version: 'Method', clean: 'Browser processing disabled; the microphone is still uncalibrated.', processed: 'Browser processing is active and may change the index.', uncertain: 'Not all processing settings could be verified; they may change the index.', clipped: 'Signal near the digital limit. Move the source away and avoid blowing on or rubbing the microphone.', history: 'Map and statistics: v5 only. Earlier history is kept separately.', allow: 'Publish anyway (reduced quality)' },
+  pt: { title: 'Diagnóstico do microfone', help: 'Não cubra nem esfregue o microfone, e evite falar de perto ou com vento direto.', idle: 'Ative o microfone para verificar os ajustes.', gain: 'Ganho automático', noise: 'Redução de ruído', echo: 'Cancelamento de eco', on: 'ativo', off: 'desativado', unknown: 'não verificável', rate: 'Amostragem', version: 'Método', clean: 'Tratamentos do navegador desativados; o microfone continua sem calibração.', processed: 'O navegador mantém tratamentos ativos: podem modificar o índice.', uncertain: 'Não foi possível verificar todos os tratamentos: podem modificar o índice.', clipped: 'Sinal próximo ao limite digital. Afaste a fonte e evite soprar ou esfregar o microfone.', history: 'Mapa e estatísticas: apenas método v5. O histórico anterior é mantido separadamente.', allow: 'Publicar mesmo assim (qualidade reduzida)' }
 };
+
+/**
+ * Autoriza publicar pese al procesado del navegador.
+ *
+ * No cambia la medición ni la fórmula: solo levanta el filtro de calidad que
+ * impide enviar cuando el navegador confirma ganancia automática o supresión
+ * de ruido. El usuario asume la limitación de forma explícita.
+ */
+function setForceProcessedPublish(value) {
+  forceProcessedPublish = Boolean(value);
+  updateAudioDiagnostics();
+}
 
 function updateAudioDiagnostics() {
   const copy = diagnosticCopy[document.documentElement.lang] || diagnosticCopy.es;
@@ -114,6 +126,18 @@ function updateAudioDiagnostics() {
     ? signalCopy[captureProfile === 'processed' ? 'processed' : 'unknown'] : '');
   setText('measurement-help-title', compact.help);
   setText('measurement-method-note', copy.history);
+  /*
+   * Autorización del usuario para publicar pese al procesado.
+   *
+   * Solo aparece cuando el navegador confirma que procesa el audio y hay medición
+   * activa. No se activa sola: es una decisión consciente con la limitación dicha.
+   */
+  const allowLabel = document.getElementById('allow-processed-label');
+  const allowText = document.getElementById('allow-processed-text');
+  if (allowText) allowText.textContent = copy.allow;
+  if (allowLabel) allowLabel.hidden = captureProfile !== 'processed' || !isMonitoring;
+  const allowInput = document.getElementById('allow-processed-publish');
+  if (allowInput && allowInput.checked !== forceProcessedPublish) allowInput.checked = forceProcessedPublish;
   if (!captureSettings || !isMonitoring) {
     setText('audio-diagnostics-data', copy.idle);
     setText('audio-quality-warning', '');

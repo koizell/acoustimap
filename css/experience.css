@@ -414,6 +414,9 @@ body.dark-theme .summary-overview { --summary-tint: #1e3a42; --summary-accent: #
 .map-selection > div { display: flex; flex-wrap: wrap; gap: 8px; }
 .map-selection button { flex: 1; min-height: 44px; padding: 8px; border: 1px solid var(--line); border-radius: 8px; color: var(--text-main); background: var(--surface); font: inherit; cursor: pointer; }
 .map-selection button:focus-visible { outline: 3px solid var(--primary); outline-offset: 2px; }
+.allow-processed { display: flex; align-items: flex-start; gap: 8px; margin-top: 10px; font-size: 0.875rem; line-height: 1.5; color: var(--text-main); }
+.allow-processed[hidden] { display: none; }
+.allow-processed input { flex: 0 0 auto; width: 20px; height: 20px; margin-top: 1px; }
 #map-view[data-selecting] #map::after { content: '+'; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 800; color: var(--text-main); background: var(--surface); border-radius: 50%; width: 32px; height: 32px; line-height: 32px; text-align: center; font-size: 24px; pointer-events: none; }
 @media (max-width: 719px) {
   .stats-feature-content .challenge-item { padding: 14px !important; }
