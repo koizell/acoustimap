@@ -168,7 +168,7 @@ test('idioma: reconstruir la interfaz no multiplica las selecciones del mapa', (
   const browser = createBrowserContext({
     document: {
       addEventListener() {}, createElement: node,
-      getElementById: () => ({ appendChild() {} })
+      getElementById: id => id === 'map-view' ? { appendChild() {} } : null
     },
     map: { on: (event, handler) => handlers.push({ event, handler }) }
   });

@@ -8,7 +8,6 @@ const projectRoot = path.resolve(__dirname, '..');
 
 function createDevServer(root = projectRoot) {
   const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
-  const version = html.match(/\?v=(\d+)/)?.[1];
   const publicPaths = new Set(['/index.html', '/sw.js', '/js/audio-level-processor.js']);
   for (const [, reference] of html.matchAll(/(?:src|href)="([^"]+)"/g)) {
     if (!/^(https?:|#)/.test(reference)) publicPaths.add(`/${reference.split('?')[0]}`);
@@ -25,6 +24,8 @@ function createDevServer(root = projectRoot) {
     try { pathname = decodeURIComponent(new URL(request.url, 'http://localhost').pathname); }
     catch (_) { response.writeHead(400); response.end(); return; }
     if (pathname === '/_dev/status') {
+      // La página se lee en cada petición: el diagnóstico debe reflejarla también.
+      const version = fs.readFileSync(path.join(root, 'index.html'), 'utf8').match(/\?v=(\d+)/)?.[1];
       let config = '';
       try { config = fs.readFileSync(path.join(root, 'js/config.local.js'), 'utf8'); }
       catch (error) {

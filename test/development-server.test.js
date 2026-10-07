@@ -43,4 +43,7 @@ test('servidor local: copia limpia sin config.local.js responde sin configurar',
   const metadata = await response.json();
   assert.equal(metadata.configured, false);
   assert.equal(metadata.version, '45');
+  fs.writeFileSync(path.join(root, 'index.html'), '<script src="js/config.js?v=46"></script>');
+  const refreshed = await fetch(`http://127.0.0.1:${server.address().port}/_dev/status`);
+  assert.equal((await refreshed.json()).version, '46', 'el diagnóstico sigue la versión servida sin reiniciar');
 });

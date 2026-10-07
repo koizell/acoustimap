@@ -47,7 +47,7 @@ header {
 .stats-page-header p { max-width: 52ch; font-size: 0.9rem; line-height: 1.45; }
 
 .stats-section-nav { gap: 5px; width: fit-content; max-width: 100%; padding: 4px; margin-bottom: 16px; border: 1px solid var(--line); border-radius: 12px; background: #e8f0f0; }
-.stats-section-btn { min-height: 40px; min-width: 92px; padding: 9px 15px; border: 0; border-radius: 8px; background: transparent; color: #3c5860; box-shadow: none; font-size: 0.8rem; }
+.stats-section-btn { min-height: 44px; min-width: 92px; padding: 9px 15px; border: 0; border-radius: 8px; background: transparent; color: #3c5860; box-shadow: none; font-size: 0.875rem; }
 .stats-section-btn.active { border-color: transparent; background: var(--surface); color: #075e59; box-shadow: 0 1px 4px rgba(23, 49, 59, 0.13); }
 
 .stats-feature-content { min-height: 0; padding: 26px 28px 32px; border: 1px solid var(--line); border-radius: 18px; background: var(--surface); box-shadow: 0 8px 28px rgba(24, 52, 60, 0.055); }
@@ -156,7 +156,7 @@ body.dark-theme .status-badge:not(.active) { background: #1e3a42; color: #b1c8ca
   .stats-page-header h1 { margin-bottom: 5px; font-size: 1.6rem; }
   .stats-page-header p { font-size: 0.82rem; }
   .stats-section-nav { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); width: 100%; gap: 3px; margin-bottom: 14px; }
-  .stats-section-btn { min-width: 0; min-height: 43px; padding: 7px 3px; font-size: 0.73rem; }
+  .stats-section-btn { min-width: 0; min-height: 44px; padding: 7px 3px; font-size: 0.875rem; }
   .stats-feature-content { padding: 18px 16px 23px; border-radius: 15px; }
   .stats-feature-content > h2:first-child { font-size: 1.16rem !important; }
   .stats-feature-content h2 { margin: 23px 0 9px; }
@@ -324,7 +324,7 @@ body.dark-theme .legend-close:hover { background: #1e3a42; color: var(--text-mai
 .summary-metric-label { display: flex; align-items: center; gap: 7px; color: var(--text-muted); font-weight: 600; }
 .summary-metric-label svg { flex: 0 0 auto; color: var(--summary-accent); }
 .stats-feature-content .summary-metrics strong { margin: 14px 0 7px; font-size: clamp(1.7rem, 3vw, 2.1rem); font-weight: 750; font-variant-numeric: tabular-nums; }
-.summary-metric small { display: block; color: var(--text-muted); font-size: 0.72rem; line-height: 1.4; }
+.summary-metric small { display: block; color: var(--text-muted); font-size: 0.875rem; line-height: 1.5; }
 .summary-feedback { display: flex; align-items: flex-start; gap: 14px; padding: 22px; border: 1px dashed var(--line); border-radius: 12px; background: var(--summary-tint); }
 .summary-feedback-icon,
 .summary-tool-icon { display: inline-flex; align-items: center; justify-content: center; width: 38px; height: 38px; flex: 0 0 auto; border: 1px solid var(--line); border-radius: 10px; color: var(--summary-accent); background: var(--surface); }
@@ -373,11 +373,50 @@ body.dark-theme .summary-overview { --summary-tint: #1e3a42; --summary-accent: #
   .summary-metric:first-child small { grid-column: 1; }
   .stats-feature-content .summary-metrics span { font-size: 0.78rem; }
   .stats-feature-content .summary-metrics strong { margin: 12px 0 5px; font-size: 1.8rem; }
-  .summary-metric small { font-size: 0.7rem; }
+  .summary-metric small { font-size: 0.875rem; }
   .summary-feedback { gap: 12px; padding: 16px; }
   .summary-feedback h3 { font-size: 0.9rem; }
   .summary-feedback p { font-size: 0.8rem; }
   .summary-results .stats-columns { grid-template-columns: 1fr; gap: 12px; }
   .summary-tools { grid-template-columns: 1fr; gap: 22px; margin-top: 20px; padding-top: 20px; }
   .summary-tool + .summary-tool { padding-top: 20px; border-top: 1px solid var(--line); }
+}
+
+/* Datos: instrucciones legibles y controles táctiles, sin depender del color. */
+.stats-feature-content > p,
+.stats-feature-content .summary-tool > p,
+.stats-feature-content .summary-feedback p,
+.challenge-group > p { font-size: 1rem; line-height: 1.6; color: var(--text-muted); }
+.stats-feature-content .data-scope,
+.stats-feature-content .comparison-periods { font-size: 0.875rem; line-height: 1.6; overflow-wrap: anywhere; }
+.challenge-group { margin-top: 24px; }
+.challenge-group h3 { margin: 0 0 8px; color: var(--text-main); font-size: 1rem; }
+.challenge-group > p { margin-bottom: 12px; }
+.stats-feature-content .challenge-item { padding: 18px !important; gap: 10px; animation-duration: 0.2s; }
+.challenge-item:nth-child(2) { animation-delay: 0.04s; }
+.challenge-item:nth-child(3) { animation-delay: 0.08s; }
+.challenge-fill { animation-duration: 0.3s; }
+.challenge-topline strong { font-size: 1rem; line-height: 1.4; }
+.challenge-count { font-size: 1rem; white-space: nowrap; }
+.challenge-detail { font-size: 1rem; line-height: 1.6; }
+.challenge-state { font-size: 0.875rem; line-height: 1.5; }
+.challenge-item button { justify-self: start; min-width: 44px; min-height: 44px; }
+.comparison-summary[data-change="increase"] div:last-child { background: var(--surface); }
+.comparison-summary[data-change="increase"] div:last-child strong { color: var(--text-main); }
+.trend-table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 0.875rem; color: var(--text-main); }
+.trend-table caption { text-align: left; padding: 10px 0; line-height: 1.5; }
+.trend-table th, .trend-table td { text-align: left; padding: 8px 4px; border-bottom: 1px solid var(--line); overflow-wrap: anywhere; }
+.stats-feature-content #zone-trend { min-width: 0; }
+.stats-page-header p { font-size: 1rem; line-height: 1.6; }
+.stats-section-btn:focus-visible { outline: 3px solid var(--primary); outline-offset: 2px; }
+.map-selection { position: absolute; top: calc(var(--header-h) + 72px); left: 50%; transform: translateX(-50%); z-index: 1000; width: min(440px, calc(100% - 112px)); padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); color: var(--text-main); box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15); }
+.map-selection p { font-size: 1rem; line-height: 1.5; margin-bottom: 10px; }
+.map-selection > div { display: flex; flex-wrap: wrap; gap: 8px; }
+.map-selection button { flex: 1; min-height: 44px; padding: 8px; border: 1px solid var(--line); border-radius: 8px; color: var(--text-main); background: var(--surface); font: inherit; cursor: pointer; }
+.map-selection button:focus-visible { outline: 3px solid var(--primary); outline-offset: 2px; }
+#map-view[data-selecting] #map::after { content: '+'; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 800; color: var(--text-main); background: var(--surface); border-radius: 50%; width: 32px; height: 32px; line-height: 32px; text-align: center; font-size: 24px; pointer-events: none; }
+@media (max-width: 719px) {
+  .stats-feature-content .challenge-item { padding: 14px !important; }
+  .stats-section-btn { font-size: 0.8rem; }
+  .map-selection { top: calc(var(--header-h) + 112px); width: calc(100% - 28px); }
 }

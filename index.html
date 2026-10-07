@@ -5,23 +5,23 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#0f172a" />
     <title>AcoustiMap - Mapeo de Contaminación Acústica</title>
-    <link rel="manifest" href="manifest.webmanifest?v=48" />
+    <link rel="manifest" href="manifest.webmanifest?v=49" />
 
-    <link rel="icon" href="assets/icon.svg?v=48" type="image/svg+xml" />
+    <link rel="icon" href="assets/icon.svg?v=49" type="image/svg+xml" />
 
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css" />
 
     <!-- Estilos modulares -->
-    <link rel="stylesheet" href="css/base.css?v=48" />
-    <link rel="stylesheet" href="css/layout.css?v=48" />
-    <link rel="stylesheet" href="css/map.css?v=48" />
-    <link rel="stylesheet" href="css/panel.css?v=48" />
-    <link rel="stylesheet" href="css/info.css?v=48" />
-    <link rel="stylesheet" href="css/responsive.css?v=48" />
-    <link rel="stylesheet" href="css/features.css?v=48" />
-    <link rel="stylesheet" href="css/experience.css?v=48" />
+    <link rel="stylesheet" href="css/base.css?v=49" />
+    <link rel="stylesheet" href="css/layout.css?v=49" />
+    <link rel="stylesheet" href="css/map.css?v=49" />
+    <link rel="stylesheet" href="css/panel.css?v=49" />
+    <link rel="stylesheet" href="css/info.css?v=49" />
+    <link rel="stylesheet" href="css/responsive.css?v=49" />
+    <link rel="stylesheet" href="css/features.css?v=49" />
+    <link rel="stylesheet" href="css/experience.css?v=49" />
   </head>
   <body>
     <header>
@@ -40,6 +40,10 @@
     <!-- PESTAÑA: MAPA -->
     <div id="map-view" class="tab-content active">
       <div id="map"></div>
+      <div id="map-selection" class="map-selection" hidden>
+        <p id="map-selection-hint" role="status" aria-live="polite">Toca el mapa o muévelo con las flechas y usa su centro.</p>
+        <div><button type="button" id="map-selection-use-center">Elegir centro del mapa</button><button type="button" id="map-selection-cancel">Cancelar selección</button></div>
+      </div>
 
       <!-- Controles secundarios bajo demanda: el mapa queda libre al entrar. -->
       <details class="map-filters" id="map-filters" ontoggle="onMapFiltersToggle()">
@@ -276,14 +280,14 @@
         <div class="stats-page-header">
           <div>
             <h1>Datos del ruido</h1>
-            <p>Mediciones ciudadanas, tendencias y reportes de tu zona.</p>
+            <p>Mediciones ciudadanas y reportes de todas las zonas con aportes.</p>
           </div>
         </div>
         <div class="stats-section-nav" role="tablist" aria-label="Secciones de estadísticas">
-          <button class="stats-section-btn active" id="stats-tab-stats" role="tab" aria-selected="true" aria-controls="stats-feature-content" onclick="openStatsTab('stats')">Resumen</button>
-          <button class="stats-section-btn" id="stats-tab-report" role="tab" aria-selected="false" aria-controls="stats-feature-content" onclick="openStatsTab('report')">Reportar</button>
-          <button class="stats-section-btn" id="stats-tab-compare" role="tab" aria-selected="false" aria-controls="stats-feature-content" onclick="openStatsTab('compare')">Comparar</button>
-          <button class="stats-section-btn" id="stats-tab-challenges" role="tab" aria-selected="false" aria-controls="stats-feature-content" onclick="openStatsTab('challenges')">Retos</button>
+          <button class="stats-section-btn active" id="stats-tab-stats" role="tab" tabindex="0" aria-selected="true" aria-controls="stats-feature-content" onclick="openStatsTab('stats')">Resumen</button>
+          <button class="stats-section-btn" id="stats-tab-report" role="tab" tabindex="-1" aria-selected="false" aria-controls="stats-feature-content" onclick="openStatsTab('report')">Reportar</button>
+          <button class="stats-section-btn" id="stats-tab-compare" role="tab" tabindex="-1" aria-selected="false" aria-controls="stats-feature-content" onclick="openStatsTab('compare')">Comparar</button>
+          <button class="stats-section-btn" id="stats-tab-challenges" role="tab" tabindex="-1" aria-selected="false" aria-controls="stats-feature-content" onclick="openStatsTab('challenges')">Retos</button>
         </div>
         <div id="stats-feature-content" class="stats-feature-content" role="tabpanel" aria-labelledby="stats-tab-stats" tabindex="0"></div>
       </div>
@@ -303,12 +307,12 @@
          Ver test/coupling.test.js.
          js/kalman.js no se carga: define la clase KalmanLatLong pero la app
          suaviza el GPS con su propio filtro de estabilidad en map.js. -->
-    <script src="js/config.local.js?v=48"></script>
-    <script src="js/config.js?v=48"></script>
-    <script src="js/map.js?v=48"></script>
-    <script src="js/audio.js?v=48"></script>
-    <script src="js/community.js?v=48"></script>
-    <script src="js/app.js?v=48"></script>
-    <script src="js/features.js?v=48"></script>
+    <script src="js/config.local.js?v=49"></script>
+    <script src="js/config.js?v=49"></script>
+    <script src="js/map.js?v=49"></script>
+    <script src="js/audio.js?v=49"></script>
+    <script src="js/community.js?v=49"></script>
+    <script src="js/app.js?v=49"></script>
+    <script src="js/features.js?v=49"></script>
   </body>
 </html>

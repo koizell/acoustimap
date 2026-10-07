@@ -12,7 +12,7 @@ const DE_FEATURES = [
   'drawnZone', 'selectedMapPoint', 'featureClientId',
   'activateComparisonLayer', 'createFeatureUi', 'openFeaturePanel', 'closeFeatureMenu',
   'flushOfflineMeasurements', 'queueOfflineMeasurement', 'enqueueOfflineRecord',
-  'summaryText', 'summaryIcon', 'updateSummaryState', 'exitComparisonMode'
+  'summaryText', 'summaryIcon', 'updateSummaryState', 'exitComparisonMode', 'cancelMapSelection'
 ];
 
 const hojasDeFeatures = () =>

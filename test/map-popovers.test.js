@@ -35,7 +35,7 @@ test('paneles: cierre táctil, Escape y reconstrucción sin multiplicar listener
   const node = () => ({ setAttribute() {}, addEventListener() {}, querySelector: node });
   const browser = createBrowserContext({ document: {
     addEventListener(event) { counts[event] = (counts[event] || 0) + 1; },
-    createElement: node, getElementById: () => ({ appendChild() {} })
+    createElement: node, getElementById: id => id === 'map-view' ? { appendChild() {} } : null
   }, map: { on() {} } });
   browser.load('config.js', 'features.js');
   browser.evaluate('createFeatureUi(); createFeatureUi(); createFeatureUi()');

@@ -153,19 +153,20 @@ function aggregatePoints(rows) {
       buckets.set(key, {
         lat: r.latitude,
         lng: r.longitude,
-        sumDb: 0,
+        energySum: 0,
         count: 0,
         latest: r.created_at
       });
     }
     const b = buckets.get(key);
-    b.sumDb += r.db_level;
+    b.energySum += energiaDe(r.db_level);
     b.count += 1;
     if (new Date(r.created_at) > new Date(b.latest)) b.latest = r.created_at;
   });
 
   return Array.from(buckets.values()).map((b) => {
-    const avg = Math.round(b.sumDb / b.count);
+    // Mismo promedio que Resumen, Tendencia y la RPC; no media de los logaritmos.
+    const avg = Math.round(promedioEnergetico(b.energySum, b.count));
     return {
       lat: b.lat,
       lng: b.lng,

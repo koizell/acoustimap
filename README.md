@@ -105,12 +105,18 @@ Esta es la sección más completa. Tiene 4 subsecciones:
 
 Vista general con:
 
-- **Total de mediciones** registradas en la ciudad.
-- **Promedio general** en dB.
-- **Niveles altos** detectados.
-- **Zonas más ruidosas** (Top 3 con sus coordenadas y número de mediciones).
+- **Total de mediciones** del método vigente en los últimos 30 días, de todas las zonas con aportes (no solo la vista del mapa).
+- **Promedio energético general** en una escala relativa sin calibrar, no dB SPL.
+- **Lecturas altas:** número de mediciones por encima de 70, no número de zonas.
+- **Zonas más ruidosas** (Top 3 con número de mediciones y botón «Ver en mapa»).
 - **Zonas más silenciosas** (Top 3).
 - **Alertas persistentes:** zonas que llevan varios días con niveles altos.
+
+La tendencia de una zona usa el mismo promedio energético y ofrece una tabla de
+siete días naturales UTC. Los días sin mediciones quedan como falta de datos,
+no como silencio, y el gráfico no une los puntos a través de esos huecos.
+Puedes elegir una ubicación tocando el mapa o moviéndolo con las flechas y
+usando «Elegir centro del mapa»; Escape o «Cancelar selección» cancela la acción.
 
 ### 📝 Reportar ruido
 
@@ -124,21 +130,32 @@ Puedes dejar un **reporte ciudadano** sobre un problema específico:
 
 ### ↔️ Comparar meses
 
-Visualiza **dos periodos de tiempo en paralelo** para ver si el ruido ha mejorado o empeorado en una zona específica.
+Compara los **últimos 30 días con los 30 anteriores**, para todas las zonas con
+aportes del método vigente. Se indican fechas UTC y recuentos de cada periodo.
 
-- Selecciona el mes A y el mes B.
-- El mapa muestra las diferencias con colores.
-- Útil para evaluar el impacto de políticas urbanas o cambios de tráfico.
+- Los botones muestran un periodo u otro en el mapa, no una resta por celda.
+- Si falta un periodo, no se calcula un cambio ni se habilitan esos botones.
+- Puedes reintentar o volver al mapa si faltan datos o falla la consulta.
+- El resultado no controla que se hayan medido las mismas zonas o dispositivos:
+  no demuestra por sí solo una mejora ambiental ni el efecto de una política.
 
 ### 🎯 Retos
 
-Pequeños **desafíos de medición** que gamifican la participación:
+Cinco retos, con progreso personal guardado en este navegador durante 30 días,
+incluidos los aportes pendientes de conexión:
 
-- "Mide tu calle 3 veces esta semana"
-- "Encuentra la zona más silenciosa de tu barrio"
-- "Reporta un ruido molesto persistente"
+- **Hora punta:** medir la misma zona entre 07:00 y 09:00 de Colombia durante 3 días.
+- **Ruta tranquila:** 5 ubicaciones distintas con lectura baja (<55).
+- **Cobertura nocturna:** 3 parejas distintas de zona/día, entre 18:00 y 06:00 de Colombia.
+- **Recoge basura:** reportes de basura recogida con foto, en 3 zonas y 3 días distintos.
+- **Denuncia la obra:** reportes de obra en 2 zonas distintas, sin exigir foto ni medición.
 
-Cada reto completado genera datos más consistentes y te ayuda a explorar tu ciudad.
+Las tarjetas ofrecen «Ir a medir» o «Preparar reporte» con su categoría. No
+activan permisos ni publican por sí solas. Las fotos de Basura/Obra no se suben;
+solo se conserva el indicador local de haber adjuntado foto. Una foto adjunta
+no constituye verificación independiente del acto reportado.
+El progreso previo se recalcula con estas reglas sin borrar los aportes locales;
+un reto completado repitiendo la misma zona puede volver a quedar pendiente.
 
 ---
 

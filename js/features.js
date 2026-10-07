@@ -304,7 +304,10 @@ function createFeatureUi() {
   if (!createFeatureUi.dismissBound) {
     createFeatureUi.dismissBound = true;
     document.addEventListener('keydown', (event) => {
-      if (event.key === 'Escape') closeFeatureMenu(true);
+      if (event.key === 'Escape') {
+        closeFeatureMenu(true);
+        if (pendingMapSelection || pendingTrendSelection || pendingReportSelection) cancelMapSelection(true);
+      }
     });
     document.addEventListener('pointerdown', (event) => {
       const current = document.querySelector('.feature-toolbar');
@@ -312,40 +315,81 @@ function createFeatureUi() {
     });
   }
 
+  if (!createFeatureUi.selectionBound) {
+    createFeatureUi.selectionBound = true;
+    document.getElementById('map-selection-use-center')?.addEventListener('click', () => completeMapSelection(map.getCenter()));
+    document.getElementById('map-selection-cancel')?.addEventListener('click', () => cancelMapSelection(true));
+  }
+  updateMapSelectionUi();
+
   // Cambiar idioma reconstruye los botones, no debe registrar otro listener.
   if (!createFeatureUi.mapClickBound) {
     createFeatureUi.mapClickBound = true;
     map.on('click', (event) => {
-      selectedMapPoint = event.latlng;
-      const status = document.getElementById('feature-status');
-      if (status) status.textContent = `${event.latlng.lat.toFixed(5)}, ${event.latlng.lng.toFixed(5)}`;
-      if (pendingMapSelection) {
-        pendingMapSelection = false;
-        switchTab('stats-view', document.querySelectorAll('.tab-btn')[2]);
-        openStatsTab('stats');
-        const confirmStatus = document.getElementById('confirm-status');
-        if (confirmStatus) confirmStatus.textContent = u('selectedLocation');
-        loadZoneConfirmations(event.latlng);
-        return;
-      }
-      if (pendingTrendSelection) {
-        pendingTrendSelection = false;
-        switchTab('stats-view', document.querySelectorAll('.tab-btn')[2]);
-        openStatsTab('stats');
-        loadZoneTrend(event.latlng);
-        return;
-      }
-      if (pendingReportSelection) {
-        pendingReportSelection = false;
-        switchTab('stats-view', document.querySelectorAll('.tab-btn')[2]);
-        const reportStatus = document.getElementById('stats-feature-content')?.querySelector('#feature-status');
-        if (reportStatus) reportStatus.textContent = u('selectedLocation');
-        return;
-      }
+      completeMapSelection(event.latlng);
     });
   }
 
   return panel;
+}
+
+function updateMapSelectionUi() {
+  const copy = {
+    es: { hint: 'Toca el mapa o muévelo con las flechas y usa su centro.', center: 'Elegir centro del mapa', cancel: 'Cancelar selección' },
+    en: { hint: 'Tap the map or move it with the arrow keys and choose its center.', center: 'Choose map center', cancel: 'Cancel selection' },
+    pt: { hint: 'Toque no mapa ou mova-o com as setas e escolha o centro.', center: 'Escolher centro do mapa', cancel: 'Cancelar seleção' }
+  }[currentLanguage];
+  for (const [id, text] of [['map-selection-hint', copy.hint], ['map-selection-use-center', copy.center], ['map-selection-cancel', copy.cancel]]) {
+    const element = document.getElementById(id); if (element) element.textContent = text;
+  }
+}
+
+function beginMapSelection(kind) {
+  cancelMapSelection();
+  pendingMapSelection = kind === 'confirm';
+  pendingTrendSelection = kind === 'trend';
+  pendingReportSelection = kind === 'report';
+  switchTab('map-view', document.querySelector('.tab-btn'));
+  const selection = document.getElementById('map-selection');
+  if (selection) selection.hidden = false;
+  document.getElementById('map-view')?.setAttribute('data-selecting', 'true');
+  map.getContainer()?.focus();
+}
+
+function cancelMapSelection(returnToData = false) {
+  const origin = pendingReportSelection ? 'select-report-location' : pendingTrendSelection ? 'select-trend-location' : 'select-confirm-location';
+  pendingMapSelection = pendingTrendSelection = pendingReportSelection = false;
+  const selection = document.getElementById('map-selection');
+  if (selection) selection.hidden = true;
+  document.getElementById('map-view')?.removeAttribute('data-selecting');
+  if (returnToData) {
+    switchTab('stats-view', document.querySelectorAll('.tab-btn')[2]);
+    document.getElementById(origin)?.focus();
+  }
+}
+
+function completeMapSelection(position) {
+  selectedMapPoint = position;
+  const kind = pendingReportSelection ? 'report' : pendingTrendSelection ? 'trend' : pendingMapSelection ? 'confirm' : null;
+  if (!kind) return;
+  cancelMapSelection();
+  switchTab('stats-view', document.querySelectorAll('.tab-btn')[2]);
+  if (kind === 'report') {
+    const status = document.getElementById('stats-feature-content')?.querySelector('#feature-status');
+    if (status) status.textContent = u('selectedLocation');
+    document.getElementById('report-note')?.focus();
+    return;
+  }
+  openStatsTab('stats');
+  if (kind === 'trend') {
+    loadZoneTrend(position);
+    document.getElementById('stats-feature-content')?.focus();
+  } else {
+    const status = document.getElementById('confirm-status');
+    if (status) status.textContent = u('selectedLocation');
+    loadZoneConfirmations(position);
+    document.getElementById('confirm-noise')?.focus();
+  }
 }
 
 function openFeaturePanel(view) {
@@ -363,6 +407,7 @@ function openStatsTab(view, render = true) {
     const active = button.id === `stats-tab-${view}`;
     button.classList.toggle('active', active);
     button.setAttribute('aria-selected', String(active));
+    button.setAttribute('tabindex', active ? '0' : '-1');
   });
   content.dataset.view = view;
   content.setAttribute('aria-labelledby', `stats-tab-${view}`);
@@ -439,19 +484,34 @@ function noDataMessage() {
 }
 
 function renderComparisonPanel(panel) {
-  panel.innerHTML = panelFrame(t('comparison'), `<p>${t('comparisonHelp')}</p><div class="feature-status" role="status" aria-live="polite">${t('loading')}</div><div class="comparison-summary" hidden><div><span>${t('previous')}</span><strong id="comparison-previous">--</strong><small>${t('average')}</small></div><div><span>${t('current')}</span><strong id="comparison-current">--</strong><small>${t('average')}</small></div><div><span>${t('difference')}</span><strong id="comparison-difference">--</strong><small>${t('indexPoints')}</small></div></div><div class="panel-actions comparison-actions" hidden><button type="button" data-comparison="previous">${t('viewPrevious')}</button><button type="button" data-comparison="current">${t('viewCurrent')}</button></div>`, panel);
+  panel.innerHTML = panelFrame(t('comparison'), `<p>${t('comparisonHelp')}</p><p class="data-scope">${dataUiText('all')} · ${summaryText('scope')}</p><p class="comparison-periods"></p><div class="feature-status" role="status" aria-live="polite">${t('loading')}</div><div class="comparison-summary" hidden><div><span>${t('previous')}</span><strong id="comparison-previous">--</strong><small>${t('average')}</small></div><div><span>${t('current')}</span><strong id="comparison-current">--</strong><small>${t('average')}</small></div><div><span>${t('difference')}</span><strong id="comparison-difference">--</strong><small>${t('indexPoints')}</small></div></div><div class="panel-actions comparison-actions" hidden><button type="button" data-comparison="previous">${t('viewPrevious')}</button><button type="button" data-comparison="current">${t('viewCurrent')}</button></div><div class="panel-actions comparison-feedback-actions" hidden><button type="button" class="comparison-retry">${dataUiText('retry')}</button><button type="button" class="comparison-map">${dataUiText('map')}</button></div>`, panel);
   panel.querySelector('[data-close]')?.addEventListener('click', closeFeaturePanel);
   panel.querySelectorAll('[data-comparison]').forEach((button) => button.addEventListener('click', () => showComparison(button.dataset.comparison)));
+  panel.querySelector('.comparison-retry').addEventListener('click', () => comparePeriods(panel));
+  panel.querySelector('.comparison-map').addEventListener('click', () => switchTab('map-view', document.querySelector('.tab-btn')));
   comparePeriods(panel);
 }
 
 async function comparePeriods(panel) {
+  // El mismo panel puede volver a Comparar mientras otra consulta sigue pendiente.
+  const requestId = panel.comparisonRequestId = (panel.comparisonRequestId || 0) + 1;
+  const status = panel.querySelector('.feature-status');
+  status.textContent = t('loading');
+  if (status.dataset) status.dataset.state = 'loading';
+  status.setAttribute?.('aria-busy', 'true');
+  const retry = panel.querySelector('.comparison-retry');
+  if (retry) retry.disabled = true;
+  for (const selector of ['.comparison-summary', '.comparison-actions', '.comparison-feedback-actions']) {
+    const element = panel.querySelector(selector); if (element) element.hidden = true;
+  }
   const now = new Date();
   const currentStart = new Date(now);
   currentStart.setDate(currentStart.getDate() - 30);
   const previousEnd = new Date(currentStart);
   const previousStart = new Date(previousEnd);
   previousStart.setDate(previousStart.getDate() - 30);
+  const periods = panel.querySelector('.comparison-periods');
+  if (periods) periods.textContent = `${t('previous')}: ${previousStart.toISOString().slice(0, 10)} – ${previousEnd.toISOString().slice(0, 10)} · ${t('current')}: ${currentStart.toISOString().slice(0, 10)} – ${now.toISOString().slice(0, 10)} (UTC)`;
   try {
     const [current, previous] = await Promise.all([
       fetchFeatureMeasurements(currentStart, now),
@@ -460,9 +520,14 @@ async function comparePeriods(panel) {
     const currentAvg = averageDb(current);
     const previousAvg = averageDb(previous);
     const difference = currentAvg == null || previousAvg == null ? null : currentAvg - previousAvg;
-    if (!panelIsCurrent(panel, 'compare')) return;
+    if (!panelIsCurrent(panel, 'compare') || panel.comparisonRequestId !== requestId
+      || panel.querySelector('.feature-status') !== status) return;
     comparisonRows = { current, previous };
-    const status = panel.querySelector('.feature-status');
+    if (status.dataset) status.dataset.state = difference == null ? 'empty' : 'ready';
+    status.setAttribute?.('aria-busy', 'false');
+    if (retry) retry.disabled = false;
+    const feedback = panel.querySelector('.comparison-feedback-actions');
+    if (feedback) feedback.hidden = difference != null;
     status.textContent = difference == null
       ? `${noDataMessage()} ${t('previous')}: ${previous.length} · ${t('current')}: ${current.length}.`
       : `${previous.length + current.length} ${m('periods')}`;
@@ -472,13 +537,23 @@ async function comparePeriods(panel) {
       panel.querySelector('#comparison-previous').textContent = previousAvg;
       panel.querySelector('#comparison-current').textContent = currentAvg;
       panel.querySelector('#comparison-difference').textContent = `${difference > 0 ? '+' : ''}${difference}`;
+      if (summary?.dataset) summary.dataset.change = difference > 0 ? 'increase' : difference < 0 ? 'decrease' : 'unchanged';
     }
     const actions = panel.querySelector('.comparison-actions');
     if (actions) actions.hidden = difference == null;
     if (difference == null) comparisonMode = null;
   } catch (error) {
+    if (!panelIsCurrent(panel, 'compare') || panel.comparisonRequestId !== requestId
+      || panel.querySelector('.feature-status') !== status) return;
     if (supabaseClient) console.error('Error comparando periodos:', error);
-    if (panelIsCurrent(panel, 'compare')) panel.querySelector('.feature-status').textContent = error.message || m('comparisonError');
+    comparisonRows = { current: [], previous: [] };
+    comparisonMode = null;
+    status.textContent = supabaseClient ? m('comparisonError') : m('connect');
+    if (status.dataset) status.dataset.state = supabaseClient ? 'error' : 'disconnected';
+    status.setAttribute?.('aria-busy', 'false');
+    if (retry) retry.disabled = false;
+    const feedback = panel.querySelector('.comparison-feedback-actions');
+    if (feedback) feedback.hidden = false;
   }
 }
 
@@ -653,8 +728,7 @@ function renderReportPanel(panel) {
     panel.querySelector('#report-photo-name').textContent = event.target.files?.[0]?.name || noPhotoLabel();
   });
   panel.querySelector('#select-report-location').addEventListener('click', () => {
-    pendingReportSelection = true;
-    switchTab('map-view', document.querySelector('.tab-btn'));
+    beginMapSelection('report');
   });
   panel.querySelector('#send-report').addEventListener('click', submitReport);
 }
@@ -781,32 +855,32 @@ function summaryText(key) {
     es: {
       scope: `Ruido medido · método v${MEASUREMENT_VERSION}`, totalLabel: 'Mediciones', singleReading: 'medición', oneZone: 'zona analizada',
       totalHint: 'Lecturas compartidas', averageLabel: 'Media en dB', averageHint: 'Escala orientativa, sin calibrar',
-      highLabel: 'Zona ruidosa', highHint: 'Lecturas por encima de 70 dB', loadingHint: 'Consultando las mediciones compartidas.',
+      highLabel: 'Lecturas altas', highHint: 'Lecturas por encima de 70 dB', loadingHint: 'Consultando las mediciones compartidas.',
       emptyTitle: 'Aún no hay mediciones', emptyHint: `Los aportes del método v${MEASUREMENT_VERSION} aparecerán aquí. Puedes empezar desde el mapa.`,
       disconnectedTitle: 'Resumen no disponible', disconnectedHint: 'Falta conectar la base de datos. Puedes probar el medidor en el mapa.',
       errorTitle: 'No pudimos cargar el resumen', errorHint: 'Revisa la conexión e inténtalo de nuevo.', retry: 'Reintentar', map: 'Ir al mapa',
       zonesHint: 'Promedios por zona · hasta 3 por lista', alertsHint: 'Ruido alto durante 3 días seguidos',
-      community: 'En tu zona', communityHint: '¿También escuchas el ruido? Elige un punto y confírmalo.', reports: 'Ver reportes ciudadanos'
+      community: 'Confirmar una zona', communityHint: '¿También escuchas el ruido? Elige un punto y confírmalo.', reports: 'Ver reportes ciudadanos'
     },
     en: {
       scope: `Measured noise · method v${MEASUREMENT_VERSION}`, totalLabel: 'Measurements', singleReading: 'measurement', oneZone: 'area analyzed',
       totalHint: 'Shared readings', averageLabel: 'Mean in dB', averageHint: 'Orientation scale, uncalibrated',
-      highLabel: 'Noisy area', highHint: 'Readings above 70 dB', loadingHint: 'Fetching shared measurements.',
+      highLabel: 'High readings', highHint: 'Readings above 70 dB', loadingHint: 'Fetching shared measurements.',
       emptyTitle: 'No measurements yet', emptyHint: `Contributions using method v${MEASUREMENT_VERSION} will appear here. You can start on the map.`,
       disconnectedTitle: 'Summary unavailable', disconnectedHint: 'The database is not connected. You can try the meter on the map.',
       errorTitle: 'Could not load the summary', errorHint: 'Check your connection and try again.', retry: 'Try again', map: 'Go to map',
       zonesHint: 'Area averages · up to 3 per list', alertsHint: 'High noise for 3 days running',
-      community: 'In your area', communityHint: 'Can you hear it too? Choose a point and confirm the noise.', reports: 'View citizen reports'
+      community: 'Confirm an area', communityHint: 'Can you hear it too? Choose a point and confirm the noise.', reports: 'View citizen reports'
     },
     pt: {
       scope: `Ruído medido · método v${MEASUREMENT_VERSION}`, totalLabel: 'Medições', singleReading: 'medição', oneZone: 'área analisada',
       totalHint: 'Leituras compartilhadas', averageLabel: 'Média em dB', averageHint: 'Escala orientativa, sem calibração',
-      highLabel: 'Área ruidosa', highHint: 'Leituras acima de 70 dB', loadingHint: 'Consultando as medições compartilhadas.',
+      highLabel: 'Leituras altas', highHint: 'Leituras acima de 70 dB', loadingHint: 'Consultando as medições compartilhadas.',
       emptyTitle: 'Ainda não há medições', emptyHint: `As contribuições do método v${MEASUREMENT_VERSION} aparecerão aqui. Comece pelo mapa.`,
       disconnectedTitle: 'Resumo indisponível', disconnectedHint: 'O banco de dados não está conectado. Você pode testar o medidor no mapa.',
       errorTitle: 'Não foi possível carregar o resumo', errorHint: 'Verifique a conexão e tente novamente.', retry: 'Tentar novamente', map: 'Ir ao mapa',
       zonesHint: 'Médias por área · até 3 por lista', alertsHint: 'Ruído alto por 3 dias seguidos',
-      community: 'Na sua região', communityHint: 'Também ouve o ruído? Escolha um ponto e confirme.', reports: 'Ver relatos da comunidade'
+      community: 'Confirmar uma área', communityHint: 'Também ouve o ruído? Escolha um ponto e confirme.', reports: 'Ver relatos da comunidade'
     }
   };
   return (copy[document.documentElement.lang] || copy.es)[key];
@@ -828,7 +902,7 @@ function renderStatsPanel(panel) {
   panel.dataset.subview = 'overview';
   panel.innerHTML = panelFrame(t('summaryTitle'), `
     <div class="summary-overview" data-state="loading">
-      <p class="summary-scope">${summaryText('scope')}</p>
+      <p class="summary-scope">${dataUiText('all')} · ${summaryText('scope')}</p>
       <div class="stats-metrics summary-metrics" aria-busy="true">
         <div class="summary-metric"><span class="summary-metric-label">${summaryIcon('readings')}${summaryText('totalLabel')}</span><strong id="metric-total">--</strong><small>${summaryText('totalHint')}</small></div>
         <div class="summary-metric"><span class="summary-metric-label">${summaryIcon('average')}${summaryText('averageLabel')}</span><strong id="metric-average">--</strong><small>${summaryText('averageHint')}</small></div>
@@ -859,14 +933,10 @@ function renderStatsPanel(panel) {
   });
   panel.querySelector('#confirm-noise').addEventListener('click', confirmNoise);
   panel.querySelector('#select-confirm-location').addEventListener('click', () => {
-    pendingMapSelection = true;
-    switchTab('map-view', document.querySelector('.tab-btn'));
-    const status = document.getElementById('confirm-status');
-    if (status) status.textContent = m('selectConfirmHint');
+    beginMapSelection('confirm');
   });
   panel.querySelector('#select-trend-location').addEventListener('click', () => {
-    pendingTrendSelection = true;
-    switchTab('map-view', document.querySelector('.tab-btn'));
+    beginMapSelection('trend');
   });
   loadStats(panel);
   loadCitizenReports(panel);
@@ -1028,28 +1098,85 @@ async function loadZoneConfirmations(position) {
   if (!error) status.textContent = `${count || 0} ${m('confirmations')}`;
 }
 
-function renderTrendChart(container, rows) {
-  const target = container.querySelector('#zone-trend') || container.querySelector('.feature-status');
-  if (!target) return;
+function dataUiText(key) {
+  const guidance = {
+    es: { challengeHelp: 'El progreso se guarda en este navegador, incluidos los aportes pendientes de conexión.', measurementHelp: 'En el mapa, activa el micrófono y Compartir cuando quieras aportar.', reportHelp: 'Prepara un reporte de la categoría indicada. No necesitas activar el micrófono.', allIntro: 'Mediciones ciudadanas y reportes de todas las zonas con aportes.' },
+    en: { challengeHelp: 'Progress is saved in this browser, including contributions awaiting a connection.', measurementHelp: 'On the map, enable the microphone and sharing when you want to contribute.', reportHelp: 'Prepare a report in the indicated category. No microphone needed.', allIntro: 'Citizen measurements and reports from all areas with contributions.' },
+    pt: { challengeHelp: 'O progresso fica neste navegador, incluindo contribuições pendentes de conexão.', measurementHelp: 'No mapa, ative o microfone e o compartilhamento quando quiser contribuir.', reportHelp: 'Prepare um relato da categoria indicada. Não precisa ativar o microfone.', allIntro: 'Medições cidadãs e relatos de todas as áreas com contribuições.' }
+  };
+  if (key in guidance.es) return (guidance[currentLanguage] || guidance.es)[key];
+  const copy = {
+    es: { date: 'Fecha (UTC)', readings: 'Mediciones', average: 'Promedio en dB', missing: 'Sin mediciones', trend: 'Tendencia de 7 días; valores en la tabla.', table: 'Últimos 7 días · escala sin calibrar', all: 'Todas las zonas con aportes', retry: 'Reintentar', map: 'Ir al mapa', measure: 'Ir a medir', report: 'Preparar reporte', measurements: 'Retos de medición', reports: 'Acciones ciudadanas', personal: 'Progreso personal · últimos 30 días', changeUp: 'Aumento', changeDown: 'Descenso', unchanged: 'Sin cambio' },
+    en: { date: 'Date (UTC)', readings: 'Measurements', average: 'Average in dB', missing: 'No measurements', trend: '7-day trend; values in the table.', table: 'Last 7 days · uncalibrated scale', all: 'All areas with contributions', retry: 'Try again', map: 'Go to map', measure: 'Go to measure', report: 'Prepare report', measurements: 'Measurement challenges', reports: 'Citizen actions', personal: 'Personal progress · last 30 days', changeUp: 'Increase', changeDown: 'Decrease', unchanged: 'No change' },
+    pt: { date: 'Data (UTC)', readings: 'Medições', average: 'Média em dB', missing: 'Sem medições', trend: 'Tendência de 7 dias; valores na tabela.', table: 'Últimos 7 dias · escala sem calibração', all: 'Todas as áreas com contribuições', retry: 'Tentar novamente', map: 'Ir ao mapa', measure: 'Ir medir', report: 'Preparar relato', measurements: 'Desafios de medição', reports: 'Ações cidadãs', personal: 'Progresso pessoal · últimos 30 dias', changeUp: 'Aumento', changeDown: 'Queda', unchanged: 'Sem mudança' }
+  };
+  return (copy[currentLanguage] || copy.es)[key];
+}
+
+/** Siete días naturales UTC: un hueco significa falta de datos, nunca silencio. */
+function buildTrendSeries(rows, end = new Date()) {
   const days = new Map();
   rows.forEach((row) => {
     const date = row.created_at.slice(0, 10);
     if (!days.has(date)) days.set(date, []);
-    days.get(date).push(row.db_level);
+    days.get(date).push(row);
   });
-  const series = [...days.entries()].sort(([a], [b]) => a.localeCompare(b)).slice(-7).map(([date, values]) => ({ date, db: Math.round(values.reduce((sum, value) => sum + value, 0) / values.length) }));
-  if (!series.length) { target.textContent = u('emptyTrend'); return; }
-  const min = Math.min(...series.map((item) => item.db));
-  const max = Math.max(...series.map((item) => item.db));
+  return Array.from({ length: 7 }, (_, index) => {
+    const date = new Date(end);
+    date.setUTCDate(date.getUTCDate() - 6 + index);
+    const key = date.toISOString().slice(0, 10);
+    const readings = days.get(key) || [];
+    return { date: key, db: averageDb(readings), count: readings.length };
+  });
+}
+
+function renderTrendChart(container, rows) {
+  const target = container.querySelector('#zone-trend') || container.querySelector('.feature-status');
+  if (!target) return;
+  const series = buildTrendSeries(rows);
+  const measured = series.filter((item) => item.count);
+  const min = Math.min(...measured.map((item) => item.db));
+  const max = Math.max(...measured.map((item) => item.db));
   const range = Math.max(max - min, 1);
-  const coords = series.map((item, index) => `${20 + index * (260 / Math.max(series.length - 1, 1))},${100 - ((item.db - min) / range) * 70}`).join(' ');
   target.textContent = '';
-  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-  svg.setAttribute('viewBox', '0 0 300 120'); svg.setAttribute('role', 'img'); svg.setAttribute('aria-label', `Tendencia del ruido: ${series.map((item) => `${item.date}: ${item.db}`).join(', ')}`);
-  const polyline = document.createElementNS(svg.namespaceURI, 'polyline');
-  polyline.setAttribute('points', coords); polyline.setAttribute('fill', 'none'); polyline.setAttribute('stroke', '#2563eb'); polyline.setAttribute('stroke-width', '4'); polyline.setAttribute('stroke-linecap', 'round'); polyline.setAttribute('stroke-linejoin', 'round');
-  svg.appendChild(polyline); target.appendChild(svg);
-  const caption = document.createElement('p'); caption.textContent = `${series[0].date} – ${series.at(-1).date} · ${min}–${max} dB`; target.appendChild(caption);
+  if (measured.length) {
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('viewBox', '0 0 300 120');
+    svg.setAttribute('role', 'img'); svg.setAttribute('aria-label', dataUiText('trend'));
+    let previous = null;
+    series.forEach((item, index) => {
+      if (!item.count) { previous = null; return; }
+      const x = 20 + index * (260 / 6);
+      const y = max === min ? 65 : 100 - ((item.db - min) / range) * 70;
+      if (previous) {
+        const line = document.createElementNS(svg.namespaceURI, 'line');
+        for (const [key, value] of Object.entries({ x1: previous.x, y1: previous.y, x2: x, y2: y, stroke: 'currentColor', 'stroke-width': 3 })) line.setAttribute(key, value);
+        svg.appendChild(line);
+      }
+      const point = document.createElementNS(svg.namespaceURI, 'circle');
+      for (const [key, value] of Object.entries({ cx: x, cy: y, r: 4, fill: 'currentColor' })) point.setAttribute(key, value);
+      svg.appendChild(point); previous = { x, y };
+    });
+    target.appendChild(svg);
+  } else {
+    const message = document.createElement('p'); message.textContent = u('emptyTrend'); target.appendChild(message);
+  }
+  const table = document.createElement('table'); table.className = 'trend-table';
+  const caption = document.createElement('caption'); caption.textContent = dataUiText('table'); table.appendChild(caption);
+  const head = document.createElement('thead'), heading = document.createElement('tr');
+  for (const key of ['date', 'average', 'readings']) {
+    const cell = document.createElement('th'); cell.scope = 'col'; cell.textContent = dataUiText(key); heading.appendChild(cell);
+  }
+  head.appendChild(heading); table.appendChild(head);
+  const body = document.createElement('tbody');
+  for (const item of series) {
+    const row = document.createElement('tr');
+    for (const value of [item.date, item.count ? item.db : dataUiText('missing'), item.count]) {
+      const cell = document.createElement('td'); cell.textContent = value; row.appendChild(cell);
+    }
+    body.appendChild(row);
+  }
+  table.appendChild(body); target.appendChild(table);
 }
 
 async function loadZoneTrend(position) {
@@ -1058,7 +1185,7 @@ async function loadZoneTrend(position) {
   target.hidden = false;
   if (!supabaseClient) { target.textContent = noDataMessage(); return; }
   const center = snapToGrid(position.lat, position.lng);
-  const start = new Date(); start.setDate(start.getDate() - 7);
+  const start = new Date(); start.setUTCHours(0, 0, 0, 0); start.setUTCDate(start.getUTCDate() - 6);
   target.textContent = m('loadingTrend');
   try {
     const rows = await fetchFeatureMeasurements(start, new Date());
@@ -1100,7 +1227,7 @@ const CHALLENGE_DEFS = [
   { key: 'rush-hour', target: 3, type: 'measurement', titleKey: 'rushTitle', detailKey: 'rushDetail' },
   { key: 'quiet-route', target: 5, type: 'measurement', titleKey: 'quietTitle', detailKey: 'quietDetail' },
   { key: 'night-cover', target: 3, type: 'measurement', titleKey: 'nightTitle', detailKey: 'nightDetail' },
-  { key: 'litter-pickup', target: 3, type: 'report', kind: 'basura', needsPhoto: true,
+  { key: 'litter-pickup', target: 3, type: 'report', kind: 'basura', needsPhoto: true, distinctDays: true,
     titleKey: 'litterTitle', detailKey: 'litterDetail' },
   { key: 'report-works', target: 2, type: 'report', kind: 'obra', needsPhoto: false,
     titleKey: 'worksTitle', detailKey: 'worksDetail' }
@@ -1113,17 +1240,36 @@ function reportChallengeProgress(definitions) {
   for (const definition of definitions.filter((d) => d.type === 'report')) {
     const matching = rows.filter((row) => row.kind === definition.kind
       && (definition.needsPhoto ? row.withPhoto === 1 : true));
-    // Celda y día distintos, como en los retos de medición: repetir el mismo reporte
-    // cinco veces no es cubrir más.
-    const places = new Set();
+    const places = new Map();
     for (const row of matching) {
       const day = coDayKey(row.created_at);
       if (!day) continue;
-      places.add(`${Math.round(row.latitude / AGG_GRID)}_${Math.round(row.longitude / AGG_GRID)}|${day}`);
+      const place = `${Math.round(row.latitude / AGG_GRID)}_${Math.round(row.longitude / AGG_GRID)}`;
+      if (!places.has(place)) places.set(place, new Set());
+      places.get(place).add(day);
     }
-    byKind.set(definition.key, places.size);
+    // Obras: zonas distintas. Basura: cada aporte elegido exige zona Y día nuevos.
+    // Emparejar evita contar tres días de una sola zona o tres zonas el mismo día.
+    byKind.set(definition.key, definition.distinctDays ? countDistinctZoneDays(places) : places.size);
   }
   return byKind;
+}
+
+function countDistinctZoneDays(places) {
+  const assignments = new Map();
+  function assign(place, visited) {
+    for (const day of places.get(place)) {
+      if (visited.has(day)) continue;
+      visited.add(day);
+      if (!assignments.has(day) || assign(assignments.get(day), visited)) {
+        assignments.set(day, place);
+        return true;
+      }
+    }
+    return false;
+  }
+  for (const place of places.keys()) assign(place, new Set());
+  return assignments.size;
 }
 
 function renderChallengesPanel(panel) {
@@ -1132,10 +1278,29 @@ function renderChallengesPanel(panel) {
     title: u(definition.titleKey),
     detail: u(definition.detailKey)
   }));
-  panel.innerHTML = panelFrame(t('challengeTitle'), `<p>${t('challengeHelp')}</p><ul class="feature-list" id="challenge-list"></ul>`, panel);
+  panel.innerHTML = panelFrame(t('challengeTitle'), `<p class="data-scope">${dataUiText('personal')}</p><p>${dataUiText('challengeHelp')}</p><section class="challenge-group"><h3>${dataUiText('measurements')}</h3><p>${dataUiText('measurementHelp')}</p><ul class="feature-list" id="challenge-list"></ul></section><section class="challenge-group"><h3>${dataUiText('reports')}</h3><p>${dataUiText('reportHelp')}</p><ul class="feature-list" id="report-challenge-list"></ul></section>`, panel);
   panel.querySelector('[data-close]')?.addEventListener('click', closeFeaturePanel);
   const list = panel.querySelector('#challenge-list');
-  loadChallengeProgress(list, challenges);
+  loadChallengeProgress(list, challenges.filter((challenge) => challenge.type === 'measurement'));
+  loadChallengeProgress(panel.querySelector('#report-challenge-list'), challenges.filter((challenge) => challenge.type === 'report'));
+}
+
+/** Solo prepara la acción: no concede permisos ni publica aportes automáticamente. */
+function startChallenge(key) {
+  const challenge = CHALLENGE_DEFS.find((definition) => definition.key === key);
+  if (!challenge) return;
+  if (challenge.type === 'measurement') {
+    switchTab('map-view', document.querySelector('.tab-btn'));
+    document.getElementById('btn-toggle')?.focus();
+    return;
+  }
+  openStatsTab('report');
+  const kind = document.getElementById('report-kind');
+  if (kind) {
+    kind.value = challenge.kind;
+    kind.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+  document.getElementById('report-note')?.focus();
 }
 
 async function loadChallengeProgress(list, challenges) {
@@ -1187,7 +1352,9 @@ async function loadChallengeProgress(list, challenges) {
         <div class="challenge-track" role="progressbar" aria-label="${challenge.title}" aria-valuemin="0" aria-valuemax="${challenge.target}" aria-valuenow="${current}">
           <span class="challenge-fill"></span>
         </div>
-        <span class="challenge-state">${percentage === 100 ? `✓ ${u('completed')}` : `${percentage}% ${t('challengeProgress')}`}</span>`;
+        <span class="challenge-state">${percentage === 100 ? `✓ ${u('completed')}` : `${percentage}% ${t('challengeProgress')}`}</span>
+        ${percentage < 100 ? `<button type="button" data-challenge-action="${challenge.key}">${dataUiText(challenge.type === 'report' ? 'report' : 'measure')}</button>` : ''}`;
+      item.querySelector?.('[data-challenge-action]')?.addEventListener('click', () => startChallenge(challenge.key));
       if (percentage === 100) item.classList.add('completed');
       list.appendChild(item);
     });
@@ -1279,7 +1446,7 @@ function updateStaticLanguage() {
   if (infoCopy[0]) infoCopy[0].textContent = copy.privacyCopy;
   if (infoCopy[1]) infoCopy[1].textContent = copy.mapHelpCopy;
   const statsTitle = document.querySelector('.stats-page-header h1'); if (statsTitle) statsTitle.textContent = copy.statsTitle;
-  const statsIntro = document.querySelector('.stats-page-header p'); if (statsIntro) statsIntro.textContent = copy.statsIntro;
+  const statsIntro = document.querySelector('.stats-page-header p'); if (statsIntro) statsIntro.textContent = dataUiText('allIntro');
   document.querySelectorAll('.stats-section-btn').forEach((button, index) => { if (copy.tabs[index]) button.textContent = copy.tabs[index]; });
   const handle = document.getElementById('stats-handle-label');
   const filtersLabel = document.getElementById('map-filters-label');
