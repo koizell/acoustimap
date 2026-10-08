@@ -53,4 +53,9 @@ test('publicación: incluye los recursos de la app y excluye código privado, pr
   assert.notEqual(disconnectedBuild.status, 0);
   assert.match(disconnectedBuild.stderr, /Supabase sin configurar/);
   assert.match(fs.readFileSync(path.join(dist, 'js/config.local.js'), 'utf8'), /public-fixture/);
+  fs.writeFileSync(path.join(root, 'js/config.local.js'), 'window.__ACOUSTIMAP_CONFIG__ = { SUPABASE_URL: "https://fixture.supabase.co", SUPABASE_ANON_KEY: "sb_secret_ficticia-no-real" };');
+  const privilegedBuild = spawnSync(process.execPath, ['scripts/build-site.js'], { cwd: root, encoding: 'utf8' });
+  assert.notEqual(privilegedBuild.status, 0, 'no empaquetar una clave secreta aunque la configuración se haya escrito a mano');
+  assert.equal(privilegedBuild.stderr.includes('sb_secret_ficticia-no-real'), false);
+  assert.match(fs.readFileSync(path.join(dist, 'js/config.local.js'), 'utf8'), /public-fixture/);
 });

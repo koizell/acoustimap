@@ -12,6 +12,8 @@ function buildInTemporaryDirectory(t, values) {
   t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
   fs.mkdirSync(path.join(directory, 'js'));
   fs.copyFileSync(path.join(__dirname, '..', 'build-config.js'), path.join(directory, 'build-config.js'));
+  fs.mkdirSync(path.join(directory, 'scripts'));
+  fs.copyFileSync(path.join(__dirname, '..', 'scripts', 'public-config.js'), path.join(directory, 'scripts', 'public-config.js'));
   const env = { ...process.env };
   delete env.SUPABASE_URL;
   delete env.SUPABASE_ANON_KEY;
@@ -40,4 +42,22 @@ test('configuración: no imprime fragmentos de la clave en los logs', (t) => {
   const result = buildInTemporaryDirectory(t, { SUPABASE_URL: 'https://example.supabase.co', SUPABASE_ANON_KEY: key });
   assert.equal(result.status, 0);
   assert.equal(`${result.stdout}${result.stderr}`.includes(key.slice(0, 20)), false);
+});
+
+test('configuración: rechaza claves privilegiadas antes de crear el archivo público', (t) => {
+  const privilegedJwt = `${Buffer.from('{"alg":"HS256"}').toString('base64url')}.${Buffer.from('{"role":"service_role"}').toString('base64url')}.firma-de-prueba`;
+  for (const key of ['sb_secret_ficticia-no-real', privilegedJwt]) {
+    const result = buildInTemporaryDirectory(t, { SUPABASE_URL: 'https://example.supabase.co', SUPABASE_ANON_KEY: key });
+    assert.notEqual(result.status, 0, 'una clave privilegiada no puede descargarse en el frontend');
+    assert.equal(fs.existsSync(result.output), false);
+    assert.equal(`${result.stdout}${result.stderr}`.includes(key), false);
+  }
+});
+
+test('configuración: permite claves anon JWT y publicables modernas', (t) => {
+  const anonJwt = `${Buffer.from('{"alg":"HS256"}').toString('base64url')}.${Buffer.from('{"role":"anon"}').toString('base64url')}.firma-de-prueba`;
+  for (const key of ['sb_publishable_ficticia-no-real', anonJwt]) {
+    const result = buildInTemporaryDirectory(t, { SUPABASE_URL: 'https://example.supabase.co', SUPABASE_ANON_KEY: key });
+    assert.equal(result.status, 0, result.stderr);
+  }
 });

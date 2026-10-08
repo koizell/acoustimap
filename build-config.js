@@ -11,6 +11,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { assertPublicSupabaseKey } = require('./scripts/public-config');
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY;
@@ -19,6 +20,9 @@ if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
   console.error('❌ Faltan variables de entorno: SUPABASE_URL y SUPABASE_ANON_KEY');
   process.exit(1);
 }
+
+try { assertPublicSupabaseKey(SUPABASE_ANON_KEY); }
+catch (error) { console.error(error.message); process.exit(1); }
 
 const configContent = `/**
  * config.local.js - GENERADO AUTOMÁTICAMENTE EN BUILD

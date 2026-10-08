@@ -6,6 +6,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
+const { assertPublicSupabaseKey } = require('./public-config');
 
 const root = path.resolve(__dirname, '..');
 const output = path.resolve(root, 'dist');
@@ -23,6 +24,7 @@ for (const file of files) {
 const configContext = { window: {} };
 vm.runInNewContext(fs.readFileSync(path.join(root, 'js/config.local.js'), 'utf8'), configContext, { timeout: 1000 });
 const config = configContext.window.__ACOUSTIMAP_CONFIG__;
+assertPublicSupabaseKey(config?.SUPABASE_ANON_KEY);
 if (!config?.SUPABASE_URL || !config?.SUPABASE_ANON_KEY
   || /TU-PROYECTO|TU_ANON_KEY_AQUI/.test(`${config.SUPABASE_URL} ${config.SUPABASE_ANON_KEY}`)) {
   throw new Error('Supabase sin configurar: genera js/config.local.js antes de preparar dist/.');
