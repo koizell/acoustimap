@@ -25,6 +25,9 @@ build/
 # Local Graphify knowledge graph and watcher output
 graphify-out/
 
+# Estado local de Codegraph MCP (configuración y memoria por proyecto)
+.codegraph/
+
 # Dependencias, resultados de pruebas y estado local de Supabase
 node_modules/
 coverage/
