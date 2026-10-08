@@ -17,6 +17,8 @@ function backendBrowser(reply) {
     clearCommunityLayers() {}, setCommunityHeatPoints() {}
   });
   browser.load('config.js', 'community.js');
+  // Frontera de dibujo: este dominio comprueba la conexión, no emula Leaflet.
+  browser.evaluate('addCommunityNoiseMarker = () => {}');
   return { ...browser, status, counter };
 }
 

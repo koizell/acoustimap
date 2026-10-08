@@ -46,6 +46,7 @@ function recordLocalChallengeMeasurement(measurement) {
       created_at: measurement.created_at
     });
     localStorage.setItem(CHALLENGE_STORE, JSON.stringify(rows.slice(-5000)));
+    if (typeof refreshRecognitionFromContributions === 'function') refreshRecognitionFromContributions();
   } catch (error) {
     console.warn('No se pudo guardar el progreso local:', error);
   }
@@ -92,6 +93,7 @@ function recordLocalChallengeReport(report, photo, createdAt) {
       created_at: createdAt || report.created_at
     });
     localStorage.setItem(REPORT_CHALLENGE_STORE, JSON.stringify(rows.slice(-2000)));
+    if (typeof refreshRecognitionFromContributions === 'function') refreshRecognitionFromContributions();
     return true;
   } catch (error) {
     // Un navegador con el almacenamiento lleno no debe impedir enviar el reporte:
@@ -118,9 +120,15 @@ let currentComparisonLayer = null;
 let comparisonRows = { current: [], previous: [] };
 let comparisonMode = null;
 let drawnZone = null;
+let activeZoneDrawer = null;
+let zoneDrawingVertices = 0;
 let selectedMapPoint = null;
-let currentLanguage = ['es', 'en', 'pt'].includes(localStorage.getItem('acoustimap-language'))
-  ? localStorage.getItem('acoustimap-language') : 'es';
+let currentLanguage = (() => {
+  try {
+    const language = localStorage.getItem('acoustimap-language');
+    return ['es', 'en', 'pt'].includes(language) ? language : 'es';
+  } catch (_) { return 'es'; }
+})();
 let pendingMapSelection = false;
 let pendingTrendSelection = false;
 let pendingReportSelection = false;
@@ -180,6 +188,8 @@ function isSchemaError(error) {
 
 const featureText = {
   es: {
+    noiseInteractionHint: 'Toca un icono de sonido para ver los datos de esa zona.',
+    noiseAnimationNote: 'Las barras animadas son decorativas: no indican audio en directo ni propagación del sonido.',
     tools: 'Herramientas', compare: 'Comparar mes', draw: 'Dibujar zona', report: 'Reportar ruido', stats: 'Estadísticas', challenges: 'Retos', theme: 'Tema oscuro', language: 'English', close: 'Cerrar',
     comparison: 'Antes y después', comparisonHelp: 'Compara los últimos 30 días con los 30 anteriores. Elige un periodo para verlo en el mapa.', loading: 'Cargando datos…', noData: 'No hay datos suficientes.', current: 'Últimos 30 días', previous: '30 días anteriores', average: 'Promedio en dB', difference: 'Cambio', index: 'dB', sector: 'sector', viewMap: 'Ver en mapa', viewCurrent: 'Ver periodo actual', viewPrevious: 'Ver periodo anterior', indexPoints: 'puntos de diferencia', summaryTitle: 'Resumen de 30 días',
     zone: 'Análisis de zona', zoneHelp: 'Dibuja un polígono sobre el mapa para calcular el promedio del área.', drawAction: 'Activar dibujo', clear: 'Limpiar zona', noZone: 'Aún no hay una zona seleccionada.', measurements: 'mediciones',
@@ -188,6 +198,8 @@ const featureText = {
     challengeTitle: 'Retos', challengeHelp: 'El progreso se guarda en este navegador con tus aportaciones de los últimos 30 días, incluidas las pendientes de conexión. Los retos de huella se completan con un reporte; los de ruido, midiendo. Activa Compartir para aportar.', challengeProgress: 'progreso', offline: 'Medición guardada sin conexión.'
   },
   en: {
+    noiseInteractionHint: 'Tap a sound icon to view the data for that area.',
+    noiseAnimationNote: 'Animated bars are decorative: they do not indicate live audio or sound propagation.',
     tools: 'Tools', compare: 'Compare month', draw: 'Draw zone', report: 'Report noise', stats: 'Statistics', challenges: 'Challenges', theme: 'Dark theme', language: 'Português', close: 'Close',
     comparison: 'Before and after', comparisonHelp: 'Compare the last 30 days with the 30 days before. Choose a period to see it on the map.', loading: 'Loading data…', noData: 'Not enough data.', current: 'Last 30 days', previous: 'Previous 30 days', average: 'Average in dB', difference: 'Change', index: 'dB', sector: 'area', viewMap: 'View on map', viewCurrent: 'View current period', viewPrevious: 'View previous period', indexPoints: 'point difference', summaryTitle: '30-day summary',
     zone: 'Zone analysis', zoneHelp: 'Draw a polygon on the map to calculate the area average.', drawAction: 'Enable drawing', clear: 'Clear zone', noZone: 'No zone selected yet.', measurements: 'measurements',
@@ -196,6 +208,8 @@ const featureText = {
     challengeTitle: 'Challenges', challengeHelp: 'Progress is saved in this browser from your contributions over the last 30 days, including those awaiting a connection. Impact challenges are completed with a report; noise ones, by measuring. Enable sharing to contribute.', challengeProgress: 'progress', offline: 'Measurement saved offline.'
   },
   pt: {
+    noiseInteractionHint: 'Toque em um ícone de som para ver os dados daquela área.',
+    noiseAnimationNote: 'As barras animadas são decorativas: não indicam áudio ao vivo nem propagação do som.',
     tools: 'Ferramentas', compare: 'Comparar mês', draw: 'Desenhar zona', report: 'Relatar ruído', stats: 'Estatísticas', challenges: 'Desafios', theme: 'Tema escuro', language: 'Español', close: 'Fechar',
     comparison: 'Antes e depois', comparisonHelp: 'Compare os últimos 30 dias com os 30 dias anteriores. Escolha um período para ver no mapa.', loading: 'Carregando dados…', noData: 'Dados insuficientes.', current: 'Últimos 30 dias', previous: '30 dias anteriores', average: 'Média em dB', difference: 'Mudança', index: 'dB', sector: 'setor', viewMap: 'Ver no mapa', viewCurrent: 'Ver período atual', viewPrevious: 'Ver período anterior', indexPoints: 'pontos de diferença', summaryTitle: 'Resumo de 30 dias',
     zone: 'Análise da zona', zoneHelp: 'Desenhe um polígono no mapa para calcular a média da área.', drawAction: 'Ativar desenho', clear: 'Limpar zona', noZone: 'Nenhuma zona selecionada.', measurements: 'medições',
@@ -305,11 +319,13 @@ function createFeatureUi() {
     createFeatureUi.dismissBound = true;
     document.addEventListener('keydown', (event) => {
       if (event.key === 'Escape') {
+        dismissRecognitionBadges();
         closeFeatureMenu(true);
         if (pendingMapSelection || pendingTrendSelection || pendingReportSelection) cancelMapSelection(true);
       }
     });
     document.addEventListener('pointerdown', (event) => {
+      if (!event.target.closest?.('.recognition-badge')) dismissRecognitionBadges();
       const current = document.querySelector('.feature-toolbar');
       if (current && !current.contains(event.target)) closeFeatureMenu();
     });
@@ -345,6 +361,7 @@ function updateMapSelectionUi() {
 }
 
 function beginMapSelection(kind) {
+  cancelZoneDrawing();
   cancelMapSelection();
   pendingMapSelection = kind === 'confirm';
   pendingTrendSelection = kind === 'trend';
@@ -576,10 +593,13 @@ function activateComparisonLayer() {
     radius: 42, blur: 30, maxZoom: 0, max: 1, minOpacity: 0.3,
     gradient: { 0.2: '#10b981', 0.55: '#f59e0b', 1: '#dc2626' }
   });
+  const interaction = captureCommunityInteraction();
   communityLayer.clearLayers();
   suspendMapHeatLayers();
   if (selectedVisualMode === 'zones') {
-    aggregated.forEach((point) => addCommunityPoint(point.lat, point.lng, point.db, point.category, point.createdAt, point.sampleCount));
+    aggregated.forEach((point, index) => addCommunityPoint(point.lat, point.lng, point.db, point.category,
+      point.createdAt, point.sampleCount, index < COMMUNITY_ANIMATED_MARKER_LIMIT));
+    restoreCommunityInteraction(interaction);
     return;
   }
   const layer = comparisonMode === 'previous' ? comparisonLayer : currentComparisonLayer;
@@ -587,6 +607,9 @@ function activateComparisonLayer() {
   if (!points.length) return;
   layer.addTo(map);
   layer.setLatLngs(points);
+  aggregated.forEach((point, index) => addCommunityNoiseMarker(point.lat, point.lng, point.db, point.category,
+    point.createdAt, point.sampleCount, false, index < COMMUNITY_ANIMATED_MARKER_LIMIT));
+  restoreCommunityInteraction(interaction);
 }
 
 function exitComparisonMode() {
@@ -595,21 +618,171 @@ function exitComparisonMode() {
   detachHeatLayer(currentComparisonLayer);
 }
 
+/** Copy de la ayuda del icono «i» y del dibujo; no ejecuta las acciones descritas. */
+function startUiText(key) {
+  const copy = {
+    es: {
+      title: 'Ayuda e información', help: 'Cómo usar AcoustiMap', label: 'Ayuda: cómo usar AcoustiMap', close: 'Cerrar ayuda',
+      intro: 'Puedes consultar el mapa sin micrófono ni permiso de ubicación.',
+      exploreTitle: 'Explora', explore: 'Toca un icono de sonido para ver sus datos. En Filtros elige el periodo y la franja horaria.',
+      measureTitle: 'Mide si quieres', measure: 'Pulsa Medir y acepta el permiso del micrófono. No se graba audio.',
+      shareTitle: 'Comparte, solo si quieres', share: 'Pulsa Compartir y acepta la ubicación para aportar el índice y una zona aproximada de 70 m, nunca audio.',
+      drawTitle: 'Analiza una zona', draw: 'Abre ⋯ → Dibujar zona. Marca al menos 3 puntos y pulsa Ver análisis.',
+      data: 'Estadísticas / Datos: tendencias, reportes y comparaciones.',
+      private: 'Medir no comparte por sí solo. Compartir es opcional.', drawing: 'Marca el área que quieres analizar',
+      first: 'Toca al menos 3 puntos del mapa para rodear el área.', next: 'Sigue marcando el contorno: necesitas al menos 3 puntos.',
+      ready: 'Ya puedes pulsar Ver análisis o tocar el primer punto para cerrar el área.', finish: 'Ver análisis', undo: 'Deshacer punto', cancel: 'Cancelar',
+      intersection: 'El contorno no puede cruzarse. Prueba otro punto o usa Deshacer punto.',
+      unavailable: 'El dibujo no está disponible. Puedes consultar los iconos del mapa o la pestaña Datos.'
+    },
+    en: {
+      title: 'Help and information', help: 'How to use AcoustiMap', label: 'Help: how to use AcoustiMap', close: 'Close help',
+      intro: 'You can explore the map without microphone or location permission.',
+      exploreTitle: 'Explore', explore: 'Tap a sound icon to see its data. In Filters choose the period and time of day.',
+      measureTitle: 'Measure if you want', measure: 'Select Measure and allow microphone access. No audio is recorded.',
+      shareTitle: 'Share, only if you want', share: 'Select Share and allow location access to contribute the index and an approximate 70 m area, never audio.',
+      drawTitle: 'Analyze an area', draw: 'Open ⋯ → Draw zone. Mark at least 3 points and select View analysis.',
+      data: 'Statistics / Data: trends, reports, and comparisons.',
+      private: 'Measuring alone does not share data. Sharing is optional.', drawing: 'Mark the area you want to analyze',
+      first: 'Tap at least 3 map points around the area.', next: 'Keep marking the outline: you need at least 3 points.',
+      ready: 'You can now select View analysis or tap the first point to close the area.', finish: 'View analysis', undo: 'Undo point', cancel: 'Cancel',
+      intersection: 'The outline cannot cross itself. Try another point or select Undo point.',
+      unavailable: 'Drawing is unavailable. You can explore map icons or the Data tab.'
+    },
+    pt: {
+      title: 'Ajuda e informações', help: 'Como usar o AcoustiMap', label: 'Ajuda: como usar o AcoustiMap', close: 'Fechar ajuda',
+      intro: 'Pode consultar o mapa sem permissão de microfone nem de localização.',
+      exploreTitle: 'Explore', explore: 'Toque num ícone de som para ver os dados. Em Filtros escolha o período e a faixa horária.',
+      measureTitle: 'Meça se quiser', measure: 'Toque em Medir e permita o microfone. O áudio não é gravado.',
+      shareTitle: 'Compartilhe, só se quiser', share: 'Toque em Compartilhar e permita a localização para contribuir com o índice e uma área aproximada de 70 m, nunca áudio.',
+      drawTitle: 'Analise uma área', draw: 'Abra ⋯ → Desenhar zona. Marque pelo menos 3 pontos e toque em Ver análise.',
+      data: 'Estatísticas / Dados: tendências, relatos e comparações.',
+      private: 'Medir não compartilha por si só. Compartilhar é opcional.', drawing: 'Marque a área que deseja analisar',
+      first: 'Toque em pelo menos 3 pontos do mapa ao redor da área.', next: 'Continue marcando o contorno: precisa de pelo menos 3 pontos.',
+      ready: 'Já pode escolher Ver análise ou tocar no primeiro ponto para fechar a área.', finish: 'Ver análise', undo: 'Desfazer ponto', cancel: 'Cancelar',
+      intersection: 'O contorno não pode se cruzar. Tente outro ponto ou use Desfazer ponto.',
+      unavailable: 'O desenho não está disponível. Pode consultar os ícones do mapa ou a aba Dados.'
+    }
+  };
+  return (copy[currentLanguage] || copy.es)[key];
+}
+
+function updateMapHelpLanguage() {
+  const labels = { 'legend-title': 'title', 'legend-help-title': 'help', 'legend-help-intro': 'intro',
+    'legend-help-explore-title': 'exploreTitle', 'legend-help-explore': 'explore',
+    'legend-help-measure-title': 'measureTitle', 'legend-help-measure': 'measure',
+    'legend-help-share-title': 'shareTitle', 'legend-help-share': 'share',
+    'legend-help-draw-title': 'drawTitle', 'legend-help-draw': 'draw', 'legend-help-data': 'data',
+    'measure-start-hint': 'private', 'zone-drawing-title': 'drawing',
+    'zone-drawing-finish': 'finish', 'zone-drawing-undo': 'undo', 'zone-drawing-cancel': 'cancel' };
+  Object.entries(labels).forEach(([id, key]) => {
+    const element = document.getElementById(id); if (element) element.textContent = startUiText(key);
+  });
+  const toggle = document.getElementById('legend-toggle');
+  toggle?.setAttribute('aria-label', startUiText('label'));
+  toggle?.setAttribute('title', startUiText('help'));
+  document.querySelector('.legend-close')?.setAttribute('aria-label', startUiText('close'));
+  updateZoneDrawingUi();
+}
+
+function updateZoneDrawingUi(event) {
+  if (event?.layers) zoneDrawingVertices = event.layers.getLayers().length;
+  const step = document.getElementById('zone-drawing-step');
+  if (step) step.textContent = startUiText(zoneDrawingVertices >= 3 ? 'ready' : zoneDrawingVertices ? 'next' : 'first');
+  const finish = document.getElementById('zone-drawing-finish');
+  const undo = document.getElementById('zone-drawing-undo');
+  if (finish) finish.disabled = zoneDrawingVertices < 3;
+  if (undo) undo.disabled = zoneDrawingVertices < 1;
+}
+
+function cancelZoneDrawing(restoreFocus = false) {
+  const drawer = activeZoneDrawer;
+  activeZoneDrawer = null;
+  map.off?.('draw:created', handleZoneCreated);
+  map.off?.('draw:drawvertex', updateZoneDrawingUi);
+  map.off?.('draw:drawstop', handleZoneDrawingStopped);
+  drawer?.disable();
+  zoneDrawingVertices = 0;
+  const help = document.getElementById('zone-drawing-help'); if (help) help.hidden = true;
+  document.getElementById('map-view')?.removeAttribute('data-drawing');
+  if (restoreFocus) document.querySelector('.feature-menu-toggle')?.focus();
+}
+
+function handleZoneDrawingStopped() { cancelZoneDrawing(true); }
+
+function handleZoneCreated(event) {
+  cancelZoneDrawing();
+  if (drawnZone) map.removeLayer(drawnZone);
+  drawnZone = event.layer.addTo(map);
+  analyzeDrawnZone(drawnZone.getLatLngs()[0]);
+}
+
+function canFinishZoneDrawing() {
+  if (zoneDrawingVertices < 3 || !activeZoneDrawer) return false;
+  // Draw 1.0.4 valida segmentos nuevos, pero su validez de polígono solo exige
+  // tres puntos. Comprobar también el cierre, sin los segmentos adyacentes.
+  const first = activeZoneDrawer._markers?.[0];
+  if (first && activeZoneDrawer._poly?.newLatLngIntersects(first.getLatLng(), true)) {
+    const step = document.getElementById('zone-drawing-step');
+    if (step) step.textContent = startUiText('intersection');
+    return false;
+  }
+  return true;
+}
+
+function finishZoneDrawing() {
+  if (canFinishZoneDrawing()) activeZoneDrawer.completeShape();
+}
+
+function undoZoneDrawing() {
+  // Draw 1.0.4 deja el primer vértice al llamar a deleteLastVertex.
+  if (zoneDrawingVertices === 1) enableZoneDrawing();
+  else activeZoneDrawer?.deleteLastVertex();
+}
+
 function enableZoneDrawing() {
   if (!window.L || !L.Draw) {
-    alert('El dibujo de zonas no está disponible en este momento.');
+    alert(startUiText('unavailable'));
     return;
   }
-  const drawer = new L.Draw.Polygon(map, { allowIntersection: false, showArea: true, shapeOptions: { color: '#2563eb', fillOpacity: 0.12 } });
-  drawer.enable();
-  map.once(L.Draw.Event.CREATED, (event) => {
-    if (drawnZone) map.removeLayer(drawnZone);
-    drawnZone = event.layer.addTo(map);
-    analyzeDrawnZone(drawnZone.getLatLngs()[0]);
+  cancelZoneDrawing();
+  cancelMapSelection();
+  closeFeatureMenu();
+  const filters = document.getElementById('map-filters'); if (filters) filters.open = false;
+  const legend = document.getElementById('map-legend');
+  if (legend && !legend.classList.contains('collapsed')) toggleLegend();
+  switchTab('map-view', document.querySelector('.tab-btn'));
+  const meterPanel = document.getElementById('stats-panel');
+  if (meterPanel && !meterPanel.classList.contains('collapsed')) toggleStatsPanel();
+  // Leaflet.Draw también muestra una ayuda junto al cursor; no dejarla en inglés.
+  Object.assign(L.drawLocal.draw.handlers.polygon.tooltip, {
+    start: startUiText('first'), cont: startUiText('next'), end: startUiText('ready')
   });
+  L.drawLocal.draw.handlers.polyline.error = startUiText('intersection');
+  activeZoneDrawer = new L.Draw.Polygon(map, { allowIntersection: false, showArea: false, shapeOptions: { color: '#2563eb', fillOpacity: 0.12 } });
+  // Los cierres nativos y completeShape usan _shapeIsValid: ampliar solo esta
+  // instancia conserva la validación original y añade la guarda del cierre.
+  const nativeShapeIsValid = activeZoneDrawer._shapeIsValid.bind(activeZoneDrawer);
+  activeZoneDrawer._shapeIsValid = () => nativeShapeIsValid() && canFinishZoneDrawing();
+  map.on('draw:created', handleZoneCreated);
+  map.on('draw:drawvertex', updateZoneDrawingUi);
+  map.on('draw:drawstop', handleZoneDrawingStopped);
+  document.getElementById('zone-drawing-help').hidden = false;
+  document.getElementById('map-view').setAttribute('data-drawing', 'true');
+  updateZoneDrawingUi();
+  activeZoneDrawer.enable();
+  // Este marcador invisible solo captura punteros; no es un botón operable.
+  const mouseMarker = document.querySelector('.leaflet-mouse-marker');
+  if (mouseMarker) {
+    mouseMarker.setAttribute('aria-hidden', 'true');
+    mouseMarker.setAttribute('tabindex', '-1');
+    mouseMarker.removeAttribute('role');
+  }
+  map.getContainer()?.focus();
 }
 
 function clearDrawnZone() {
+  cancelZoneDrawing();
   if (drawnZone) map.removeLayer(drawnZone);
   drawnZone = null;
   exitComparisonMode();
@@ -635,9 +808,21 @@ async function analyzeDrawnZone(polygon) {
   openStatsTab('stats', false);
   const panel = document.getElementById('stats-feature-content');
   panel.dataset.subview = 'zone';
-  panel.innerHTML = panelFrame(t('zone'), `<p>${t('zoneHelp')} (${u('last30')})</p><div class="feature-status">${t('loading')}</div><div id="zone-trend" class="feature-status"></div>`, panel);
+  panel.innerHTML = panelFrame(t('zone'), `
+    <p class="zone-analysis-scope">${zoneUiText('polygonScope')}</p>
+    <div class="zone-analysis-actions"><button type="button" class="zone-back-map">${zoneUiText('backMap')}</button><button type="button" class="zone-analysis-retry" hidden>${dataUiText('retry')}</button></div>
+    <p class="feature-status zone-analysis-status" role="status" aria-live="polite" aria-busy="true" data-state="loading">${t('loading')}</p>
+    <div class="zone-analysis-summary" hidden></div>
+    <div id="zone-trend" class="feature-status"></div>`, panel);
   const zoneTrend = panel.querySelector('#zone-trend');
+  const status = panel.querySelector('.zone-analysis-status');
   panel.querySelector('[data-close]')?.addEventListener('click', closeFeaturePanel);
+  panel.querySelector('.zone-back-map').addEventListener('click', () => {
+    switchTab('map-view', document.querySelector('.tab-btn'));
+    if (drawnZone) map.fitBounds(drawnZone.getBounds(), { padding: [24, 24] });
+    map.getContainer()?.focus();
+  });
+  panel.querySelector('.zone-analysis-retry').addEventListener('click', () => analyzeDrawnZone(polygon));
   try {
     const end = new Date();
     const start = new Date(end);
@@ -645,12 +830,20 @@ async function analyzeDrawnZone(polygon) {
     const rows = await fetchFeatureMeasurements(start, end);
     const selected = rows.filter((row) => pointInPolygon({ lat: row.latitude, lng: row.longitude }, polygon));
     if (!panelIsCurrent(panel, 'stats') || panel.dataset.subview !== 'zone' || panel.querySelector('#zone-trend') !== zoneTrend) return;
-    panel.querySelector('.feature-status').textContent = selected.length ? `${t('average')}: ${averageDb(selected)} · ${selected.length} ${t('measurements')} (${u('last30')})` : noDataMessage();
-    renderTrendChart(panel, selected);
+    const summary = panel.querySelector('.zone-analysis-summary');
+    summary.innerHTML = zoneSummaryHtml(selected, start, end);
+    summary.hidden = false;
+    status.textContent = selected.length ? zoneUiText('summaryReady') : noDataMessage();
+    status.dataset.state = selected.length ? 'ready' : 'empty';
+    status.setAttribute('aria-busy', 'false');
+    renderTrendChart(panel, selected, end);
   } catch (error) {
     if (supabaseClient) console.error('Error analizando zona:', error);
     if (panelIsCurrent(panel, 'stats') && panel.dataset.subview === 'zone' && panel.querySelector('#zone-trend') === zoneTrend) {
-      panel.querySelector('.feature-status').textContent = error.message || m('analyzingError');
+      status.textContent = supabaseClient ? m('analyzingError') : m('connect');
+      status.dataset.state = supabaseClient ? 'error' : 'disconnected';
+      status.setAttribute('aria-busy', 'false');
+      panel.querySelector('.zone-analysis-retry').hidden = false;
     }
   }
 }
@@ -1130,42 +1323,168 @@ function buildTrendSeries(rows, end = new Date()) {
   });
 }
 
-function renderTrendChart(container, rows) {
+/** Interfaz propia inspirada en Line Chart / Advanced Stats de 21st, sin React. */
+function zoneUiText(key) {
+  const copy = {
+    es: {
+      polygonScope: 'Solo mediciones con ubicación aproximada dentro del área dibujada.',
+      backMap: 'Ver área en el mapa', summaryTitle: 'Resumen de 30 días', summaryReady: 'Análisis del área seleccionada.',
+      average: 'Índice medio', readings: 'Mediciones', zones: 'Zonas con aportes', relative: 'Escala relativa sin calibrar',
+      method: 'Método', trendTitle: 'Promedio diario', trendPeriod: 'Últimos 7 días',
+      trendHelp: 'Toca o recorre la gráfica. Con el teclado, usa las flechas o Inicio y Fin para elegir un día.',
+      explore: 'Explorar la tendencia diaria', chooseDay: 'Elegir día', table: 'Ver tabla de los 7 días',
+      gaps: 'Los días sin mediciones quedan vacíos: no significan silencio.', axis: 'Escala fija de 30 a 95 · sin calibrar'
+    },
+    en: {
+      polygonScope: 'Only measurements with approximate locations inside the drawn area.',
+      backMap: 'View area on the map', summaryTitle: '30-day summary', summaryReady: 'Selected area analysis.',
+      average: 'Average index', readings: 'Measurements', zones: 'Areas with contributions', relative: 'Uncalibrated relative scale',
+      method: 'Method', trendTitle: 'Daily average', trendPeriod: 'Last 7 days',
+      trendHelp: 'Tap or move across the chart. With a keyboard, use the arrows or Home and End to choose a day.',
+      explore: 'Explore the daily trend', chooseDay: 'Choose day', table: 'View the 7-day table',
+      gaps: 'Days without measurements remain empty: they do not mean silence.', axis: 'Fixed scale from 30 to 95 · uncalibrated'
+    },
+    pt: {
+      polygonScope: 'Só medições com localização aproximada dentro da área desenhada.',
+      backMap: 'Ver área no mapa', summaryTitle: 'Resumo de 30 dias', summaryReady: 'Análise da área selecionada.',
+      average: 'Índice médio', readings: 'Medições', zones: 'Áreas com contribuições', relative: 'Escala relativa sem calibração',
+      method: 'Método', trendTitle: 'Média diária', trendPeriod: 'Últimos 7 dias',
+      trendHelp: 'Toque ou percorra o gráfico. No teclado, use as setas ou Início e Fim para escolher um dia.',
+      explore: 'Explorar a tendência diária', chooseDay: 'Escolher dia', table: 'Ver tabela dos 7 dias',
+      gaps: 'Os dias sem medições ficam vazios: não significam silêncio.', axis: 'Escala fixa de 30 a 95 · sem calibração'
+    }
+  };
+  return (copy[currentLanguage] || copy.es)[key];
+}
+
+function formatTrendDate(value, short = false) {
+  const options = short ? { day: '2-digit', month: '2-digit', timeZone: 'UTC' }
+    : { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' };
+  return new Intl.DateTimeFormat(currentLanguage, options).format(new Date(`${value.slice(0, 10)}T12:00:00Z`));
+}
+
+function zoneSummaryHtml(rows, start, end) {
+  const metrics = [
+    ['average', averageDb(rows) ?? '—', zoneUiText('relative')],
+    ['readings', rows.length, `${zoneUiText('method')} v${MEASUREMENT_VERSION}`],
+    ['zones', aggregatePoints(rows).length, zoneUiText('polygonScope')]
+  ];
+  return `<section class="zone-summary" aria-label="${zoneUiText('summaryTitle')}">
+    <div class="zone-summary-heading"><h3>${zoneUiText('summaryTitle')}</h3><p>${formatTrendDate(start.toISOString())} — ${formatTrendDate(end.toISOString())} · UTC</p></div>
+    <div class="zone-summary-metrics">${metrics.map(([key, value, hint]) => `<div class="zone-summary-metric"><span>${zoneUiText(key)}</span><strong data-zone-metric="${key}">${value}</strong><small>${hint}</small></div>`).join('')}</div>
+  </section>`;
+}
+
+/** Coordenadas porcentuales: sin autoescala ni conexión a través de los huecos. */
+function buildTrendGeometry(series) {
+  const points = series.map((item, index) => item.count && Number.isFinite(item.db)
+    ? { index, x: index * 100 / (series.length - 1 || 1), y: (95 - item.db) * 100 / 65, db: item.db }
+    : null);
+  const segments = [];
+  for (let index = 1; index < points.length; index++) {
+    if (points[index - 1] && points[index]) segments.push([points[index - 1], points[index]]);
+  }
+  return { points, segments };
+}
+
+function trendIndexFromPointer(clientX, left, width, count = 7) {
+  if (!(width > 0)) return count - 1;
+  return Math.min(count - 1, Math.max(0, Math.round((clientX - left) / width * (count - 1))));
+}
+
+function trendReadingText(item) {
+  return `${formatTrendDate(item.date)} · UTC · ${item.count ? `${zoneUiText('average')}: ${item.db}` : dataUiText('missing')} · ${zoneUiText('readings')}: ${item.count}`;
+}
+
+function selectTrendDay(chart, series, index, focusButton = false) {
+  const item = series[index];
+  if (!item) return;
+  chart.dataset.selectedDay = String(index);
+  chart.querySelector('.trend-selected-date').textContent = `${formatTrendDate(item.date)} · UTC`;
+  chart.querySelector('.trend-selected-value').textContent = item.count ? String(item.db) : dataUiText('missing');
+  chart.querySelector('.trend-selected-count').textContent = `${zoneUiText('readings')}: ${item.count}`;
+  const plot = chart.querySelector('.trend-plot');
+  plot?.setAttribute('aria-valuenow', String(index + 1));
+  plot?.setAttribute('aria-valuetext', trendReadingText(item));
+  const crosshair = chart.querySelector('.trend-crosshair');
+  if (crosshair) crosshair.style.left = `${index * 100 / (series.length - 1 || 1)}%`;
+  chart.querySelectorAll('.trend-chart-dot').forEach((dot) => dot.classList.toggle('is-selected', Number(dot.dataset.day) === index));
+  chart.querySelectorAll('.trend-day-button').forEach((button, day) => {
+    button.setAttribute('aria-pressed', String(day === index));
+    button.tabIndex = day === index ? 0 : -1;
+    if (focusButton && day === index) button.focus({ preventScroll: true });
+  });
+  chart.querySelectorAll('.trend-table tbody tr').forEach((row, day) => row.classList.toggle('is-selected', day === index));
+}
+
+function renderTrendChart(container, rows, end = new Date()) {
   const target = container.querySelector('#zone-trend') || container.querySelector('.feature-status');
   if (!target) return;
-  const series = buildTrendSeries(rows);
+  const series = buildTrendSeries(rows, end);
   const measured = series.filter((item) => item.count);
-  const min = Math.min(...measured.map((item) => item.db));
-  const max = Math.max(...measured.map((item) => item.db));
-  const range = Math.max(max - min, 1);
+  const geometry = buildTrendGeometry(series);
   target.textContent = '';
+  target.classList.add('interactive-trend');
+  const chart = document.createElement('figure');
+  chart.className = 'trend-card';
+  chart.setAttribute('aria-label', zoneUiText('trendTitle'));
+  chart.innerHTML = `
+    <figcaption class="trend-chart-heading"><div><p class="trend-eyebrow">${zoneUiText('trendPeriod')}</p><h3>${zoneUiText('trendTitle')}</h3></div><p class="trend-period">${formatTrendDate(series[0].date)} — ${formatTrendDate(series[6].date)} · UTC</p></figcaption>
+    <p class="trend-scale-note">${zoneUiText('axis')}</p>
+    <div class="trend-readout"><div><span class="trend-selected-date"></span><span class="trend-value-label">${zoneUiText('average')}</span><strong class="trend-selected-value"></strong></div><span class="trend-selected-count"></span></div>`;
   if (measured.length) {
-    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-    svg.setAttribute('viewBox', '0 0 300 120');
-    svg.setAttribute('role', 'img'); svg.setAttribute('aria-label', dataUiText('trend'));
-    let previous = null;
+    const ticks = [95, 70, 55, 30];
+    const graph = document.createElement('div');
+    graph.className = 'trend-chart-grid';
+    graph.innerHTML = `<div class="trend-y-axis" aria-hidden="true">${ticks.map(value => `<span style="top:${(95 - value) * 100 / 65}%">${value}</span>`).join('')}</div>
+      <div class="trend-plot" role="slider" tabindex="0" aria-label="${zoneUiText('explore')}" aria-orientation="horizontal" aria-valuemin="1" aria-valuemax="7">
+        <svg viewBox="0 0 600 200" preserveAspectRatio="none" aria-hidden="true" focusable="false">
+          ${ticks.map(value => `<line class="trend-gridline" x1="0" x2="600" y1="${(95 - value) * 200 / 65}" y2="${(95 - value) * 200 / 65}" />`).join('')}
+          ${geometry.segments.map(([a, b]) => `<line class="trend-line" x1="${a.x * 6}" y1="${a.y * 2}" x2="${b.x * 6}" y2="${b.y * 2}" />`).join('')}
+        </svg>
+        <span class="trend-crosshair" aria-hidden="true"></span>
+        ${geometry.points.filter(Boolean).map(point => `<span class="trend-chart-dot trend-dot-${classifyDb(point.db)}" data-day="${point.index}" style="left:${point.x}%;top:${point.y}%" aria-hidden="true"></span>`).join('')}
+      </div>`;
+    chart.appendChild(graph);
+    const axis = document.createElement('div'); axis.className = 'trend-x-axis'; axis.setAttribute('aria-hidden', 'true');
+    axis.innerHTML = [0, 3, 6].map(index => `<span>${formatTrendDate(series[index].date, true)}</span>`).join('');
+    chart.appendChild(axis);
+    const help = document.createElement('p'); help.className = 'trend-interaction-help'; help.textContent = zoneUiText('trendHelp'); chart.appendChild(help);
+    const days = document.createElement('div'); days.className = 'trend-day-controls'; days.setAttribute('role', 'group'); days.setAttribute('aria-label', zoneUiText('chooseDay'));
     series.forEach((item, index) => {
-      if (!item.count) { previous = null; return; }
-      const x = 20 + index * (260 / 6);
-      const y = max === min ? 65 : 100 - ((item.db - min) / range) * 70;
-      if (previous) {
-        const line = document.createElementNS(svg.namespaceURI, 'line');
-        for (const [key, value] of Object.entries({ x1: previous.x, y1: previous.y, x2: x, y2: y, stroke: 'currentColor', 'stroke-width': 3 })) line.setAttribute(key, value);
-        svg.appendChild(line);
-      }
-      const point = document.createElementNS(svg.namespaceURI, 'circle');
-      for (const [key, value] of Object.entries({ cx: x, cy: y, r: 4, fill: 'currentColor' })) point.setAttribute(key, value);
-      svg.appendChild(point); previous = { x, y };
+      const button = document.createElement('button'); button.type = 'button'; button.className = 'trend-day-button';
+      button.textContent = formatTrendDate(item.date, true); button.setAttribute('aria-label', trendReadingText(item));
+      button.dataset.hasData = String(Boolean(item.count));
+      button.addEventListener('click', () => selectTrendDay(chart, series, index));
+      days.appendChild(button);
     });
-    target.appendChild(svg);
+    chart.appendChild(days);
+    const onKey = (event) => {
+      const index = Number(chart.dataset.selectedDay);
+      const next = { ArrowLeft: index - 1, ArrowDown: index - 1, ArrowRight: index + 1, ArrowUp: index + 1, Home: 0, End: 6, Escape: 6 }[event.key];
+      if (next === undefined) return;
+      event.preventDefault();
+      selectTrendDay(chart, series, Math.max(0, Math.min(6, next)), Boolean(event.target.closest('.trend-day-button')));
+    };
+    days.addEventListener('keydown', onKey);
+    const plot = graph.querySelector('.trend-plot'); plot.addEventListener('keydown', onKey);
+    const onPointer = (event) => {
+      const rect = plot.getBoundingClientRect();
+      selectTrendDay(chart, series, trendIndexFromPointer(event.clientX, rect.left, rect.width));
+    };
+    plot.addEventListener('pointerdown', (event) => { if (event.button === 0) onPointer(event); });
+    plot.addEventListener('pointermove', (event) => { if (event.pointerType === 'mouse' || event.buttons) onPointer(event); });
   } else {
-    const message = document.createElement('p'); message.textContent = u('emptyTrend'); target.appendChild(message);
+    const message = document.createElement('p'); message.className = 'trend-empty'; message.textContent = u('emptyTrend'); chart.appendChild(message);
   }
+  const note = document.createElement('p'); note.className = 'trend-gap-note'; note.textContent = zoneUiText('gaps'); chart.appendChild(note);
+  const details = document.createElement('details'); details.className = 'trend-data-table';
+  const toggle = document.createElement('summary'); toggle.textContent = zoneUiText('table'); details.appendChild(toggle);
   const table = document.createElement('table'); table.className = 'trend-table';
   const caption = document.createElement('caption'); caption.textContent = dataUiText('table'); table.appendChild(caption);
   const head = document.createElement('thead'), heading = document.createElement('tr');
   for (const key of ['date', 'average', 'readings']) {
-    const cell = document.createElement('th'); cell.scope = 'col'; cell.textContent = dataUiText(key); heading.appendChild(cell);
+    const cell = document.createElement('th'); cell.scope = 'col'; cell.textContent = key === 'average' ? zoneUiText(key) : dataUiText(key); heading.appendChild(cell);
   }
   head.appendChild(heading); table.appendChild(head);
   const body = document.createElement('tbody');
@@ -1176,24 +1495,39 @@ function renderTrendChart(container, rows) {
     }
     body.appendChild(row);
   }
-  table.appendChild(body); target.appendChild(table);
+  table.appendChild(body); details.appendChild(table); chart.appendChild(details); target.appendChild(chart);
+  selectTrendDay(chart, series, 6);
 }
 
 async function loadZoneTrend(position) {
   const target = document.getElementById('zone-trend');
   if (!target) return;
+  const requestToken = (target.trendRequestToken || 0) + 1;
+  target.trendRequestToken = requestToken;
   target.hidden = false;
-  if (!supabaseClient) { target.textContent = noDataMessage(); return; }
+  if (!supabaseClient) {
+    target.classList.remove('interactive-trend');
+    target.setAttribute('aria-busy', 'false');
+    target.textContent = noDataMessage();
+    return;
+  }
   const center = snapToGrid(position.lat, position.lng);
   const start = new Date(); start.setUTCHours(0, 0, 0, 0); start.setUTCDate(start.getUTCDate() - 6);
   target.textContent = m('loadingTrend');
+  target.classList.remove('interactive-trend');
+  target.setAttribute('aria-busy', 'true');
   try {
-    const rows = await fetchFeatureMeasurements(start, new Date());
-    if (!target.isConnected || document.getElementById('zone-trend') !== target) return;
+    const end = new Date();
+    const rows = await fetchFeatureMeasurements(start, end);
+    if (!target.isConnected || document.getElementById('zone-trend') !== target || target.trendRequestToken !== requestToken) return;
     const selected = rows.filter((row) => haversineDistance(center.lat, center.lng, row.latitude, row.longitude) <= 90);
-    renderTrendChart(target.parentElement, selected);
+    target.setAttribute('aria-busy', 'false');
+    renderTrendChart(target.parentElement, selected, end);
   } catch (error) {
-    if (target.isConnected) target.textContent = error.message || m('trendError');
+    if (target.isConnected && document.getElementById('zone-trend') === target && target.trendRequestToken === requestToken) {
+      target.setAttribute('aria-busy', 'false');
+      target.textContent = m('trendError');
+    }
   }
 }
 
@@ -1233,9 +1567,365 @@ const CHALLENGE_DEFS = [
     titleKey: 'worksTitle', detailKey: 'worksDetail' }
 ];
 
+// Reconocimiento local, no identidad de hardware. No guarda coordenadas ni
+// audio y nunca forma parte de payloads de Supabase o de la cola offline.
+const RECOGNITION_STORE = 'acoustimap-recognition';
+const RECOGNITION_DEFS = [
+  ...CHALLENGE_DEFS.map((challenge) => ({ key: challenge.key, points: 100 })),
+  { key: 'first-measurement', points: 25 }, { key: 'first-report', points: 25 },
+  { key: 'ten-zones', points: 75 }, { key: 'ten-days', points: 75 },
+  { key: 'streak-3', points: 50 }, { key: 'streak-7', points: 100 }, { key: 'streak-30', points: 200 }
+];
+const RECOGNITION_LEVELS = [0, 100, 250, 500, 900];
+let recognitionMemory = null;
+let recognitionStorageStatus = 'ok';
+let recognitionNoticeKeys = [];
+
+function recognitionText(key) {
+  const copy = {
+    es: {
+      title: 'Tu colección', help: 'Sin cuenta ni nombre. Se guarda en este navegador, no reconoce el celular. Tus insignias ganadas no caducan; el progreso de los retos usa los últimos 30 días.',
+      level: 'Nivel', points: 'puntos', streak: 'Racha actual', best: 'Mejor racha', days: 'días', earned: 'Insignia ganada', locked: 'Por desbloquear', next: 'puntos para el siguiente nivel', maximum: 'Nivel máximo',
+      rules: 'Cada reto otorga 100 puntos una sola vez. Los hitos y las rachas otorgan los puntos indicados, también una sola vez. Una aportación guardada (incluso pendiente de conexión) cuenta como día activo en hora de Colombia; abrir la app no cuenta.',
+      milestones: 'Hitos y constancia', challenges: 'Insignias de retos', collection: 'Mis insignias', about: 'Cómo se ganan', unlocked: 'Has desbloqueado:', close: 'Cerrar aviso de recompensa',
+      'first-measurement': 'Primera medición', 'first-report': 'Primer reporte', 'ten-zones': 'Explora 10 zonas', 'ten-days': 'Participa en 10 días',
+      'streak-3': 'Racha de 3 días', 'streak-7': 'Racha de 7 días', 'streak-30': 'Racha de 30 días',
+      backup: 'Conservar o recuperar mis logros', backupHelp: 'Si borras los datos del sitio, usas otro navegador o cambias de celular, perderás esta colección salvo que guardes el código. No es un login ni una contraseña. Contiene insignias, fechas de logro y hasta 400 días de actividad, sin ubicación ni audio. No incluye mediciones ni aportes pendientes. Un código antiguo no incluye logros posteriores.',
+      generate: 'Generar código de respaldo', generated: 'Código generado. Cópialo y guárdalo fuera de la app.', code: 'Mi código de respaldo', copy: 'Copiar código', copied: 'Código copiado.', copyFallback: 'No se pudo copiar automáticamente. Selecciona el código y cópialo manualmente.',
+      restoreCode: 'Código para recuperar', restore: 'Recuperar y unir logros', restoreHelp: 'Pega tu código. Se une a tu colección sin borrar logros actuales. No sincroniza celulares ni acredita aportes ante otras personas.', restored: 'Logros recuperados y unidos. No se reenviaron aportes.', invalid: 'Código inválido o dañado. No se cambió tu colección.',
+      unavailable: 'No se pudo guardar de forma persistente. Lo nuevo queda solo en esta visita: genera un respaldo antes de cerrar.', corrupt: 'Los datos de reconocimiento están dañados. No se sobrescribieron. Recupera una copia válida para guardarlos de nuevo.',
+      ruleFirstMeasurement: 'Guarda tu primera aportación de medición.', ruleFirstReport: 'Guarda tu primer reporte ciudadano.', ruleZones: 'Aporta en 10 zonas distintas dentro de 30 días.', ruleDays: 'Aporta en 10 días distintos.', ruleStreak3: 'Aporta 3 días consecutivos.', ruleStreak7: 'Aporta 7 días consecutivos.', ruleStreak30: 'Aporta 30 días consecutivos.'
+    },
+    en: {
+      title: 'Your collection', help: 'No account or name. Saved in this browser, not tied to your phone. Earned badges do not expire; challenge progress uses the last 30 days.',
+      level: 'Level', points: 'points', streak: 'Current streak', best: 'Best streak', days: 'days', earned: 'Badge earned', locked: 'To unlock', next: 'points to the next level', maximum: 'Maximum level',
+      rules: 'Each challenge awards 100 points only once. Milestones and streaks award the points shown, also only once. A saved contribution (including one waiting for a connection) counts as an active day in Colombian time; opening the app does not count.',
+      milestones: 'Milestones and consistency', challenges: 'Challenge badges', collection: 'My badges', about: 'How to earn them', unlocked: 'You unlocked:', close: 'Close reward notice',
+      'first-measurement': 'First measurement', 'first-report': 'First report', 'ten-zones': 'Explore 10 areas', 'ten-days': 'Contribute on 10 days',
+      'streak-3': '3-day streak', 'streak-7': '7-day streak', 'streak-30': '30-day streak',
+      backup: 'Keep or recover my achievements', backupHelp: 'Clearing site data, using another browser or changing phones loses this collection unless you save the code. It is not a login or password. It contains badges, award dates and up to 400 activity days, without location or audio. Measurements and pending contributions are not included. An old code does not include later achievements.',
+      generate: 'Generate backup code', generated: 'Code generated. Copy it and keep it outside the app.', code: 'My backup code', copy: 'Copy code', copied: 'Code copied.', copyFallback: 'Could not copy automatically. Select the code and copy it manually.',
+      restoreCode: 'Recovery code', restore: 'Recover and merge achievements', restoreHelp: 'Paste your code. It merges with your collection without deleting current achievements. It does not sync phones or certify contributions to others.', restored: 'Achievements recovered and merged. No contributions were resubmitted.', invalid: 'Invalid or damaged code. Your collection was not changed.',
+      unavailable: 'Could not save persistently. New achievements last only for this visit: generate a backup before closing.', corrupt: 'Recognition data is damaged. It was not overwritten. Recover a valid backup to save it again.',
+      ruleFirstMeasurement: 'Save your first measurement contribution.', ruleFirstReport: 'Save your first citizen report.', ruleZones: 'Contribute in 10 different areas within 30 days.', ruleDays: 'Contribute on 10 different days.', ruleStreak3: 'Contribute on 3 consecutive days.', ruleStreak7: 'Contribute on 7 consecutive days.', ruleStreak30: 'Contribute on 30 consecutive days.'
+    },
+    pt: {
+      title: 'Sua coleção', help: 'Sem conta nem nome. Fica neste navegador, não identifica o celular. As insígnias ganhas não expiram; o progresso dos desafios usa os últimos 30 dias.',
+      level: 'Nível', points: 'pontos', streak: 'Sequência atual', best: 'Melhor sequência', days: 'dias', earned: 'Insígnia ganha', locked: 'Para desbloquear', next: 'pontos para o próximo nível', maximum: 'Nível máximo',
+      rules: 'Cada desafio dá 100 pontos uma única vez. Marcos e sequências dão os pontos indicados, também uma única vez. Uma contribuição salva (mesmo aguardando conexão) conta como dia ativo no horário da Colômbia; abrir o app não conta.',
+      milestones: 'Marcos e constância', challenges: 'Insígnias de desafios', collection: 'Minhas insígnias', about: 'Como ganhar', unlocked: 'Você desbloqueou:', close: 'Fechar aviso de recompensa',
+      'first-measurement': 'Primeira medição', 'first-report': 'Primeiro relato', 'ten-zones': 'Explore 10 áreas', 'ten-days': 'Participe em 10 dias',
+      'streak-3': 'Sequência de 3 dias', 'streak-7': 'Sequência de 7 dias', 'streak-30': 'Sequência de 30 dias',
+      backup: 'Guardar ou recuperar conquistas', backupHelp: 'Ao apagar os dados do site, usar outro navegador ou trocar de celular, perde esta coleção se não guardar o código. Não é login nem senha. Contém insígnias, datas das conquistas e até 400 dias de atividade, sem localização nem áudio. Não inclui medições nem contribuições pendentes. Um código antigo não inclui conquistas posteriores.',
+      generate: 'Gerar código de backup', generated: 'Código gerado. Copie e guarde fora do app.', code: 'Meu código de backup', copy: 'Copiar código', copied: 'Código copiado.', copyFallback: 'Não foi possível copiar automaticamente. Selecione o código e copie manualmente.',
+      restoreCode: 'Código de recuperação', restore: 'Recuperar e unir conquistas', restoreHelp: 'Cole seu código. Será unido à coleção sem apagar conquistas atuais. Não sincroniza celulares nem certifica contribuições para terceiros.', restored: 'Conquistas recuperadas e unidas. Nenhuma contribuição foi reenviada.', invalid: 'Código inválido ou danificado. A coleção não foi alterada.',
+      unavailable: 'Não foi possível salvar de forma persistente. As novas conquistas ficam só nesta visita: gere um backup antes de fechar.', corrupt: 'Os dados de reconhecimento estão danificados. Não foram sobrescritos. Recupere uma cópia válida para salvar novamente.',
+      ruleFirstMeasurement: 'Salve sua primeira contribuição de medição.', ruleFirstReport: 'Salve seu primeiro relato cidadão.', ruleZones: 'Contribua em 10 áreas distintas dentro de 30 dias.', ruleDays: 'Contribua em 10 dias distintos.', ruleStreak3: 'Contribua em 3 dias consecutivos.', ruleStreak7: 'Contribua em 7 dias consecutivos.', ruleStreak30: 'Contribua em 30 dias consecutivos.'
+    }
+  };
+  return (copy[currentLanguage] || copy.es)[key] || key;
+}
+
+function recognitionTitle(key) {
+  const challenge = CHALLENGE_DEFS.find((item) => item.key === key);
+  return challenge ? u(challenge.titleKey) : recognitionText(key);
+}
+
+function recognitionIcon(key) {
+  const paths = {
+    'rush-hour': '<circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1 1m12 12 1 1M5 19l1-1M18 6l1-1"/>',
+    'quiet-route': '<path d="M5 3v5c0 4 14 4 14 8v5M3 3h4M17 21h4"/>',
+    'night-cover': '<path d="M20 15.5A9 9 0 0 1 8.5 4 9 9 0 1 0 20 15.5Z"/>',
+    'litter-pickup': '<path d="M20 3C9 2 3 8 4 15s11 9 14 0c1-3 2-7 2-12ZM4 21 15 10"/>',
+    'report-works': '<path d="M3 21h18M5 21V9h6v12M11 21V3h8v18M14 7h2m-2 4h2m-2 4h2"/>',
+    'first-measurement': '<rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10v2a7 7 0 0 0 14 0v-2M12 19v3M8 22h8"/>',
+    'first-report': '<path d="M6 3h12v18H6zM9 8h6m-6 4h6m-6 4h4"/>',
+    'ten-zones': '<circle cx="12" cy="12" r="9"/><path d="m16 8-3 5-5 3 3-5Z"/>',
+    'ten-days': '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 2v6M17 2v6M3 11h18m-13 5 2 2 5-4"/>'
+  };
+  return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${paths[key] || '<path d="M12 3c2 5 7 7 7 12a7 7 0 0 1-14 0c0-3 2-5 3-6 0 3 2 4 3 4 2-3 2-6 1-10Z"/>'}</svg>`;
+}
+
+function emptyRecognitionState() { return { version: 1, earned: {}, days: [], best: 0 }; }
+
+/** Esquema cerrado: el respaldo no puede transportar payloads o campos ocultos. */
+function validateRecognitionState(value) {
+  const validKeys = new Set(RECOGNITION_DEFS.map((item) => item.key));
+  const today = coDayKey(Date.now());
+  if (!value || Array.isArray(value) || value.version !== 1
+    || Object.keys(value).some((key) => !['version', 'earned', 'days', 'best'].includes(key))
+    || !value.earned || typeof value.earned !== 'object' || Array.isArray(value.earned)
+    || !Array.isArray(value.days) || value.days.length > 400
+    || !Number.isInteger(value.best) || value.best < 0 || value.best > 36500) throw new Error('Invalid recognition state');
+  const entries = Object.entries(value.earned);
+  for (const [key, date] of entries) {
+    const ms = Date.parse(date);
+    if (!validKeys.has(key) || typeof date !== 'string' || !Number.isFinite(ms) || ms < 0 || ms > Date.now()
+      || new Date(ms).toISOString() !== date) throw new Error('Invalid achievement');
+  }
+  for (const day of value.days) {
+    if (typeof day !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(day) || day < '1970-01-01' || day > today
+      || new Date(`${day}T00:00:00Z`).toISOString().slice(0, 10) !== day) throw new Error('Invalid activity day');
+  }
+  return { version: 1, earned: Object.fromEntries(entries), days: [...new Set(value.days)].sort(), best: value.best };
+}
+
+function mergeRecognitionStates(a, b) {
+  const earned = { ...a.earned };
+  for (const [key, date] of Object.entries(b.earned)) {
+    if (!earned[key] || date < earned[key]) earned[key] = date;
+  }
+  return { version: 1, earned, days: [...new Set([...a.days, ...b.days])].sort().slice(-400), best: Math.max(a.best, b.best) };
+}
+
+function getRecognitionState() {
+  let stored = emptyRecognitionState();
+  try {
+    const raw = localStorage.getItem(RECOGNITION_STORE);
+    try { if (raw) stored = validateRecognitionState(JSON.parse(raw)); }
+    catch (_) { recognitionStorageStatus = 'corrupt'; }
+  } catch (_) { recognitionStorageStatus = 'unavailable'; }
+  return mergeRecognitionStates(stored, recognitionMemory || emptyRecognitionState());
+}
+
+function saveRecognitionState(state, restore = false) {
+  recognitionMemory = state;
+  if (recognitionStorageStatus === 'corrupt' && !restore) return false;
+  try {
+    const encoded = JSON.stringify(state);
+    if (localStorage.getItem(RECOGNITION_STORE) !== encoded) localStorage.setItem(RECOGNITION_STORE, encoded);
+    recognitionStorageStatus = 'ok';
+    return true;
+  } catch (_) { recognitionStorageStatus = 'unavailable'; return false; }
+}
+
+function eligibleRecognitionMeasurements() {
+  return getLocalChallengeMeasurements().filter((row) => validRecognitionContribution(row)
+    && Number.isFinite(row.db_level) && row.db_level >= 30 && row.db_level <= 95);
+}
+
+function eligibleRecognitionReports() {
+  return getLocalChallengeReports().filter((row) => validRecognitionContribution(row) && REPORT_KINDS.includes(row.kind));
+}
+
+function validRecognitionContribution(row) {
+  const ms = Date.parse(row?.created_at);
+  return Boolean(row && Number.isFinite(ms) && ms <= Date.now() && ms >= Date.now() - 30 * 86400000
+    && Number.isFinite(row.latitude) && Math.abs(row.latitude) <= 90
+    && Number.isFinite(row.longitude) && Math.abs(row.longitude) <= 180);
+}
+
+function recognitionStreak(days) {
+  let best = 0, run = 0, previous = null;
+  for (const day of days) {
+    const ms = Date.parse(`${day}T00:00:00Z`);
+    run = previous !== null && ms - previous === 86400000 ? run + 1 : 1;
+    best = Math.max(best, run); previous = ms;
+  }
+  const last = days[days.length - 1];
+  // El día actual todavía puede completarse: una racha de ayer sigue vigente.
+  const today = coDayKey(Date.now()), yesterday = coDayKey(Date.now() - 86400000);
+  return { current: last === today || last === yesterday ? run : 0, best };
+}
+
+function recognitionSummary(state) {
+  const points = RECOGNITION_DEFS.reduce((sum, item) => sum + (state.earned[item.key] ? item.points : 0), 0);
+  const level = RECOGNITION_LEVELS.filter((threshold) => points >= threshold).length;
+  const streak = recognitionStreak(state.days);
+  return { points, level, current: streak.current, best: Math.max(state.best, streak.best), next: RECOGNITION_LEVELS[level] ?? null };
+}
+
+/** Reconcilia logros ya existentes y aportes aceptados; abrir la app no crea actividad. */
+function refreshRecognitionFromContributions(announce = true) {
+  const state = getRecognitionState();
+  const measurements = eligibleRecognitionMeasurements(), reports = eligibleRecognitionReports();
+  const contributions = [...measurements, ...reports];
+  state.days = [...new Set([...state.days, ...contributions.map((row) => coDayKey(row.created_at))])].sort().slice(-400);
+  state.best = Math.max(state.best, recognitionStreak(state.days).best);
+  const progress = calculateChallengeProgress();
+  const zones = new Set(contributions.map((row) => `${Math.round(row.latitude / AGG_GRID)}_${Math.round(row.longitude / AGG_GRID)}`));
+  const conditions = Object.fromEntries(CHALLENGE_DEFS.map((item) => [item.key, progress[item.key] >= item.target]));
+  Object.assign(conditions, { 'first-measurement': measurements.length > 0, 'first-report': reports.length > 0,
+    'ten-zones': zones.size >= 10, 'ten-days': state.days.length >= 10,
+    'streak-3': state.best >= 3, 'streak-7': state.best >= 7, 'streak-30': state.best >= 30 });
+  const newKeys = [];
+  for (const item of RECOGNITION_DEFS) {
+    if (conditions[item.key] && !state.earned[item.key]) {
+      state.earned[item.key] = new Date().toISOString(); newKeys.push(item.key);
+    }
+  }
+  saveRecognitionState(state);
+  if (announce && newKeys.length) {
+    recognitionNoticeKeys = newKeys;
+    const notice = document.getElementById('recognition-notice');
+    if (notice) { notice.hidden = false; updateRecognitionNoticeLanguage(); }
+  }
+  document.querySelectorAll?.('.recognition-panel').forEach((panel) => updateRecognitionCollection(panel, state));
+  return state;
+}
+
+function closeRecognitionNotice() {
+  const notice = document.getElementById('recognition-notice');
+  if (notice?.contains?.(document.activeElement)) document.querySelector('.tab-btn.active')?.focus();
+  if (notice) notice.hidden = true;
+}
+
+function updateRecognitionNoticeLanguage() {
+  const message = document.getElementById('recognition-notice-message');
+  if (message) message.textContent = `${recognitionText('unlocked')} ${recognitionNoticeKeys.map(recognitionTitle).join(', ')}`;
+  document.getElementById('recognition-notice-close')?.setAttribute('aria-label', recognitionText('close'));
+  document.getElementById('recognition-notice')?.setAttribute('aria-label', recognitionText('earned'));
+}
+
+function recognitionCollectionMarkup(state) {
+  const summary = recognitionSummary(state);
+  const groups = [RECOGNITION_DEFS.slice(0, 5), RECOGNITION_DEFS.slice(5)];
+  const rules = { 'first-measurement': 'ruleFirstMeasurement', 'first-report': 'ruleFirstReport', 'ten-zones': 'ruleZones',
+    'ten-days': 'ruleDays', 'streak-3': 'ruleStreak3', 'streak-7': 'ruleStreak7', 'streak-30': 'ruleStreak30' };
+  return `<h3>${recognitionText('title')}</h3>
+    <dl class="recognition-metrics"><div><dt>${recognitionText('level')}</dt><dd>${summary.level}</dd></div><div><dt>${recognitionText('points')}</dt><dd>${summary.points}</dd></div><div><dt>${recognitionText('streak')}</dt><dd>${summary.current} <small>${recognitionText('days')}</small></dd></div><div><dt>${recognitionText('best')}</dt><dd>${summary.best} <small>${recognitionText('days')}</small></dd></div></dl>
+    <p class="recognition-next">${summary.next === null ? recognitionText('maximum') : `${summary.next - summary.points} ${recognitionText('next')}`}</p>
+    <p class="recognition-warning" role="status" ${recognitionStorageStatus === 'ok' ? 'hidden' : ''}>${recognitionText(recognitionStorageStatus)}</p>
+    <details class="recognition-achievements" open><summary>${recognitionText('collection')} · ${Object.keys(state.earned).length}/${RECOGNITION_DEFS.length}</summary>
+    ${groups.map((items, index) => `<section class="recognition-badge-group"><h4>${recognitionText(index ? 'milestones' : 'challenges')}</h4><ul class="recognition-badges">${items.map((item) => {
+      const date = state.earned[item.key], challenge = CHALLENGE_DEFS.find((c) => c.key === item.key);
+      const title = recognitionTitle(item.key), status = recognitionText(date ? 'earned' : 'locked');
+      return `<li class="recognition-badge ${date ? 'is-earned' : ''}" data-reward="${item.key}">
+        <button type="button" class="recognition-medal" aria-label="${title} · ${status}" aria-describedby="recognition-tip-${item.key}">
+          <span class="recognition-icon">${recognitionIcon(item.key)}</span><span class="recognition-medal-state" aria-hidden="true">${date ? '✓' : '◇'}</span>
+          ${item.key.startsWith('streak-') ? `<span class="recognition-medal-number" aria-hidden="true">${item.key.split('-')[1]}</span>` : ''}
+        </button>
+        <div class="recognition-tooltip" id="recognition-tip-${item.key}" role="tooltip" hidden>
+          <strong>${title}</strong><p>${challenge ? u(challenge.detailKey) : recognitionText(rules[item.key])}</p>
+          <span class="recognition-state">${date ? '✓ ' : '◇ '}${status} · ${item.points} ${recognitionText('points')}</span>
+          ${date ? `<time datetime="${date}">${new Intl.DateTimeFormat(currentLanguage, { timeZone: 'America/Bogota' }).format(new Date(date))}</time>` : ''}
+        </div></li>`;
+    }).join('')}</ul></section>`).join('')}</details>
+    <details class="recognition-about"><summary>${recognitionText('about')}</summary><p>${recognitionText('help')}</p><p class="recognition-rules">${recognitionText('rules')}</p></details>`;
+}
+
+/** Un solo detalle visible; hover, foco y toque sin depender del atributo title. */
+function bindRecognitionBadges(collection) {
+  let timer = null;
+  function hide() {
+    clearTimeout(timer);
+    collection.querySelectorAll('.recognition-tooltip').forEach((tip) => { tip.hidden = true; });
+    collection.querySelectorAll('.recognition-badge').forEach((badge) => { delete badge.dataset.pinned; });
+  }
+  function show(badge) {
+    clearTimeout(timer);
+    collection.querySelectorAll('.recognition-tooltip').forEach((tip) => { tip.hidden = tip !== badge.querySelector('.recognition-tooltip'); });
+    collection.querySelectorAll('.recognition-badge').forEach((other) => { if (other !== badge) delete other.dataset.pinned; });
+  }
+  for (const badge of collection.querySelectorAll('.recognition-badge')) {
+    const button = badge.querySelector('button'), tip = badge.querySelector('.recognition-tooltip');
+    button.addEventListener('pointerenter', (event) => { if (event.pointerType !== 'touch') show(badge); });
+    button.addEventListener('focus', () => show(badge));
+    button.addEventListener('click', () => {
+      if (badge.dataset.pinned) hide();
+      else { show(badge); badge.dataset.pinned = 'true'; }
+    });
+    tip.addEventListener('pointerenter', () => clearTimeout(timer));
+    tip.addEventListener('pointerleave', () => scheduleHide(badge));
+    button.addEventListener('pointerleave', () => scheduleHide(badge));
+    button.addEventListener('blur', (event) => { if (!badge.contains(event.relatedTarget)) hide(); });
+    button.addEventListener('keydown', (event) => { if (event.key === 'Escape') { hide(); event.stopPropagation(); } });
+  }
+  function scheduleHide(badge) {
+    clearTimeout(timer);
+    if (!badge.dataset.pinned && !badge.contains(document.activeElement)) timer = setTimeout(() => { if (badge.isConnected) hide(); }, 160);
+  }
+}
+
+function dismissRecognitionBadges() {
+  document.querySelectorAll('.recognition-tooltip').forEach((tip) => { tip.hidden = true; });
+  document.querySelectorAll('.recognition-badge').forEach((badge) => { delete badge.dataset.pinned; });
+}
+
+function updateRecognitionCollection(panel, state) {
+  const collection = panel?.querySelector?.('.recognition-collection');
+  if (!collection) return;
+  const opened = collection.querySelector('.recognition-achievements')?.open;
+  const focused = collection.querySelector('.recognition-achievements > summary') === document.activeElement;
+  const focusedBadge = document.activeElement?.closest?.('.recognition-badge')?.dataset.reward;
+  const aboutOpened = collection.querySelector('.recognition-about')?.open;
+  collection.innerHTML = recognitionCollectionMarkup(state);
+  bindRecognitionBadges(collection);
+  const details = collection.querySelector('.recognition-achievements');
+  if (details) details.open = Boolean(opened);
+  const about = collection.querySelector('.recognition-about');
+  if (about) about.open = Boolean(aboutOpened);
+  if (focused) details?.querySelector('summary')?.focus({ preventScroll: true });
+  if (focusedBadge) collection.querySelector(`[data-reward="${focusedBadge}"] button`)?.focus({ preventScroll: true });
+}
+
+function renderRecognitionPanel(panel) {
+  if (!panel) return;
+  // Las actualizaciones de puntos solo sustituyen la colección, nunca los campos
+  // de respaldo: no perder texto escrito ni robar el foco durante una medición.
+  panel.innerHTML = `<div class="recognition-collection">${recognitionCollectionMarkup(getRecognitionState())}</div>
+    <details class="recognition-backup"><summary>${recognitionText('backup')}</summary><p>${recognitionText('backupHelp')}</p>
+    <button type="button" data-backup-generate>${recognitionText('generate')}</button>
+    <div class="recognition-backup-output" hidden><label>${recognitionText('code')}<textarea rows="3" readonly data-backup-code spellcheck="false"></textarea></label><button type="button" data-backup-copy>${recognitionText('copy')}</button></div>
+    <label>${recognitionText('restoreCode')}<textarea rows="3" data-backup-restore spellcheck="false" autocomplete="off" maxlength="16000"></textarea></label><p>${recognitionText('restoreHelp')}</p>
+    <button type="button" data-backup-import>${recognitionText('restore')}</button><p class="recognition-backup-status" role="status" aria-live="polite"></p></details>`;
+  bindRecognitionBadges(panel.querySelector('.recognition-collection'));
+  const status = panel.querySelector('.recognition-backup-status');
+  panel.querySelector('[data-backup-generate]').addEventListener('click', async (event) => {
+    const button = event.currentTarget; button.disabled = true;
+    try {
+      const code = await createRecognitionBackup();
+      panel.querySelector('[data-backup-code]').value = code;
+      panel.querySelector('.recognition-backup-output').hidden = false;
+      status.textContent = recognitionText('generated');
+    } catch (_) { status.textContent = recognitionText('unavailable'); }
+    finally { button.disabled = false; }
+  });
+  panel.querySelector('[data-backup-copy]').addEventListener('click', async () => {
+    const code = panel.querySelector('[data-backup-code]');
+    try { await navigator.clipboard.writeText(code.value); status.textContent = recognitionText('copied'); }
+    catch (_) { code.focus(); code.select(); status.textContent = recognitionText('copyFallback'); }
+  });
+  panel.querySelector('[data-backup-import]').addEventListener('click', async (event) => {
+    const button = event.currentTarget; button.disabled = true;
+    try {
+      const saved = await restoreRecognitionBackup(panel.querySelector('[data-backup-restore]').value);
+      updateRecognitionCollection(panel, getRecognitionState());
+      status.textContent = recognitionText(saved ? 'restored' : 'unavailable');
+    } catch (_) { status.textContent = recognitionText('invalid'); }
+    finally { button.disabled = false; }
+  });
+}
+
+async function recognitionChecksum(text) {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+  return [...new Uint8Array(digest)].map((value) => value.toString(16).padStart(2, '0')).join('').slice(0, 16);
+}
+
+async function createRecognitionBackup() {
+  const state = refreshRecognitionFromContributions(false);
+  const text = JSON.stringify(validateRecognitionState(state));
+  // El esquema tiene solo claves ASCII y fechas ISO, no nombres ni contenido del usuario.
+  const encoded = btoa(text).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  return `AM1.${encoded}.${await recognitionChecksum(encoded)}`;
+}
+
+async function restoreRecognitionBackup(code) {
+  const value = typeof code === 'string' ? code.trim() : '';
+  if (value.length > 16000) throw new Error('Backup too large');
+  const match = /^AM1\.([A-Za-z0-9_-]+)\.([a-f0-9]{16})$/.exec(value);
+  if (!match || await recognitionChecksum(match[1]) !== match[2]) throw new Error('Invalid backup checksum');
+  const decoded = atob(match[1].replace(/-/g, '+').replace(/_/g, '/'));
+  const incoming = validateRecognitionState(JSON.parse(decoded));
+  // Leer el estado ACTUAL después del await; no perder logros ganados entretanto.
+  const merged = mergeRecognitionStates(getRecognitionState(), incoming);
+  merged.best = Math.max(merged.best, recognitionStreak(merged.days).best);
+  return saveRecognitionState(merged, true);
+}
+
 /** Retos de reporte y su progreso, contados por categoría y sin salir del dispositivo. */
 function reportChallengeProgress(definitions) {
-  const rows = getLocalChallengeReports();
+  const rows = eligibleRecognitionReports();
   const byKind = new Map();
   for (const definition of definitions.filter((d) => d.type === 'report')) {
     const matching = rows.filter((row) => row.kind === definition.kind
@@ -1278,7 +1968,9 @@ function renderChallengesPanel(panel) {
     title: u(definition.titleKey),
     detail: u(definition.detailKey)
   }));
-  panel.innerHTML = panelFrame(t('challengeTitle'), `<p class="data-scope">${dataUiText('personal')}</p><p>${dataUiText('challengeHelp')}</p><section class="challenge-group"><h3>${dataUiText('measurements')}</h3><p>${dataUiText('measurementHelp')}</p><ul class="feature-list" id="challenge-list"></ul></section><section class="challenge-group"><h3>${dataUiText('reports')}</h3><p>${dataUiText('reportHelp')}</p><ul class="feature-list" id="report-challenge-list"></ul></section>`, panel);
+  refreshRecognitionFromContributions(false);
+  panel.innerHTML = panelFrame(t('challengeTitle'), `<section class="recognition-panel" aria-label="${recognitionText('title')}"></section><p class="data-scope">${dataUiText('personal')}</p><p>${dataUiText('challengeHelp')}</p><section class="challenge-group"><h3>${dataUiText('measurements')}</h3><p>${dataUiText('measurementHelp')}</p><ul class="feature-list" id="challenge-list"></ul></section><section class="challenge-group"><h3>${dataUiText('reports')}</h3><p>${dataUiText('reportHelp')}</p><ul class="feature-list" id="report-challenge-list"></ul></section>`, panel);
+  renderRecognitionPanel(panel.querySelector('.recognition-panel'));
   panel.querySelector('[data-close]')?.addEventListener('click', closeFeaturePanel);
   const list = panel.querySelector('#challenge-list');
   loadChallengeProgress(list, challenges.filter((challenge) => challenge.type === 'measurement'));
@@ -1303,39 +1995,44 @@ function startChallenge(key) {
   document.getElementById('report-note')?.focus();
 }
 
+function calculateChallengeProgress(challenges = CHALLENGE_DEFS) {
+  const rows = eligibleRecognitionMeasurements();
+  const rushByZone = new Map();
+  const nightZoneDays = new Set();
+  const quietLocations = new Set();
+  rows.forEach((row) => {
+    // La hora y el día se calculan en hora de Colombia (UTC−5), no en la del
+    // dispositivo. Antes usaba getHours()/getFullYear(), que seguían la zona
+    // del navegador mientras el mapa se filtraba por America/Bogota en el servidor.
+    const hour = coHour(row.created_at);
+    const day = coDayKey(row.created_at);
+    if (hour === null || day === null) return;
+    const challengeCell = `${Math.round(row.latitude / AGG_GRID)}_${Math.round(row.longitude / AGG_GRID)}`;
+    // Hora punta: ventana de 7:00 a 9:00, que es una sub-ventana de la
+    // franja "morning" a propósito. Conservamos el horario del reto existente;
+    // no tiene que abarcar toda la franja del filtro del mapa.
+    if (hour >= 7 && hour < 9) {
+      if (!rushByZone.has(challengeCell)) rushByZone.set(challengeCell, new Set());
+      rushByZone.get(challengeCell).add(day);
+    }
+    if (inCoTimeBand(row.created_at, 'night')) {
+      // Repetir una lectura en la misma zona y día no aumenta el progreso.
+      nightZoneDays.add(`${challengeCell}|${day}`);
+    }
+    if (row.db_level < 55) quietLocations.add(challengeCell);
+  });
+  return {
+    'rush-hour': Math.max(0, ...[...rushByZone.values()].map((days) => days.size)),
+    'quiet-route': quietLocations.size,
+    'night-cover': nightZoneDays.size,
+    ...Object.fromEntries(reportChallengeProgress(challenges))
+  };
+}
+
 async function loadChallengeProgress(list, challenges) {
   try {
-    const rows = getLocalChallengeMeasurements();
-    const rushByZone = new Map();
-    const nightZoneDays = new Set();
-    const quietLocations = new Set();
-    rows.forEach((row) => {
-      // La hora y el día se calculan en hora de Colombia (UTC−5), no en la del
-      // dispositivo. Antes usaba getHours()/getFullYear(), que seguían la zona
-      // del navegador mientras el mapa se filtraba por America/Bogota en el servidor.
-      const hour = coHour(row.created_at);
-      const day = coDayKey(row.created_at);
-      if (hour === null || day === null) return;
-      const challengeCell = `${Math.round(row.latitude / AGG_GRID)}_${Math.round(row.longitude / AGG_GRID)}`;
-      // Hora punta: ventana de 7:00 a 9:00, que es una sub-ventana de la
-      // franja "morning" a propósito. Conservamos el horario del reto existente;
-      // no tiene que abarcar toda la franja del filtro del mapa.
-      if (hour >= 7 && hour < 9) {
-        if (!rushByZone.has(challengeCell)) rushByZone.set(challengeCell, new Set());
-        rushByZone.get(challengeCell).add(day);
-      }
-      if (inCoTimeBand(row.created_at, 'night')) {
-        // Repetir una lectura en la misma zona y día no aumenta el progreso.
-        nightZoneDays.add(`${challengeCell}|${day}`);
-      }
-      if (row.db_level < 55) quietLocations.add(challengeCell);
-    });
-    const progress = {
-      'rush-hour': Math.max(0, ...[...rushByZone.values()].map((days) => days.size)),
-      'quiet-route': quietLocations.size,
-      'night-cover': nightZoneDays.size,
-      ...Object.fromEntries(reportChallengeProgress(challenges))
-    };
+    const progress = calculateChallengeProgress(challenges);
+    const earned = getRecognitionState().earned;
     list.innerHTML = '';
     challenges.forEach((challenge) => {
       const item = document.createElement('li');
@@ -1353,6 +2050,7 @@ async function loadChallengeProgress(list, challenges) {
           <span class="challenge-fill"></span>
         </div>
         <span class="challenge-state">${percentage === 100 ? `✓ ${u('completed')}` : `${percentage}% ${t('challengeProgress')}`}</span>
+        ${earned[challenge.key] ? `<span class="challenge-reward">${recognitionIcon(challenge.key)}${recognitionText('earned')}</span>` : ''}
         ${percentage < 100 ? `<button type="button" data-challenge-action="${challenge.key}">${dataUiText(challenge.type === 'report' ? 'report' : 'measure')}</button>` : ''}`;
       item.querySelector?.('[data-challenge-action]')?.addEventListener('click', () => startChallenge(challenge.key));
       if (percentage === 100) item.classList.add('completed');
@@ -1435,9 +2133,9 @@ function updateStaticLanguage() {
   if (nav[1]) nav[1].setAttribute('aria-label', copy.health);
   const title = document.querySelector('.info-header h1'); if (title) title.textContent = copy.title;
   const intro = document.querySelector('.info-header p'); if (intro) intro.textContent = details.intro;
-  const cards = document.querySelectorAll('.info-card h3'); cards.forEach((element, index) => { if (copy.cardTitles[index]) element.textContent = copy.cardTitles[index]; });
+  const cards = document.querySelectorAll('.info-card h2'); cards.forEach((element, index) => { if (copy.cardTitles[index]) element.textContent = copy.cardTitles[index]; });
   document.querySelectorAll('.info-card p').forEach((element, index) => { element.textContent = details.cardDescriptions[index] || ''; });
-  document.querySelectorAll('.info-card .badge').forEach((element, index) => { const emoji = element.textContent.match(/^\S+\s*/)?.[0] || ''; element.textContent = `${emoji}${details.badges[index] || ''}`; });
+  document.querySelectorAll('.info-card .badge-label').forEach((element, index) => { element.textContent = details.badges[index] || ''; });
   document.querySelectorAll('.info-card .card-header strong').forEach((element, index) => { element.textContent = details.cardLabels[index] || ''; });
   const sectionTitles = document.querySelectorAll('.info-wrapper > .section-title');
   if (sectionTitles[0]) sectionTitles[0].textContent = copy.privacy;
@@ -1451,6 +2149,10 @@ function updateStaticLanguage() {
   const handle = document.getElementById('stats-handle-label');
   const filtersLabel = document.getElementById('map-filters-label');
   if (filtersLabel) filtersLabel.textContent = { es: 'Filtros', en: 'Filters', pt: 'Filtros' }[currentLanguage];
+  [['map-motion-hint', t('noiseInteractionHint')], ['legend-motion-note', t('noiseAnimationNote')]].forEach(([id, text]) => {
+    const element = document.getElementById(id); if (element) element.textContent = text;
+  });
+  updateCommunityMotion();
   if (handle) handle.textContent = sharingText(document.getElementById('stats-panel')?.classList.contains('collapsed') ? 'showDetails' : 'hideDetails');
   [['time-all', copy.all], ['time-morning', copy.morning], ['time-afternoon', copy.afternoon], ['time-night', copy.night]].forEach(([id, value]) => { const el = document.getElementById(id); if (el) el.textContent = value; });
   [
@@ -1464,14 +2166,12 @@ function updateStaticLanguage() {
   });
   const csv = document.getElementById('export-csv-btn'); if (csv) csv.textContent = copy.exportCsv;
   const geo = document.getElementById('export-geojson-btn'); if (geo) geo.textContent = copy.exportGeo;
-  const legendTitle = document.querySelector('.legend-header span'); if (legendTitle) legendTitle.textContent = details.legend;
-  const legendButton = document.getElementById('legend-toggle'); if (legendButton) legendButton.setAttribute('aria-label', details.legend);
-  const legendClose = document.querySelector('.legend-close'); if (legendClose) legendClose.setAttribute('aria-label', t('close'));
+  updateMapHelpLanguage();
+  updateRecognitionNoticeLanguage();
   const statsTabs = document.querySelector('.stats-section-nav'); if (statsTabs) statsTabs.setAttribute('aria-label', m('statsTabLabel'));
   const timeGroup = document.querySelector('.time-filters'); if (timeGroup) timeGroup.setAttribute('aria-label', extra.timeGroup);
   const timeLabel = document.querySelector('.time-filters-label'); if (timeLabel) timeLabel.textContent = extra.timeLabel;
   const visualGroup = document.querySelector('.visual-filters'); if (visualGroup) visualGroup.setAttribute('aria-label', periodLabels.group);
-  const legend = document.getElementById('map-legend'); if (legend) legend.setAttribute('aria-label', details.legend);
   const legendLabels = {
     es: { scale: 'Escala del mapa', levels: ['Bajo', 'Moderado', 'Alto'], data: 'Datos en esta vista', technical: 'Método y conexión', downloads: 'Descargar datos' },
     en: { scale: 'Map scale', levels: ['Low', 'Moderate', 'High'], data: 'Data in this view', technical: 'Method and connection', downloads: 'Download data' },
@@ -1495,7 +2195,7 @@ function updateStaticLanguage() {
     modal.querySelector('.modal-btn.confirm').textContent = actionText;
   });
   const monitoring = document.getElementById('stats-panel')?.classList.contains('monitoring');
-  const actionText = document.querySelector('#btn-toggle .action-text'); if (actionText) actionText.textContent = monitoring ? extra.stop : extra.activate;
+  const actionText = document.querySelector('#btn-toggle .action-text'); if (actionText) actionText.textContent = meterText(monitoring ? 'stop' : 'activate');
   if (typeof updateActionButtons === 'function') updateActionButtons();
   if (typeof updateSharingStatus === 'function') updateSharingStatus();
   const statusText = document.getElementById('status-text'); if (statusText) statusText.textContent = meterText(monitoring ? 'measuring' : 'idle');
@@ -1677,10 +2377,12 @@ async function configureServiceWorker() {
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
-  if (localStorage.getItem('acoustimap-theme') === 'dark') document.body.classList.add('dark-theme');
+  try { if (localStorage.getItem('acoustimap-theme') === 'dark') document.body.classList.add('dark-theme'); }
+  catch (_) { /* Preferencias bloqueadas: mantener el tema por defecto. */ }
   document.documentElement.lang = currentLanguage;
   updateStaticLanguage();
   createFeatureUi();
+  refreshRecognitionFromContributions(false);
   document.querySelector('.stats-section-nav')?.addEventListener('keydown', (event) => {
     if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
     const tabs = [...document.querySelectorAll('.stats-section-btn')];
@@ -1698,4 +2400,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (legacy.length && migration.every((result) => result.status === 'fulfilled')) localStorage.removeItem('acoustimap-pending-measurements');
   } catch (error) { console.warn('No se pudo migrar la cola local antigua:', error); }
   flushOfflineMeasurements();
+});
+
+window.addEventListener('storage', (event) => {
+  if (event.key !== RECOGNITION_STORE || !event.newValue) return;
+  // Unión idempotente entre pestañas; el estado importado nunca reenvía aportes.
+  const state = getRecognitionState();
+  saveRecognitionState(state);
+  document.querySelectorAll?.('.recognition-panel').forEach((panel) => updateRecognitionCollection(panel, state));
 });

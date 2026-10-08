@@ -14,7 +14,8 @@ function appBrowser() {
     documentElement: { lang: 'es' }, activeElement: null,
     addEventListener: (name, handler) => events.set(name, handler),
     getElementById: (id) => elements.get(id) || null,
-    querySelectorAll: () => [elements.get('header'), elements.get('map-view')]
+    querySelectorAll: (selector) => [elements.get('header'), elements.get('map-view'),
+      ...(selector.includes('#recognition-notice') ? [elements.get('recognition-notice')] : [])]
   };
   function element(id) {
     const classes = new Set();
@@ -31,7 +32,7 @@ function appBrowser() {
     elements.set(id, node);
     return node;
   }
-  ['header', 'map-view', 'btn-toggle', 'btn-share', 'gps-chip', 'share-status'].forEach(element);
+  ['header', 'map-view', 'btn-toggle', 'btn-share', 'gps-chip', 'share-status', 'recognition-notice'].forEach(element);
   const modal = element('mic-modal');
   modal.inert = true;
   const cancel = element('cancel');
@@ -73,6 +74,14 @@ test('modales: foco inicial, fondo inerte, Tab circular y Escape devuelve el foc
   assert.equal(browser.document.activeElement.id, 'btn-toggle');
   assert.equal(browser.elements.get('header').inert, false);
   assert.equal(browser.elements.get('mic-modal').inert, true);
+});
+
+test('modales: el aviso de insignia queda inerte y recupera su estado al cancelar', () => {
+  const browser = appBrowser();
+  browser.evaluate('openMicModal()');
+  assert.equal(browser.elements.get('recognition-notice').inert, true);
+  browser.evaluate('closeMicModal()');
+  assert.equal(browser.elements.get('recognition-notice').inert, false);
 });
 
 test('GPS: cancelar Compartir ignora una respuesta tardía de ubicación', () => {

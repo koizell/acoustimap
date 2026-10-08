@@ -9,6 +9,50 @@ let selectedVisualMode = 'heatmap';
 let lastAggregatedPoints = [];
 let communityLoadToken = 0;
 
+// El movimiento es decorativo y uniforme: no representa audio en directo,
+// propagación ni más confianza. Se limita el trabajo en vistas muy densas.
+const COMMUNITY_ANIMATED_MARKER_LIMIT = 80;
+let communityMotionEnabled = true;
+try { communityMotionEnabled = localStorage.getItem('acoustimap-map-motion') !== 'off'; } catch (_) {}
+
+const communityInteractionCopy = {
+  es: { on: 'Animación: activada', off: 'Animación: pausada', reduced: 'Animación: reducida por el dispositivo', details: 'Ver detalles de la zona', zoom: 'Acercar a la zona' },
+  en: { on: 'Animation: on', off: 'Animation: paused', reduced: 'Animation: reduced by your device', details: 'View area details', zoom: 'Zoom into the area' },
+  pt: { on: 'Animação: ativada', off: 'Animação: pausada', reduced: 'Animação: reduzida pelo dispositivo', details: 'Ver detalhes da área', zoom: 'Aproximar a área' }
+};
+
+function communityInteractionText(key) {
+  let language = document.documentElement.lang;
+  try { language = localStorage.getItem('acoustimap-language') || language; } catch (_) {}
+  return (communityInteractionCopy[language] || communityInteractionCopy.es)[key];
+}
+
+function updateCommunityMotion() {
+  const reduced = typeof window.matchMedia === 'function'
+    && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const enabled = communityMotionEnabled && !reduced;
+  const view = document.getElementById('map-view');
+  view?.setAttribute?.('data-motion', enabled && !document.hidden ? 'on' : 'off');
+  const button = document.getElementById('map-motion-toggle');
+  if (button) {
+    button.textContent = communityInteractionText(reduced ? 'reduced' : enabled ? 'on' : 'off');
+    button.setAttribute('aria-pressed', String(enabled));
+    button.disabled = Boolean(reduced);
+  }
+}
+
+function toggleCommunityMotion() {
+  communityMotionEnabled = !communityMotionEnabled;
+  try { localStorage.setItem('acoustimap-map-motion', communityMotionEnabled ? 'on' : 'off'); } catch (_) {}
+  updateCommunityMotion();
+}
+
+document.addEventListener('visibilitychange', updateCommunityMotion);
+if (typeof window.matchMedia === 'function') {
+  window.matchMedia('(prefers-reduced-motion: reduce)').addEventListener?.('change', updateCommunityMotion);
+}
+updateCommunityMotion();
+
 const communityCopy = {
   es: { now: 'ahora', index: 'Índice', category: 'Categoría', lastMeasurement: 'Última medición', cumulative: 'mediciones acumuladas', exporting: 'Exportando…', exportError: 'No se pudieron exportar las mediciones.', noCommunity: 'Sin datos comunitarios aún', noLive: 'Sin mediciones recientes (<24 h)', noHistory: 'Aún no hay mediciones en el historial', live: 'En vivo (24 h)', history: 'Historial (90 días)', zones: 'zonas', zone: 'zona', measurements: 'mediciones', measurement: 'medición', updated: 'Última actualización', loadError: 'Error al cargar datos', low: 'bajo', moderate: 'moderado', high: 'alto' },
   en: { now: 'now', index: 'Index', category: 'Category', lastMeasurement: 'Last measurement', cumulative: 'measurements combined', exporting: 'Exporting…', exportError: 'Measurements could not be exported.', noCommunity: 'No community data yet', noLive: 'No recent measurements (<24 h)', noHistory: 'No measurements in history yet', live: 'Live (24 h)', history: 'History (90 days)', zones: 'areas', zone: 'area', measurements: 'measurements', measurement: 'measurement', updated: 'Last updated', loadError: 'Could not load data', low: 'low', moderate: 'moderate', high: 'high' },
@@ -16,7 +60,8 @@ const communityCopy = {
 };
 
 function communityText(key) {
-  const language = localStorage.getItem('acoustimap-language') || document.documentElement.lang;
+  let language = document.documentElement.lang;
+  try { language = localStorage.getItem('acoustimap-language') || language; } catch (_) {}
   return (communityCopy[language] || communityCopy.es)[key];
 }
 
@@ -61,18 +106,77 @@ function formatLegendCounter(modeLabel, cells, measurements) {
 // ============================================
 // DIBUJAR UN PUNTO COMUNITARIO
 // ============================================
-function addCommunityPoint(lat, lng, db, category, createdAt, sampleCount = 1) {
-  const color = COLOR_BY_CAT[category] || COLOR_BY_CAT[classifyDb(db)];
+function communityPopupHtml(db, category, createdAt, sampleCount) {
   const when  = createdAt ? timeAgo(createdAt) : communityText('now');
-
   const categoryLabel = communityText(category === 'bajo' ? 'low' : category === 'moderado' ? 'moderate' : 'high');
-
-  const popupHtml = [
+  return [
     `<b>${communityText('index')} ${db}</b>`,
     `${communityText('category')}: <b>${categoryLabel}</b>`,
     `<small>${communityText('lastMeasurement')}: ${when}</small>`,
-    sampleCount > 1 ? `<small>${sampleCount} ${communityText('cumulative')}</small>` : ''
-  ].filter(Boolean).join('<br>');
+    `<small>${sampleCount} ${communityText(sampleCount === 1 ? 'measurement' : 'measurements')}</small>`,
+    `<button type="button" class="noise-zone-zoom">${communityInteractionText('zoom')}</button>`
+  ].join('<br>');
+}
+
+/** Botón nativo: táctil y activable con Enter/Espacio, incluso sobre el calor. */
+function addCommunityNoiseMarker(lat, lng, db, category, createdAt, sampleCount, permanentLabel = false, animated = true) {
+  const color = COLOR_BY_CAT[category] || COLOR_BY_CAT[classifyDb(db)];
+  const icon = L.divIcon({
+    className: `community-noise-marker${animated ? ' noise-marker-animated' : ''}`,
+    iconSize: [44, 44], iconAnchor: [22, 22], popupAnchor: [0, -18],
+    html: `<button type="button" class="noise-zone-button" style="--noise-color:${color}"><span class="noise-glyph" aria-hidden="true"><span class="noise-bar"></span><span class="noise-bar"></span><span class="noise-bar"></span></span></button>`
+  });
+  const marker = L.marker([lat, lng], { icon, keyboard: false, bubblingMouseEvents: false });
+  marker.on('add', () => {
+    const button = marker.getElement().querySelector('button');
+    button.setAttribute('aria-label', `${communityInteractionText('details')}: ${communityText('index')} ${db}, ${sampleCount} ${communityText(sampleCount === 1 ? 'measurement' : 'measurements')}`);
+    button.setAttribute('aria-expanded', 'false');
+    L.DomEvent.disableClickPropagation(button);
+    button.addEventListener('click', (event) => {
+      L.DomEvent.stop(event);
+      // No robar la selección de ubicación a los reportes, retos o tendencias.
+      if (document.getElementById('map-view')?.hasAttribute('data-selecting')) {
+        map.fire('click', { latlng: marker.getLatLng() });
+        return;
+      }
+      marker.openPopup();
+    });
+    button.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter' || event.key === ' ') event.stopPropagation();
+      if (event.key === 'Escape') { L.DomEvent.stop(event); marker.closePopup(); }
+    });
+    // Leaflet también transforma keypress/Enter en clic de marcador. El botón
+    // ya genera su clic nativo: impedir ese segundo flujo evita abrir un popup
+    // al elegir una ubicación mediante el teclado.
+    button.addEventListener('keypress', (event) => event.stopPropagation());
+  });
+  marker.bindTooltip(`${db} · ${sampleCount}`, {
+    permanent: permanentLabel,
+    direction: 'top', offset: [0, -22], className: `zone-tooltip tooltip-${category}`
+  }).bindPopup(communityPopupHtml(db, category, createdAt, sampleCount), {
+    className: 'noise-zone-popup', minWidth: 180, maxWidth: 260
+  });
+  marker.on('popupopen', (event) => {
+    const button = marker.getElement()?.querySelector('button');
+    button?.setAttribute('aria-expanded', 'true');
+    const popup = event.popup.getElement();
+    popup.querySelector('.noise-zone-zoom').onclick = () => {
+      marker.closePopup();
+      map.setView([lat, lng], Math.max(map.getZoom(), 17));
+    };
+    popup.onkeydown = (keyEvent) => {
+      if (keyEvent.key !== 'Escape') return;
+      L.DomEvent.stop(keyEvent);
+      marker.closePopup();
+      button?.focus({ preventScroll: true });
+    };
+  });
+  marker.on('popupclose', () => marker.getElement()?.querySelector('button')?.setAttribute('aria-expanded', 'false'));
+  return marker.addTo(communityLayer);
+}
+
+function addCommunityPoint(lat, lng, db, category, createdAt, sampleCount = 1, animated = true) {
+  const color = COLOR_BY_CAT[category] || COLOR_BY_CAT[classifyDb(db)];
 
   // Huella visual dentro de la celda (~70 m), no radio de propagación sonora.
   // El halo anterior de 90 m superponía varias celdas incluso al acercar.
@@ -111,21 +215,8 @@ function addCommunityPoint(lat, lng, db, category, createdAt, sampleCount = 1) {
 
   // Etiquetas permanentes solo si hay espacio; al tocar el marcador siempre
   // se puede consultar el índice/cantidad en su popup, incluso en zoom lejano.
-  L.circleMarker([lat, lng], {
-    radius: 20,
-    color: 'transparent',
-    fillColor: 'transparent',
-    fillOpacity: 0,
-    weight: 0
-  })
-    .addTo(communityLayer)
-    .bindTooltip(`${db} · ${sampleCount}`, {
-      permanent: communityLabelVisible(lat, lng),
-      direction: 'top',
-      offset: [0, -30],
-      className: `zone-tooltip tooltip-${category}`
-    })
-    .bindPopup(popupHtml);
+  addCommunityNoiseMarker(lat, lng, db, category, createdAt, sampleCount,
+    communityLabelVisible(lat, lng), animated);
 }
 
 function communityLabelVisible(lat, lng) {
@@ -178,6 +269,45 @@ function aggregatePoints(rows) {
   });
 }
 
+/** Captura solo interacción visible; no conserva puntos fuera de la respuesta. */
+function captureCommunityInteraction() {
+  let state = null;
+  if (typeof communityLayer === 'undefined') return state;
+  communityLayer.eachLayer?.((layer) => {
+    const popup = layer.getPopup?.();
+    if (!popup) return;
+    const button = layer.getElement?.()?.querySelector('button');
+    const focused = document.activeElement;
+    const popupFocused = popup.getElement?.()?.contains(focused);
+    if (!layer.isPopupOpen() && button !== focused && !popupFocused) return;
+    state = { location: layer.getLatLng(), open: layer.isPopupOpen(),
+      focus: button === focused ? 'marker' : popupFocused
+        ? focused.matches('.noise-zone-zoom') ? 'zoom' : 'close' : null };
+  });
+  return state;
+}
+
+function restoreCommunityInteraction(state) {
+  if (!state || typeof communityLayer === 'undefined') return;
+  communityLayer.eachLayer?.((layer) => {
+    const popup = layer.getPopup?.();
+    if (!popup) return;
+    const location = layer.getLatLng();
+    if (location.lat !== state.location.lat || location.lng !== state.location.lng) return;
+    if (state.open) {
+      // Ya se hizo autopan al abrir: repetirlo durante el refresco genera otra
+      // consulta moveend y puede producir un bucle de cierre/apertura.
+      const autoPan = popup.options.autoPan;
+      popup.options.autoPan = false;
+      layer.openPopup();
+      popup.options.autoPan = autoPan;
+    }
+    const target = state.focus === 'marker' ? layer.getElement?.()?.querySelector('button')
+      : state.focus ? popup.getElement?.()?.querySelector(state.focus === 'zoom' ? '.noise-zone-zoom' : '.leaflet-popup-close-button') : null;
+    target?.focus({ preventScroll: true });
+  });
+}
+
 function renderCommunityPoints(points) {
   // comparisonMode vive en features.js, que se carga despues. La comprobacion
   // lo mantiene segura: community.js llama a loadCommunityPoints() en tiempo de
@@ -187,16 +317,21 @@ function renderCommunityPoints(points) {
     if (typeof activateComparisonLayer === 'function') activateComparisonLayer();
     return;
   }
+  const interaction = captureCommunityInteraction();
   clearCommunityLayers();
   const view = document.getElementById('map-view');
   if (view && !view.classList.contains('active')) return;
   if (selectedVisualMode === 'heatmap') {
     setCommunityHeatPoints(points);
-    return;
+    points.forEach((point, index) => addCommunityNoiseMarker(point.lat, point.lng, point.db,
+      point.category, point.createdAt, point.sampleCount, false, index < COMMUNITY_ANIMATED_MARKER_LIMIT));
+  } else {
+    points.forEach((point, index) =>
+      addCommunityPoint(point.lat, point.lng, point.db, point.category, point.createdAt, point.sampleCount,
+        index < COMMUNITY_ANIMATED_MARKER_LIMIT)
+    );
   }
-  points.forEach((point) =>
-    addCommunityPoint(point.lat, point.lng, point.db, point.category, point.createdAt, point.sampleCount)
-  );
+  restoreCommunityInteraction(interaction);
 }
 
 function setCommunityVisualMode(mode) {
@@ -374,8 +509,6 @@ async function loadCommunityPoints() {
       if (!page || page.length < pageSize || requestToken !== communityLoadToken) break;
     }
     if (requestToken !== communityLoadToken) return;
-
-    clearCommunityLayers();
 
     if (rows.length === 0) {
       lastAggregatedPoints = [];

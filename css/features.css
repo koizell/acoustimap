@@ -292,7 +292,7 @@ body.dark-theme .action-btn.secondary { background: #0f172a; color: #93c5fd; }
 body.dark-theme .action-btn.secondary:hover { background: #1e293b; }
 body.dark-theme .stats-page-header h1,
 body.dark-theme .section-title,
-body.dark-theme .info-card h3 { color: var(--text-main); }
+body.dark-theme .info-card h2 { color: var(--text-main); }
 body.dark-theme .info-card,
 body.dark-theme .stats-feature-content { background: #0f172a; border-color: #334155; }
 body.dark-theme .info-copy,

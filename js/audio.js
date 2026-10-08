@@ -204,9 +204,9 @@ function resetMonitoringUi() {
 }
 
 const meterCopy = {
-  es: { stop: 'Detener', activate: 'Activar', measuring: 'Midiendo', idle: 'Inactivo', denied: 'No se pudo iniciar el micrófono. Revisa el permiso y usa un navegador compatible con AudioWorklet.', collecting: 'Tomando señal…', start: 'Sin medir', noData: 'Sin datos', low: 'Bajo', moderate: 'Moderado', high: 'Alto', lowIndex: 'Bajo', moderateIndex: 'Moderado', highIndex: 'Alto' },
-  en: { stop: 'Stop', activate: 'Enable', measuring: 'Measuring', idle: 'Inactive', denied: 'Could not start the microphone. Check permission and use a browser supporting AudioWorklet.', collecting: 'Reading signal…', start: 'Not measuring', noData: 'No data', low: 'Low', moderate: 'Moderate', high: 'High', lowIndex: 'Low', moderateIndex: 'Moderate', highIndex: 'High' },
-  pt: { stop: 'Parar', activate: 'Ativar', measuring: 'Medindo', idle: 'Inativo', denied: 'Não foi possível iniciar o microfone. Verifique a permissão e use um navegador compatível com AudioWorklet.', collecting: 'Lendo sinal…', start: 'Sem medir', noData: 'Sem dados', low: 'Baixo', moderate: 'Moderado', high: 'Alto', lowIndex: 'Baixo', moderateIndex: 'Moderado', highIndex: 'Alto' }
+  es: { stop: 'Detener', activate: 'Medir', measuring: 'Midiendo', idle: 'Inactivo', denied: 'No se pudo iniciar el micrófono. Revisa el permiso y usa un navegador compatible con AudioWorklet.', collecting: 'Tomando señal…', start: 'Sin medir', noData: 'Sin datos', low: 'Bajo', moderate: 'Moderado', high: 'Alto', lowIndex: 'Bajo', moderateIndex: 'Moderado', highIndex: 'Alto' },
+  en: { stop: 'Stop', activate: 'Measure', measuring: 'Measuring', idle: 'Inactive', denied: 'Could not start the microphone. Check permission and use a browser supporting AudioWorklet.', collecting: 'Reading signal…', start: 'Not measuring', noData: 'No data', low: 'Low', moderate: 'Moderate', high: 'High', lowIndex: 'Low', moderateIndex: 'Moderate', highIndex: 'High' },
+  pt: { stop: 'Parar', activate: 'Medir', measuring: 'Medindo', idle: 'Inativo', denied: 'Não foi possível iniciar o microfone. Verifique a permissão e use um navegador compatível com AudioWorklet.', collecting: 'Lendo sinal…', start: 'Sem medir', noData: 'Sem dados', low: 'Baixo', moderate: 'Moderado', high: 'Alto', lowIndex: 'Baixo', moderateIndex: 'Moderado', highIndex: 'Alto' }
 };
 
 function meterText(key) {

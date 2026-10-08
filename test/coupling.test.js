@@ -12,7 +12,18 @@ const DE_FEATURES = [
   'drawnZone', 'selectedMapPoint', 'featureClientId',
   'activateComparisonLayer', 'createFeatureUi', 'openFeaturePanel', 'closeFeatureMenu',
   'flushOfflineMeasurements', 'queueOfflineMeasurement', 'enqueueOfflineRecord',
-  'summaryText', 'summaryIcon', 'updateSummaryState', 'exitComparisonMode', 'cancelMapSelection'
+  'summaryText', 'summaryIcon', 'updateSummaryState', 'exitComparisonMode', 'cancelMapSelection',
+  'activeZoneDrawer', 'zoneDrawingVertices', 'cancelZoneDrawing',
+  'RECOGNITION_STORE', 'RECOGNITION_DEFS', 'RECOGNITION_LEVELS',
+  'recognitionMemory', 'recognitionStorageStatus', 'recognitionNoticeKeys',
+  'recognitionText', 'recognitionTitle', 'recognitionIcon', 'emptyRecognitionState',
+  'validateRecognitionState', 'mergeRecognitionStates', 'getRecognitionState', 'saveRecognitionState',
+  'eligibleRecognitionMeasurements', 'eligibleRecognitionReports', 'validRecognitionContribution',
+  'recognitionStreak', 'recognitionSummary', 'refreshRecognitionFromContributions',
+  'closeRecognitionNotice', 'updateRecognitionNoticeLanguage', 'recognitionCollectionMarkup',
+  'updateRecognitionCollection', 'renderRecognitionPanel', 'recognitionChecksum',
+  'createRecognitionBackup', 'restoreRecognitionBackup', 'calculateChallengeProgress',
+  'bindRecognitionBadges', 'dismissRecognitionBadges', 'canFinishZoneDrawing'
 ];
 
 const hojasDeFeatures = () =>

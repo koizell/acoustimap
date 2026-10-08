@@ -40,6 +40,7 @@ test('estado de conexión: Información conserva la respuesta completa', () => {
   const detail = {};
   const browser = createBrowserContext({ document: {
     documentElement: { lang: 'es' },
+    addEventListener() {},
     getElementById: id => ({ 'map-data-status': banner, 'map-connection-detail': detail }[id])
   } });
   browser.load('config.js', 'community.js');

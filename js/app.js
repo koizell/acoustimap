@@ -7,13 +7,14 @@
 // NAVEGACIÓN ENTRE PESTAÑAS
 // ============================================
 function switchTab(tabId, btn) {
+  if (tabId !== 'map-view' && typeof cancelZoneDrawing === 'function') cancelZoneDrawing();
   if (tabId !== 'map-view' && typeof cancelMapSelection === 'function') cancelMapSelection();
   if (tabId !== 'map-view') suspendMapHeatLayers();
   document.querySelectorAll('.tab-content').forEach((t) => t.classList.remove('active'));
   document.querySelectorAll('.tab-btn').forEach((b) => b.classList.remove('active'));
   const tab = document.getElementById(tabId);
   if (tab) tab.classList.add('active');
-  if (tabId !== 'map-view' && typeof revealUi === 'function') revealUi(tab?.querySelector?.('.info-wrapper, .stats-page'));
+  if (tabId === 'stats-view' && typeof revealUi === 'function') revealUi(tab?.querySelector?.('.stats-page'));
   if (btn) btn.classList.add('active');
   if (tabId === 'map-view') {
     setTimeout(() => {
@@ -36,8 +37,13 @@ function toggleLegend() {
   const toggle = document.getElementById('legend-toggle');
   toggle?.setAttribute('aria-expanded', String(!collapsed));
   if (collapsed && legend.contains(document.activeElement)) toggle?.focus();
-  if (!collapsed) revealUi(legend);
+  if (!collapsed) {
+    const body = legend.querySelector?.('.legend-body');
+    if (body) body.scrollTop = 0;
+    legend.querySelector?.('.legend-header-title')?.focus({ preventScroll: true });
+  }
   if (!collapsed && typeof closeFeatureMenu === 'function') closeFeatureMenu();
+  if (!collapsed && typeof cancelZoneDrawing === 'function') cancelZoneDrawing();
   const filters = document.getElementById('map-filters');
   if (!collapsed && filters) filters.open = false;
 }
@@ -107,8 +113,9 @@ let privacyModalState = null;
 function openPrivacyModal(id) {
   const modal = document.getElementById(id);
   if (!modal) return;
+  if (typeof cancelZoneDrawing === 'function') cancelZoneDrawing();
   if (privacyModalState) closePrivacyModal(privacyModalState.modal.id);
-  const background = [...document.querySelectorAll('header, .tab-content')]
+  const background = [...document.querySelectorAll('header, .tab-content, #recognition-notice')]
     .map((element) => [element, element.inert]);
   privacyModalState = { modal, trigger: document.activeElement, background };
   background.forEach(([element]) => { element.inert = true; });

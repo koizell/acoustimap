@@ -101,15 +101,17 @@ test('puntos: cambiar la visualización termina Comparar incluso sin datos comun
 });
 
 test('comparación: Limpiar funciona sin polígono y restaura la visualización normal', () => {
-  let cleared = 0, rendered = 0;
+  let cleared = 0, rendered = 0, canceled = 0;
   const context = {
     drawnZone: null, lastAggregatedPoints: [],
     exitComparisonMode: () => { cleared++; },
+    cancelZoneDrawing: () => { canceled++; },
     renderCommunityPoints: () => { rendered++; }, closeFeaturePanel() {}
   };
   vm.runInNewContext(`${source('features.js', 'clearDrawnZone')}\nclearDrawnZone();`, context);
   assert.equal(cleared, 1);
   assert.equal(rendered, 1);
+  assert.equal(canceled, 1);
 });
 
 test('mapa: si falta la RPC de la versión vigente, lo dice y no finge un mapa vacío', async () => {
@@ -213,7 +215,8 @@ test('puntos: la huella visual no invade celdas vecinas ni representa propagaci�
     communityLayer: {}, COLOR_BY_CAT: { bajo: 'green' }, classifyDb: () => 'bajo',
     timeAgo: () => 'ahora', communityText: key => key, densityConfidence: () => 0,
     cellBorderOpacity: () => 1, CIRCLE_VISUAL_RADIUS_M: 50, CELL_SIZE_M: 70,
-    communityLabelVisible: () => false
+    communityLabelVisible: () => false,
+    addCommunityNoiseMarker: () => layers.push({ type: 'noise-marker' })
   };
   vm.runInNewContext(`${source('community.js', 'addCommunityPoint')}\naddCommunityPoint(8.75, -75.88, 40, 'bajo', null, 1);`, context);
   assert.equal(layers.length, 4);

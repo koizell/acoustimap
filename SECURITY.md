@@ -80,8 +80,25 @@ de servidor que primero elimina el archivo del almacenamiento y luego la fila,
 para no dejar objetos huérfanos. Si el almacenamiento falla, la fila se
 conserva y se reintenta.
 
-Los datos del SQLite de tu navegador (retos, cola sin conexión) no salen del
-dispositivo y se pierden si borras los datos del sitio.
+El progreso de retos se guarda en `localStorage` y la cola sin conexión usa
+IndexedDB, con respaldo en `localStorage` cuando IndexedDB no está disponible.
+Estos almacenes se pierden si borras los datos del sitio. Los aportes de la cola
+se envían al recuperar conexión bajo el consentimiento original; el progreso
+personal no se envía.
+
+El reconocimiento se guarda aparte en `acoustimap-recognition`: insignias con
+su fecha de logro, hasta 400 días de actividad y mejor racha. Puntos y nivel se
+derivan del catálogo local. Los logros no caducan mientras ese almacén exista;
+no contienen coordenadas, fotos, audio, nombres ni identificador del navegador.
+No hay reconocimiento de hardware, fingerprinting ni sincronización remota.
+
+Un código de respaldo permite recuperar y unir solo ese reconocimiento en otro
+navegador, sin reenviar contribuciones ni recuperar fotos o datos pendientes.
+El código **no está cifrado**: revela insignias, fechas y días de actividad a
+quien lo tenga. Su checksum detecta daños, no autentica a una persona ni valida
+que sus aportes sean reales. No es una contraseña. El esquema se valida y
+rechaza versiones, campos, fechas o tamaños no admitidos antes de guardar.
+Un código inválido no modifica la colección ni otros almacenes locales.
 
 ## Limitaciones conocidas
 

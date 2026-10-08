@@ -28,9 +28,10 @@ test('comparison renders the selected period without a ReferenceError', () => {
     selectedVisualMode: 'heatmap',
     aggregatePoints: (rows) => rows.map((row) => ({ lat: row.latitude, lng: row.longitude, db: row.db_level })),
     suspendMapHeatLayers() {},
+    COMMUNITY_ANIMATED_MARKER_LIMIT: 80, addCommunityNoiseMarker() {},
     normalizeDbForHeatmap: () => 0.6
   };
-  vm.runInNewContext(`${functionSource('features.js', 'activateComparisonLayer')}\nthis.run = activateComparisonLayer;`, context);
+  vm.runInNewContext(`${functionSource('community.js', 'captureCommunityInteraction')}\n${functionSource('community.js', 'restoreCommunityInteraction')}\n${functionSource('features.js', 'activateComparisonLayer')}\nthis.run = activateComparisonLayer;`, context);
   context.run();
   assert.equal(layers.length, 1);
   assert.deepEqual(Array.from(layers[0].points[0]), [8.75, -75.88, 0.6]);

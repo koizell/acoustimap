@@ -157,6 +157,61 @@ no constituye verificación independiente del acto reportado.
 El progreso previo se recalcula con estas reglas sin borrar los aportes locales;
 un reto completado repitiendo la misma zona puede volver a quedar pendiente.
 
+#### Reconocimiento sin cuentas
+
+En **Datos → Retos**, «Tu colección» reúne **12 insignias** y **5 niveles**:
+
+Las insignias aparecen como **medallas circulares de colores**. Al pasar el
+cursor o enfocarlas con el teclado, se muestra el nombre y una descripción
+breve con tipografía más pequeña. En celular se consulta tocando la medalla;
+otro toque, tocar fuera o Escape cierra el detalle. Las ganadas llevan ✓; las
+pendientes tienen borde discontinuo y ◇. Las animaciones respetan la preferencia
+de movimiento reducido. Las instrucciones largas están plegadas en «Cómo se ganan».
+
+| Recompensa | Puntos (una sola vez) |
+| --- | --- |
+| Cada uno de los cinco retos completados | 100 |
+| Primera aportación de medición / primer reporte | 25 cada uno |
+| Aportes en 10 zonas distintas durante 30 días / en 10 días distintos | 75 cada uno |
+| Rachas de 3 / 7 / 30 días consecutivos | 50 / 100 / 200 |
+
+Los niveles empiezan en **0, 100, 250, 500 y 900 puntos**. El catálogo actual
+permite ganar hasta **1.050 puntos**, sin premios repetidos por recargar o por
+importar una copia. Las insignias ya ganadas no caducan; el progreso de cada reto
+sigue usando aportes de los últimos 30 días. Se reconocen retroactivamente los
+logros que puedan comprobarse con el progreso local que aún exista, no los
+aportes antiguos que ya se hayan descartado.
+
+Una aportación válida guardada (también pendiente de conexión) marca un día
+activo en hora de **Colombia**, sin importar la hora del celular. Abrir la app
+o medir sin aportar no cuenta. La racha de ayer sigue activa durante el día
+actual; perder un día la reinicia, pero no retira insignias ni la mejor racha.
+El registro conserva hasta **400 días de actividad**, sin rutas ni coordenadas.
+
+No se reconoce el celular ni se usa una huella digital: se conserva información
+en **el mismo navegador y origen** con `localStorage`. El modo privado, otro
+navegador, borrar los datos del sitio o una expulsión del almacenamiento pueden
+perderla. Actualizar los recursos de la PWA no borra ese almacén. Localhost y la
+web pública son orígenes distintos: sus colecciones no se comparten solas.
+
+**Para cambiar de celular:** despliega «Conservar o recuperar mis logros», pulsa
+«Generar código de respaldo», cópialo y guárdalo fuera de la app. En el nuevo
+navegador pega el código y pulsa «Recuperar y unir logros». Se une a lo que ya
+exista sin duplicar puntos ni borrar preferencias o aportes pendientes.
+**Actualiza tu respaldo** cuando ganes más logros; una copia antigua no incluye
+los nuevos. No recupera mediciones, fotos ni la cola pendiente de envío.
+
+El código puede ser largo. Contiene insignias, fechas de logro, días de actividad
+y mejor racha, sin identidad, coordenadas ni audio. Es legible, no está cifrado
+y no es una contraseña ni una credencial. La suma de comprobación detecta daños
+de copia, **no certifica autenticidad**. Los logros son reconocimiento personal,
+no un ranking verificado ni recompensas canjeables. Nada de este sistema se
+envía a Supabase; no necesita migraciones SQL.
+
+Si no se puede guardar, aparece un aviso: los nuevos logros quedan solo en esa
+visita y pueden respaldarse antes de cerrar. Un almacén de reconocimiento
+dañado no se sobrescribe automáticamente: se recupera con un código válido.
+
 ---
 
 ## 📤 Exportar datos
@@ -262,15 +317,27 @@ Puedes contribuir en [GitHub](https://github.com/koizell/acoustimap) con mejoras
 
 ## 🛠️ Desarrollo local
 
+Herramienta opcional del desarrollador: [Codegraph MCP global en OpenCode](docs/CODEGRAPH_MCP.md).
+No forma parte de la app ni del artefacto público.
+
 Sirve el repositorio desde localhost para probar la interfaz; el micrófono y la geolocalización exigen un contexto seguro, así que no abras `index.html` por `file://`.
 
 ```sh
 npm ci --ignore-scripts   # instalación fijada, la misma que usa CI
 npm run check             # puerta obligatoria: sintaxis + pruebas
-npm run dev               # npx serve . -> http://localhost:3000
+npm run dev               # servidor Node local -> http://localhost:3000
 ```
 
 `js/config.local.js` está en `.gitignore`: créalo copiando `js/config.local.js.template` para poder abrir la interfaz sin backend. Con los placeholders de la plantilla el cliente Supabase no se crea y el mapa queda vacío, así que es normal que no aparezcan datos. `npm run build:config` lo genera a partir de `SUPABASE_URL` y `SUPABASE_ANON_KEY` y falla con código 1 si falta alguno.
+
+El build rechaza claves `sb_secret_` y JWT con un rol distinto de `anon`, antes
+de escribir la configuración o sustituir `dist/`. Es una protección contra
+exposición accidental, no una verificación de la firma o de las políticas RLS.
+Usa una clave **anon/publicable**, nunca `service_role`.
+
+`serve` permanece como dependencia histórica; el servidor actual no lo usa.
+Se fija su `compression` transitivo en 1.8.2 para corregir
+[GHSA-vc2v-76pw-4v95](https://github.com/advisories/GHSA-vc2v-76pw-4v95).
 
 ---
 
@@ -279,6 +346,9 @@ npm run dev               # npx serve . -> http://localhost:3000
 El flujo [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) publica la rama `main` en [koizell.github.io/acoustimap](https://koizell.github.io/acoustimap/). Necesita los secretos de Actions `SUPABASE_URL` y `SUPABASE_ANON_KEY` para generar `js/config.local.js` durante el build. Publicar **no** aplica migraciones ni despliega Edge Functions: son pasos manuales y en el orden de la sección siguiente. Aplica y verifica primero las migraciones; después publica el frontend.
 
 El service worker cambia de versión para renovar los recursos guardados. Si había una pestaña abierta antes del despliegue, recárgala: seguía usando los recursos anteriores.
+
+Revisión del candidato local v58 y límites de la auditoría:
+[AUDITORIA_PRE_DESPLIEGUE.md](docs/AUDITORIA_PRE_DESPLIEGUE.md).
 
 ---
 

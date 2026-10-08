@@ -48,6 +48,8 @@ test('mapa: una respuesta antigua no borra los datos de la consulta más recient
   });
   browser.load('config.js', 'community.js');
   const counter = { innerText: '' };
+  // La carrera de consultas no necesita emular los iconos de Leaflet.
+  browser.evaluate('addCommunityNoiseMarker = () => {}');
   browser.context.document.getElementById = (id) => id === 'community-count' ? counter : null;
   browser.evaluate('supabaseClient = client');
   const first = browser.evaluate('loadCommunityPoints()');
